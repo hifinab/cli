@@ -2,6 +2,8 @@
 
 Status: Draft
 
+Dependencies: `uv` on `PATH`; existing release installation.
+
 ## Goal
 
 Create predictable agent-driven repositories without requiring users to remember
@@ -19,6 +21,10 @@ hi init webapp [directory]
 
 When no directory is supplied, the target is the current working directory.
 Template names are reserved command arguments rather than project names.
+
+The `py` template is defined here. The `quant` and `webapp` variants extend this
+planner and safety contract and are specified separately in
+`hi_init_quant.md` and `hi_init_webapp.md`.
 
 ## Interactive helper
 
