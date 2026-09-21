@@ -8,20 +8,23 @@ predictable.
 
 ### `hi init`
 
-Create a default repository for agent-driven development.
+Start an interactive helper for creating an agent-driven repository. The wizard
+should ask for the template, target directory, and project name, then show the
+planned commands and files before writing anything.
 
-Initial shape:
+Initial template choices:
 
-- `README.md` for the project contract and entry points
-- `AGENTS.md` for repository-specific agent instructions
-- `docs/` for durable architecture and operational documentation
-- `specs/` for scoped feature specifications and acceptance criteria
-- `roadmap.md` for planned work and unresolved product decisions
-- A minimal `.gitignore` and initialized Git repository when needed
+```text
+py      Python project
+quant   Quantitative-research project
+webapp  Deterministic web application
+```
 
-The command should be safe to rerun, refuse to overwrite non-empty files, and
-print every file it creates. Before implementation, decide whether it targets
-the current directory only or accepts a separate project-directory argument.
+The equivalent non-interactive form is `hi init <template>`. Generated projects
+should include repository instructions, documentation, specifications, a
+roadmap, and starter agent/skill templates. The command must be safe to rerun,
+refuse to overwrite non-empty files, and print every command and file it
+creates.
 
 Generated repositories should record their template identity in
 `.hifin/template.json`:
@@ -43,6 +46,32 @@ hi init --upgrade  Apply a reviewed template migration
 ```
 
 Template upgrades must preserve user-owned files and refuse ambiguous merges.
+
+### `hi init py`
+
+Create the baseline Python template. It should run these commands in the target
+project root:
+
+```sh
+uv init
+uv venv
+```
+
+It should then add the Hifin project structure:
+
+```text
+source/
+tests/
+data/
+docs/
+docs/specs/
+docs/roadmap.md
+```
+
+The template should also provide the project README, `AGENTS.md`, `.gitignore`,
+and starter agent/skill templates. Empty generated directories need tracked
+placeholder files or purpose documentation so the repository retains its
+structure. The detailed contract is specified in `docs/specs/hi_init.md`.
 
 ### `hi init quant`
 
