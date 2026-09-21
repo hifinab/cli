@@ -1,6 +1,6 @@
 # `hi init` specification
 
-Status: Draft
+Status: Approved
 
 Dependencies: `uv` on `PATH`; existing release installation; a selected Hifin
 web stack before implementing the webapp template.

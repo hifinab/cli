@@ -1,6 +1,10 @@
 # `hi net` specification
 
-Status: Draft
+Status: In development
+
+Implementation progress: setup-key enrollment and the device-hostname prompt
+are released; hidden key input, `--setup-key-file`, and lifecycle subcommands
+are pending.
 
 Dependencies: NetBird CLI with `--setup-key-file`; existing hostname prompt.
 

@@ -1,6 +1,10 @@
 # `hi hostname` specification
 
-Status: Draft
+Status: In development
+
+Implementation progress: hostname prompting, validation, `hostnamectl`, and
+`/etc/hosts` updates exist in workstation installation; the standalone
+`hi hostname` command is pending.
 
 Dependencies: existing hostname validation and `/etc/hosts` update behavior.
 

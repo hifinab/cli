@@ -1,6 +1,6 @@
 # `hi login` specification
 
-Status: Draft
+Status: Approved
 
 Dependencies: GitHub CLI for GitHub login; OMP for provider login.
 

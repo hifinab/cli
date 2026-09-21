@@ -29,9 +29,9 @@ Implementation order for `hi`. Completed releases use `[x]`; planned work uses
 ### v0.5.0 — Security and diagnostics
 
 - [ ] Move NetBird setup keys out of shell history and process arguments.
-  See [hi_net.md](specs/hi_net.md).
+  See [hi_net.md](specs/approved/hi_net.md).
 - [ ] Add read-only machine diagnostics with human and JSON output.
-  See [hi_doctor.md](specs/hi_doctor.md).
+  See [hi_doctor.md](specs/ideas/hi_doctor.md).
 
 Dependency: shared machine-state checks established here are reused by later
 service, export, model-serving, and declarative commands.
@@ -39,9 +39,9 @@ service, export, model-serving, and declarative commands.
 ### v0.6.0 — Updates and authentication
 
 - [ ] Add atomic, checksummed self-updates.
-  See [hi_update.md](specs/hi_update.md).
+  See [hi_update.md](specs/approved/hi_update.md).
 - [ ] Delegate GitHub and OMP authentication to their native tools.
-  See [hi_login.md](specs/hi_login.md).
+  See [hi_login.md](specs/approved/hi_login.md).
 
 Dependencies: `hi update` relies on the existing release assets and checksum
 pipeline. Login requires the corresponding installed CLI.
@@ -49,7 +49,7 @@ pipeline. Login requires the corresponding installed CLI.
 ### v0.7.0 — Project bootstrap
 
 - [ ] Add the interactive `hi init` helper and deterministic Python template.
-  See [hi_init.md](specs/hi_init.md).
+  See [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: the Python template requires `uv` and establishes the metadata and
 safe-generation contract used by later templates.
@@ -57,9 +57,9 @@ safe-generation contract used by later templates.
 ### v0.8.0 — Specialized project templates
 
 - [ ] Add the quantitative-research template.
-  See [hi_init.md](specs/hi_init.md).
+  See [hi_init.md](specs/approved/hi_init.md).
 - [ ] Add the deterministic web-application template.
-  See [hi_init.md](specs/hi_init.md).
+  See [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: both templates extend the v0.7.0 planner, conflict detection,
 metadata, agent instructions, and documentation structure.
@@ -69,9 +69,9 @@ metadata, agent instructions, and documentation structure.
 - [ ] Add a compact managed-service status view.
   See [hi_services.md](specs/ideas/hi_services.md).
 - [ ] Read and change the machine hostname independently of installation.
-  See [hi_hostname.md](specs/hi_hostname.md).
+  See [hi_hostname.md](specs/approved/hi_hostname.md).
 - [ ] Add explicit account-creation profiles.
-  See [hi_adduser_profiles.md](specs/hi_adduser_profiles.md).
+  See [hi_adduser_profiles.md](specs/approved/hi_adduser_profiles.md).
 - [ ] Export a redacted machine diagnostic bundle.
   See [hi_export.md](specs/ideas/hi_export.md).
 
@@ -92,7 +92,7 @@ machine detectors.
 
 - [ ] Detect AMD, NVIDIA, and supported CPU serving profiles.
 - [ ] Pull, serve, inspect, log, and stop validated model containers.
-  See [hi_model.md](specs/hi_model.md).
+  See [hi_model.md](specs/ideas/hi_model.md).
 
 Dependencies: model serving requires doctor-grade hardware detection, Docker or
 Podman, service lifecycle behavior, and a small validated recipe catalog.

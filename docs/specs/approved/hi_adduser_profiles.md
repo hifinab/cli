@@ -1,6 +1,10 @@
 # `hi adduser` profiles specification
 
-Status: Draft
+Status: In development
+
+Implementation progress: the base `hi adduser <name>` flow and render/video
+group assignment are released; profile flags and profile-specific behavior are
+pending.
 
 Dependencies: existing `hi adduser <name>` behavior and Ubuntu group management.
 

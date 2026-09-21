@@ -1,6 +1,6 @@
 # `hi update` specification
 
-Status: Draft
+Status: Approved
 
 Dependencies: GitHub release assets and published SHA-256 checksums.
 
