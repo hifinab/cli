@@ -211,19 +211,6 @@ material, cookies, and browser data.
 
 ## Agent-driven repository workflows
 
-### `hi task`
-
-Create a feature specification under `specs/`:
-
-```text
-hi task "Add portfolio risk limits"
-```
-
-The generated document should contain the goal, user-visible behavior,
-constraints, acceptance criteria, risks, and verification plan. Branch or
-worktree creation can be added later as an explicit option, not as an automatic
-side effect.
-
 ### `hi repo doctor`
 
 Inspect an initialized repository for template drift and broken project
@@ -412,7 +399,7 @@ manager or provider plug-in system before repeated use demonstrates the need.
 6. Select the web stack and add `hi init webapp`.
 7. Add GitHub-backed `hi login`, then OMP provider discovery and delegated
    login.
-8. Add repository workflows: `hi task`, `hi repo doctor`, and `hi context`.
+8. Add repository workflows: `hi repo doctor` and `hi context`.
 9. Add focused machine commands such as `hi services`, `hi hostname`, user
    profiles, and redacted exports.
 10. Add hardware detection and a small validated set of AMD and NVIDIA model
