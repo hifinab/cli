@@ -12,7 +12,7 @@ Make repeatable account roles explicit without silently granting privileges.
 
 ```text
 hi adduser <name>
-hi adduser <name> --developer
+hi adduser <name> --dev
 hi adduser <name> --admin
 ```
 

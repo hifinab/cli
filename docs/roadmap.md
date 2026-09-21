@@ -67,13 +67,13 @@ metadata, agent instructions, and documentation structure.
 ### v0.9.0 — Focused machine operations
 
 - [ ] Add a compact managed-service status view.
-  See [hi_services.md](specs/hi_services.md).
+  See [hi_services.md](specs/ideas/hi_services.md).
 - [ ] Read and change the machine hostname independently of installation.
   See [hi_hostname.md](specs/hi_hostname.md).
 - [ ] Add explicit account-creation profiles.
   See [hi_adduser_profiles.md](specs/hi_adduser_profiles.md).
 - [ ] Export a redacted machine diagnostic bundle.
-  See [hi_export.md](specs/hi_export.md).
+  See [hi_export.md](specs/ideas/hi_export.md).
 
 Dependency: service status and export reuse the v0.5.0 doctor detectors rather
 than defining health twice.
@@ -81,9 +81,9 @@ than defining health twice.
 ### v0.10.0 — Repository intelligence
 
 - [ ] Detect template drift and broken repository contracts.
-  See [hi_repo_doctor.md](specs/hi_repo_doctor.md).
+  See [hi_repo_doctor.md](specs/ideas/hi_repo_doctor.md).
 - [ ] Produce concise, redacted machine and repository context.
-  See [hi_context.md](specs/hi_context.md).
+  See [hi_context.md](specs/ideas/hi_context.md).
 
 Dependencies: these commands consume v0.7.0 template metadata and v0.5.0
 machine detectors.
@@ -100,7 +100,7 @@ Podman, service lifecycle behavior, and a small validated recipe catalog.
 ### v1.0.0 — Declarative machine state
 
 - [ ] Preview and converge a versioned `hi.yaml` with `hi apply`.
-  See [hi_apply.md](specs/hi_apply.md).
+  See [hi_apply.md](specs/ideas/hi_apply.md).
 
 Dependencies: `hi apply` is last because it composes proven detectors and
 independently usable mutation commands. It must not hide imperative scripts
