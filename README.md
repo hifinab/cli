@@ -56,9 +56,17 @@ setup key:
 hi net "$NETBIRD_SETUP_KEY"
 ```
 
-This delegates to `netbird up --setup-key "$NETBIRD_SETUP_KEY"` with the
-terminal attached. `hi` does not print or store the setup key. Running the
-command without NetBird installed reports that `hi install` is required.
+`hi` explains that this name becomes the NetBird device hostname, then prompts
+with the machine's current hostname as the default. Press Enter to accept it or
+enter a different valid hostname. The command then delegates to:
+
+```sh
+netbird up --setup-key "$NETBIRD_SETUP_KEY" --hostname "$DEVICE_HOSTNAME"
+```
+
+The terminal remains attached, and `hi` does not print or store the setup key.
+Running the command without NetBird installed reports that `hi install` is
+required.
 
 ## Workstation setup
 
