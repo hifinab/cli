@@ -25,17 +25,19 @@ and adds `~/.local/bin` to `PATH` in `~/.profile` when needed. Set
 
 ```text
 hi adduser <name>  Create a user with render and video access
-hi install strix   Set up an Ubuntu 26.04 Strix Halo workstation
+hi install         Install general workstation software
+hi install strix   Install software and Strix Halo hardware support
 hi verify strix    Check an installed Strix Halo workstation
 hi version         Print the installed version
 hi help            Show help
 ```
 
-`hi install strix` first offers to change the current hostname; pressing Enter
-keeps it unchanged. The setup then asks for `sudo` once before system changes.
-A logout is required afterward for group and `PATH` changes.
+`hi install` first offers to change the current hostname; pressing Enter keeps
+it unchanged. It then asks for `sudo` once before installing the general
+workstation software. Open a new shell afterward to apply `PATH` changes.
 
-Installation ends with a local report covering packages, commands, services,
+`hi install strix` installs the same software plus the Strix Halo hardware
+support. It ends with a local report covering packages, commands, services,
 group membership, GPU devices, and ROCm detection. No report data is uploaded.
 Checks that require the new login session are marked pending; after reboot, run
 `hi verify strix` for the final hardware report.
@@ -44,19 +46,25 @@ Checks that require the new login session are marked pending; after reboot, run
 to the `render` and `video` groups. Usernames must follow Ubuntu's conventional
 lowercase format and may contain digits, hyphens, and underscores.
 
-## Strix Halo setup
+## Workstation setup
 
-The Strix profile requires Ubuntu 26.04 on amd64 and targets AMD's `gfx1151`
-packages. It installs:
+Both installation profiles currently require Ubuntu 26.04. `hi install`
+installs:
 
-- AMD ROCm 10
-- uv, pipx, and amd-debug-tools
+- uv and pipx
 - Node.js and npm
 - GitHub CLI
 - Docker Engine and Docker Compose
 - NetBird, OMP, btop, and tmux
+- Available Ubuntu package upgrades
 
-The setup updates Ubuntu packages with `apt upgrade -y` and requires a reboot.
+`hi install strix` installs everything above and adds:
+
+- AMD ROCm 10 for `gfx1151`
+- amd-debug-tools
+- `render` and `video` group membership
+
+The Strix profile requires amd64 and a reboot.
 It has been exercised on a physical AMD Ryzen AI Max+ 395 machine with Radeon
 8060S graphics; the final report detected the GPU through both `amd-smi` and
 `rocminfo`.

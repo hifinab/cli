@@ -13,8 +13,8 @@ import (
 
 var version = "dev"
 
-//go:embed scripts/strixhalo.sh
-var strixSetup []byte
+//go:embed scripts/install.sh
+var setupScript []byte
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -44,11 +44,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return 0
 	case "install":
-		if len(args) != 2 || args[1] != "strix" {
-			fmt.Fprintln(stderr, "usage: hi install strix")
+		strix := len(args) == 2 && args[1] == "strix"
+		if len(args) > 2 || (len(args) == 2 && !strix) {
+			fmt.Fprintln(stderr, "usage: hi install [strix]")
 			return 2
 		}
-		if err := installStrix(stdin, stdout, stderr); err != nil {
+		if err := installWorkstation(stdin, stdout, stderr, strix); err != nil {
 			fmt.Fprintf(stderr, "hi: %v\n", err)
 			return 1
 		}
@@ -74,15 +75,16 @@ func printUsage(w io.Writer) {
 
 Usage:
   hi adduser <name>   Create a user with render and video access
-  hi install strix   Set up an Ubuntu Strix Halo workstation
-  hi verify strix    Check an installed Strix Halo workstation
-  hi version         Print the installed version
-  hi help            Show this help`)
+  hi install          Install general workstation software
+  hi install strix    Install software and Strix Halo hardware support
+  hi verify strix     Check an installed Strix Halo workstation
+  hi version          Print the installed version
+  hi help             Show this help`)
 }
 
-func installStrix(stdin io.Reader, stdout, stderr io.Writer) error {
+func installWorkstation(stdin io.Reader, stdout, stderr io.Writer, strix bool) error {
 	if runtime.GOOS != "linux" {
-		return errors.New("the Strix installer supports Linux only")
+		return errors.New("the installer supports Linux only")
 	}
 	if os.Geteuid() == 0 {
 		return errors.New("run this command as your regular user; it uses sudo when needed")
@@ -101,7 +103,7 @@ func installStrix(stdin io.Reader, stdout, stderr io.Writer) error {
 		return errors.New("bash is required")
 	}
 
-	script, err := os.CreateTemp("", "hi-strix-*.sh")
+	script, err := os.CreateTemp("", "hi-install-*.sh")
 	if err != nil {
 		return fmt.Errorf("create temporary setup script: %w", err)
 	}
@@ -112,7 +114,7 @@ func installStrix(stdin io.Reader, stdout, stderr io.Writer) error {
 		script.Close()
 		return fmt.Errorf("secure temporary setup script: %w", err)
 	}
-	if _, err := script.Write(strixSetup); err != nil {
+	if _, err := script.Write(setupScript); err != nil {
 		script.Close()
 		return fmt.Errorf("write temporary setup script: %w", err)
 	}
@@ -120,20 +122,26 @@ func installStrix(stdin io.Reader, stdout, stderr io.Writer) error {
 		return fmt.Errorf("close temporary setup script: %w", err)
 	}
 
-	cmd := exec.Command(bash, path, requestedHostname)
+	profile := "standard"
+	if strix {
+		profile = "strix"
+	}
+	cmd := exec.Command(bash, path, profile, requestedHostname)
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			return fmt.Errorf("Strix setup failed with exit code %d", exitErr.ExitCode())
+			return fmt.Errorf("%s setup failed with exit code %d", profile, exitErr.ExitCode())
 		}
-		return fmt.Errorf("start Strix setup: %w", err)
+		return fmt.Errorf("start %s setup: %w", profile, err)
 	}
-	result := verifyStrix(stdout)
-	if result.failures > 0 {
-		return fmt.Errorf("installation completed with %d failed report check(s)", result.failures)
+	if strix {
+		result := verifyStrix(stdout)
+		if result.failures > 0 {
+			return fmt.Errorf("installation completed with %d failed report check(s)", result.failures)
+		}
 	}
 	return nil
 }

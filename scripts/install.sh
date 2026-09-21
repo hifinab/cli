@@ -10,6 +10,13 @@ fail() {
   exit 1
 }
 
+profile="${1:-standard}"
+requested_hostname="${2:-}"
+case "$profile" in
+  standard | strix) ;;
+  *) fail "unknown installation profile: $profile" ;;
+esac
+
 valid_hostname() {
   local hostname="$1"
   local label
@@ -29,14 +36,15 @@ valid_hostname() {
 
 # shellcheck disable=SC1091
 source /etc/os-release
-[[ "${ID:-}" == "ubuntu" ]] || fail "the Strix setup supports Ubuntu only"
-[[ "${VERSION_ID:-}" == "26.04" ]] || fail "the Strix setup currently requires Ubuntu 26.04"
-[[ "$(dpkg --print-architecture)" == "amd64" ]] || fail "the Strix setup requires amd64"
+[[ "${ID:-}" == "ubuntu" ]] || fail "the installer supports Ubuntu only"
+[[ "${VERSION_ID:-}" == "26.04" ]] || fail "the installer currently requires Ubuntu 26.04"
+if [[ "$profile" == "strix" ]]; then
+  [[ "$(dpkg --print-architecture)" == "amd64" ]] || fail "the Strix setup requires amd64"
+fi
 command -v sudo >/dev/null || fail "sudo is required"
 
 target_user="$(id -un)"
 current_hostname="$(hostname)"
-requested_hostname="${1:-}"
 if [[ -n "$requested_hostname" ]]; then
   valid_hostname "$requested_hostname" ||
     fail "invalid hostname: $requested_hostname"
@@ -86,15 +94,17 @@ fi
 
 log "Installing base packages"
 sudo apt-get update
-apt_install ca-certificates curl wget gnupg libatomic1 libquadmath0
-sudo usermod -a -G render,video "$target_user"
+apt_install ca-certificates curl wget gnupg
 sudo install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d
 
-log "Configuring AMD ROCm"
-curl -fsSL https://stable.repo.amd.com/rocm/gpg/packages.gpg -o "$tmp_dir/amdrocm.gpg"
-gpg --batch --yes --dearmor --output "$tmp_dir/amdrocm-keyring.gpg" "$tmp_dir/amdrocm.gpg"
-sudo install -m 0644 "$tmp_dir/amdrocm-keyring.gpg" /etc/apt/keyrings/amdrocm.gpg
-sudo tee /etc/apt/sources.list.d/amdrocm-stable.sources >/dev/null <<'EOF'
+if [[ "$profile" == "strix" ]]; then
+  log "Configuring AMD ROCm"
+  sudo usermod -a -G render,video "$target_user"
+  apt_install libatomic1 libquadmath0
+  curl -fsSL https://stable.repo.amd.com/rocm/gpg/packages.gpg -o "$tmp_dir/amdrocm.gpg"
+  gpg --batch --yes --dearmor --output "$tmp_dir/amdrocm-keyring.gpg" "$tmp_dir/amdrocm.gpg"
+  sudo install -m 0644 "$tmp_dir/amdrocm-keyring.gpg" /etc/apt/keyrings/amdrocm.gpg
+  sudo tee /etc/apt/sources.list.d/amdrocm-stable.sources >/dev/null <<'EOF'
 X-Repo-Id: amdrocm-stable
 Types: deb
 URIs: https://stable.repo.amd.com/rocm/core/packages/ubuntu2604/
@@ -104,13 +114,16 @@ Architectures: amd64
 Signed-By: /etc/apt/keyrings/amdrocm.gpg
 Enabled: yes
 EOF
-sudo apt-get update
-apt_install amdrocm10.0-gfx1151
+  sudo apt-get update
+  apt_install amdrocm10.0-gfx1151
+fi
 
 log "Installing workstation tools"
 apt_install python3-setuptools python3-wheel pipx btop wtmpdb tmux nodejs npm
 pipx ensurepath
-pipx install --force amd-debug-tools
+if [[ "$profile" == "strix" ]]; then
+  pipx install --force amd-debug-tools
+fi
 curl -LsSf https://astral.sh/uv/install.sh | sh
 curl -fsSL https://pkgs.netbird.io/install.sh | sh
 curl -fsSL https://omp.sh/install | sh
@@ -143,4 +156,8 @@ apt_install gh docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker
 log "Upgrading Ubuntu packages"
 sudo env DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 
-printf '\nStrix setup complete. Log out and back in to apply render/video group membership and PATH changes.\n'
+if [[ "$profile" == "strix" ]]; then
+  printf '\nStrix setup complete. Log out and back in to apply render/video group membership and PATH changes.\n'
+else
+  printf '\nWorkstation software installation complete. Open a new shell to apply PATH changes.\n'
+fi
