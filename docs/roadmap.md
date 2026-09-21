@@ -57,9 +57,9 @@ safe-generation contract used by later templates.
 ### v0.8.0 — Specialized project templates
 
 - [ ] Add the quantitative-research template.
-  See [hi_init_quant.md](specs/hi_init_quant.md).
+  See [hi_init.md](specs/hi_init.md).
 - [ ] Add the deterministic web-application template.
-  See [hi_init_webapp.md](specs/hi_init_webapp.md).
+  See [hi_init.md](specs/hi_init.md).
 
 Dependency: both templates extend the v0.7.0 planner, conflict detection,
 metadata, agent instructions, and documentation structure.

@@ -2,7 +2,8 @@
 
 Status: Draft
 
-Dependencies: `uv` on `PATH`; existing release installation.
+Dependencies: `uv` on `PATH`; existing release installation; a selected Hifin
+web stack before implementing the webapp template.
 
 ## Goal
 
@@ -22,9 +23,8 @@ hi init webapp [directory]
 When no directory is supplied, the target is the current working directory.
 Template names are reserved command arguments rather than project names.
 
-The `py` template is defined here. The `quant` and `webapp` variants extend this
-planner and safety contract and are specified separately in
-`hi_init_quant.md` and `hi_init_webapp.md`.
+The `py`, `quant`, and `webapp` templates are defined here and share the same
+planner, conflict detection, metadata, and safety contract.
 
 ## Interactive helper
 
@@ -139,13 +139,96 @@ that claim capabilities they do not implement.
 completed milestones. It describes the generated project, not the `hi` CLI
 roadmap.
 
+## Quantitative-research template
+
+`hi init quant [directory]` extends the Python template with a reproducible
+research and backtesting layout:
+
+```text
+research/       Exploration and notebooks
+backtests/      Strategy and evaluation entry points
+source/         Reusable production logic
+source/data/    Market-data provider adapters
+source/brokers/ Broker/execution adapters
+tests/          Deterministic behavioral tests
+data/           Untracked local datasets
+docs/specs/     Research and feature specifications
+docs/roadmap.md Planned research and engineering milestones
+```
+
+Tracked purpose files preserve empty directories. Dataset, result, notebook
+checkpoint, cache, and credential paths are ignored by default.
+
+Use `uv` for the project, virtual environment, dependency resolution, and lock
+file. The recipe must pin one primary backtesting framework. Candidates are
+Backtesting.py, Backtrader, vectorbt, and LEAN; implementation must choose and
+document one before generating dependencies. Optional adapters are explicit
+additions rather than default duplicates.
+
+The baseline includes tabular storage/query tools, notebook support, and a test
+runner only when each has a defined repository role. Provider SDKs and broker
+credentials are never generated speculatively.
+
+Experiments record configuration, random seeds, input dataset identity, time
+range, fees, slippage, and result metadata. Notebook cells may explore ideas,
+but reusable strategy, data, and evaluation logic belongs under `source/`.
+
+### Quant acceptance criteria
+
+1. Direct and wizard invocation generate identical plans.
+2. The result includes the Python template and quant-specific structure.
+3. `uv` produces a locked environment with one documented backtesting stack.
+4. A generated example runs a deterministic backtest without network access.
+5. Data, results, credentials, and notebook checkpoints are ignored.
+
+## Web-application template
+
+`hi init webapp [directory]` creates one deterministic, production-capable web
+application recipe instead of an interactive matrix of frameworks.
+
+Before implementation, choose and document exactly one supported combination
+for:
+
+- Server runtime and framework
+- Frontend runtime and framework, if separate
+- Package manager and lockfile
+- Database and migration tool
+- Formatter, linter, type checker, and test runner
+- Local container composition and production image
+- CI commands and deployment artifact
+
+Every runtime, image, action, and dependency family is pinned or locked. The
+template does not ask users to choose stack alternatives during generation.
+
+The generated repository includes application source, tests, migrations,
+operational documentation, specifications, agent instructions, environment
+examples, and standard template metadata. It defines deterministic commands for
+development, formatting, linting, type checking, testing, database migration,
+production build, and container startup. A fresh clone requires no undocumented
+global tools beyond those named by the recipe.
+
+Commit a `.env.example` containing names and safe example values only. Never
+generate live credentials. Development defaults bind locally unless explicitly
+changed. Production configuration fails closed when required secrets are absent.
+Initialization does not start services or apply migrations implicitly.
+
+### Webapp acceptance criteria
+
+1. Direct and wizard invocation generate identical plans.
+2. A fresh generated project installs from committed lockfiles.
+3. Documented format, lint, type-check, test, build, and migration commands run.
+4. The production container starts the built application and exposes a health
+   endpoint.
+5. Generated files contain no credential or machine-specific absolute path.
+
 ## Safety and reruns
 
 - Resolve and normalize the target before presenting the plan.
 - Never delete existing content.
 - Never overwrite a non-empty file.
-- If every planned file already matches and the `uv` project and `.venv` exist,
-  report that the template is already initialized and exit successfully.
+- If every planned file already matches and the template prerequisites exist,
+  report that the template is already initialized and exit successfully. For
+  `py` and `quant`, those prerequisites include the `uv` project and `.venv`.
 - If existing output differs, report every conflicting path and exit before
   mutation.
 - Temporary files must be created inside the target and renamed atomically.
@@ -159,7 +242,7 @@ Successful initialization ends with:
 - Template and target directory
 - Commands executed
 - Files and directories created
-- Virtual environment path
+- Runtime environment or dependency-install path, when applicable
 - The next commands required to enter the environment and begin work
 
 No analytics or repository contents are uploaded.
