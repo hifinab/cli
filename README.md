@@ -47,9 +47,18 @@ Checks that require the new login session are marked pending; after reboot, run
 to the `render` and `video` groups. Usernames must follow Ubuntu's conventional
 lowercase format and may contain digits, hyphens, and underscores.
 
-`hi net <setup-key>` runs `netbird up --setup-key <setup-key>` with the
-terminal attached. `hi` does not store the setup key. Install NetBird first
-with `hi install`.
+## NetBird
+
+After installing the workstation software, connect the machine with a NetBird
+setup key:
+
+```sh
+hi net "$NETBIRD_SETUP_KEY"
+```
+
+This delegates to `netbird up --setup-key "$NETBIRD_SETUP_KEY"` with the
+terminal attached. `hi` does not print or store the setup key. Running the
+command without NetBird installed reports that `hi install` is required.
 
 ## Workstation setup
 
