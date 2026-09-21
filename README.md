@@ -27,6 +27,7 @@ and adds `~/.local/bin` to `PATH` in `~/.profile` when needed. Set
 hi adduser <name>  Create a user with render and video access
 hi install         Install general workstation software
 hi install strix   Install software and Strix Halo hardware support
+hi net <setup-key>  Connect this machine to NetBird
 hi verify strix    Check an installed Strix Halo workstation
 hi version         Print the installed version
 hi help            Show help
@@ -45,6 +46,10 @@ Checks that require the new login session are marked pending; after reboot, run
 `hi adduser <name>` runs Ubuntu's interactive `adduser`, then adds the new user
 to the `render` and `video` groups. Usernames must follow Ubuntu's conventional
 lowercase format and may contain digits, hyphens, and underscores.
+
+`hi net <setup-key>` runs `netbird up --setup-key <setup-key>` with the
+terminal attached. `hi` does not store the setup key. Install NetBird first
+with `hi install`.
 
 ## Workstation setup
 

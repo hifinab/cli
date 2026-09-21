@@ -54,6 +54,16 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
+	case "net":
+		if len(args) != 2 || args[1] == "" {
+			fmt.Fprintln(stderr, "usage: hi net <setup-key>")
+			return 2
+		}
+		if err := connectNetBird(args[1], stdin, stdout, stderr); err != nil {
+			fmt.Fprintf(stderr, "hi: %v\n", err)
+			return 1
+		}
+		return 0
 	case "verify":
 		if len(args) != 2 || args[1] != "strix" {
 			fmt.Fprintln(stderr, "usage: hi verify strix")
@@ -77,6 +87,7 @@ Usage:
   hi adduser <name>   Create a user with render and video access
   hi install          Install general workstation software
   hi install strix    Install software and Strix Halo hardware support
+  hi net <setup-key>  Connect this machine to NetBird
   hi verify strix     Check an installed Strix Halo workstation
   hi version          Print the installed version
   hi help             Show this help`)
