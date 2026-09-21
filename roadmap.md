@@ -252,6 +252,105 @@ Include the operating system, architecture, repository template, runtime
 versions, Git branch and remote, available tools, service state, and hardware
 profile. Never include tokens, keys, cookies, or credential paths.
 
+## Local model serving
+
+### `hi model`
+
+Provide one hardware-aware control plane for downloading and serving local
+models in containers:
+
+```text
+hi model detect
+hi model list
+hi model pull <recipe>
+hi model serve <recipe>
+hi model status
+hi model logs
+hi model stop
+```
+
+`hi model detect` should report the processor, GPU vendor and devices, usable
+GPU or unified memory, driver stack, container engine, and compatible serving
+profiles. Detection must be evidence-based:
+
+- AMD Strix Halo: identify `gfx1151`, `/dev/kfd`, `/dev/dri`, ROCm or Vulkan,
+  render/video access, and available unified memory.
+- NVIDIA: query `nvidia-smi`, driver and CUDA compatibility, and NVIDIA
+  Container Toolkit or CDI availability.
+- CPU: expose an explicit fallback only for engines and model sizes that can run
+  meaningfully without a GPU.
+
+Do not build one supposedly universal GPU image. AMD ROCm/Vulkan and NVIDIA
+CUDA require different runtime libraries, device mappings, launch flags, and
+validated model recipes. `hi` should select a platform-specific image while
+presenting the same lifecycle and API contract.
+
+#### AMD profiles
+
+Evaluate reusing or delegating to the maintained
+[Strix Halo AI Toolboxes](https://strix-halo-toolboxes.com/) for llama.cpp,
+vLLM, ComfyUI, and fine-tuning. Their images already encode the `gfx1151`
+patches and launch requirements that should not be duplicated casually.
+
+[AI Toolbox Cockpit](https://github.com/kyuz0/ai-toolbox-cockpit) already
+manages compatible Toolbx, Distrobox, Podman, and Docker environments across
+multiple hardware families. Prefer integration with its catalog or command
+builders over maintaining a divergent copy of every model and container
+recipe.
+
+AMD containers may require `/dev/kfd`, `/dev/dri`, render/video groups,
+relaxed seccomp, host IPC, persistent Hugging Face and compilation caches, and
+Strix-specific flags such as flash attention and no-mmap. Each recipe must own
+those details rather than applying generic defaults to every backend.
+
+#### NVIDIA profiles
+
+Use separate CUDA images and the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+instead of attempting to run ROCm images on NVIDIA devices. Docker profiles
+should use the configured NVIDIA runtime and GPU requests; Podman profiles
+should prefer NVIDIA's documented CDI path. Validate the host driver against
+the image's CUDA requirement before pulling or starting a server.
+
+Initial NVIDIA backends should use maintained upstream vLLM or llama.cpp CUDA
+images pinned by digest. Hardware-specific defaults such as tensor parallelism,
+quantization support, context size, and attention implementation belong in
+versioned recipes.
+
+#### Recipe and API contract
+
+A recipe should identify:
+
+- Model repository, revision, files, quantization, and expected storage
+- Serving engine and hardware-specific image digest
+- Supported platforms and minimum usable memory
+- Context, concurrency, tensor parallelism, and backend-specific launch flags
+- Persistent model and compilation-cache mounts
+- API protocol, model name, bind address, port, and health check
+
+Prefer an OpenAI-compatible endpoint for text-generation engines where the
+backend supports it, without pretending that llama.cpp, vLLM, ComfyUI, and
+fine-tuning jobs have interchangeable semantics.
+
+Models and caches should live in XDG data/cache directories on the host and be
+mounted into disposable containers. Pulling a new image must not delete model
+weights or compiled caches. `hi model serve` should print the selected hardware
+profile, image digest, mounts, generated command, endpoint, and health result.
+
+#### Security and lifecycle
+
+- Bind to `127.0.0.1` by default; external or NetBird exposure must be explicit.
+- Keep API keys in protected files or environment references, never recipe
+  files or command previews.
+- Mount model weights read-only when the backend permits it.
+- Never mount the Docker socket into a serving container.
+- Pin production images by digest and show when a newer validated recipe exists.
+- Support `--dry-run` before pulling images or starting containers.
+- Use deterministic container names, health checks, logs, stop, and replacement
+  behavior so interrupted runs remain recoverable.
+- Treat distributed inference, RDMA, automatic model selection, and public
+  ingress as later capabilities requiring separate validation.
+
 ## Declarative machine state
 
 ### `hi apply`
@@ -316,5 +415,7 @@ manager or provider plug-in system before repeated use demonstrates the need.
 8. Add repository workflows: `hi task`, `hi repo doctor`, and `hi context`.
 9. Add focused machine commands such as `hi services`, `hi hostname`, user
    profiles, and redacted exports.
-10. Specify and implement `hi apply` only after its detectors and component
+10. Add hardware detection and a small validated set of AMD and NVIDIA model
+    serving recipes before expanding the catalog.
+11. Specify and implement `hi apply` only after its detectors and component
     operations are independently reliable.
