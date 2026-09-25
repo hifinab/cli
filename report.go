@@ -47,7 +47,7 @@ func verifyStrix(w io.Writer) reportResult {
 	}
 
 	for _, tool := range []string{
-		"gh", "docker", "uv", "pipx", "btop", "tmux", "node", "npm", "omp", "netbird", "amd-smi", "rocminfo",
+		"gh", "docker", "uv", "pipx", "btop", "tmux", "node", "npm", "omp", "claude", "codex", "herdr", "netbird", "amd-smi", "rocminfo",
 	} {
 		checks = append(checks, check("Command available: "+tool, toolAvailable(tool)))
 	}

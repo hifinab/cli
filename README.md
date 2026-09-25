@@ -91,6 +91,7 @@ installs:
 - Node.js and npm
 - GitHub CLI
 - Docker Engine and Docker Compose
+- Claude Code, Codex CLI, and herdr
 - NetBird, OMP, btop, and tmux
 - Available Ubuntu package upgrades
 
