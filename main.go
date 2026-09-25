@@ -55,11 +55,19 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return 0
 	case "net":
-		if len(args) != 2 || args[1] == "" {
-			fmt.Fprintln(stderr, "usage: hi net <setup-key>")
+		var err error
+		switch {
+		case len(args) == 1:
+			err = connectNetBird("", stdin, stdout, stderr)
+		case len(args) == 2 && (args[1] == "status" || args[1] == "down" || args[1] == "reconnect"):
+			err = runNetBirdLifecycle(args[1], stdin, stdout, stderr)
+		case len(args) == 3 && args[1] == "--setup-key-file" && args[2] != "":
+			err = connectNetBird(args[2], stdin, stdout, stderr)
+		default:
+			printNetUsage(stderr)
 			return 2
 		}
-		if err := connectNetBird(args[1], stdin, stdout, stderr); err != nil {
+		if err != nil {
 			fmt.Fprintf(stderr, "hi: %v\n", err)
 			return 1
 		}
@@ -84,13 +92,25 @@ func printUsage(w io.Writer) {
 	fmt.Fprintln(w, `hi prepares Hifin development machines and projects.
 
 Usage:
-  hi adduser <name>   Create a user with render and video access
-  hi install          Install general workstation software
-  hi install strix    Install software and Strix Halo hardware support
-  hi net <setup-key>  Connect this machine to NetBird
-  hi verify strix     Check an installed Strix Halo workstation
-  hi version          Print the installed version
-  hi help             Show this help`)
+  hi adduser <name>             Create a user with render and video access
+  hi install                    Install general workstation software
+  hi install strix              Install software and Strix Halo hardware support
+  hi net                        Securely enroll this machine with NetBird
+  hi net status                 Show NetBird connection status
+  hi net down                   Disconnect NetBird
+  hi net reconnect              Reconnect an enrolled NetBird peer
+  hi verify strix               Check an installed Strix Halo workstation
+  hi version                    Print the installed version
+  hi help                       Show this help`)
+}
+
+func printNetUsage(w io.Writer) {
+	fmt.Fprintln(w, `usage:
+  hi net
+  hi net --setup-key-file <path>
+  hi net status
+  hi net down
+  hi net reconnect`)
 }
 
 func installWorkstation(stdin io.Reader, stdout, stderr io.Writer, strix bool) error {

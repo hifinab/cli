@@ -27,7 +27,10 @@ and adds `~/.local/bin` to `PATH` in `~/.profile` when needed. Set
 hi adduser <name>  Create a user with render and video access
 hi install         Install general workstation software
 hi install strix   Install software and Strix Halo hardware support
-hi net <setup-key>  Connect this machine to NetBird
+hi net             Securely enroll this machine with NetBird
+hi net status      Show NetBird connection status
+hi net down        Disconnect NetBird
+hi net reconnect   Reconnect an enrolled NetBird peer
 hi verify strix    Check an installed Strix Halo workstation
 hi version         Print the installed version
 hi help            Show help
@@ -49,23 +52,34 @@ lowercase format and may contain digits, hyphens, and underscores.
 
 ## NetBird
 
-After installing the workstation software, connect the machine with a NetBird
-setup key:
+After installing the workstation software, run `hi net`. It reads the setup key
+from a no-echo terminal prompt, then explains that the next prompt controls the
+NetBird device hostname. Press Enter to accept the machine hostname or enter a
+different valid hostname.
+
+`hi` writes the key to a temporary `0600` file and delegates to:
 
 ```sh
-hi net "$NETBIRD_SETUP_KEY"
+netbird up --setup-key-file "$TEMPORARY_KEY_FILE" --hostname "$DEVICE_HOSTNAME"
 ```
 
-`hi` explains that this name becomes the NetBird device hostname, then prompts
-with the machine's current hostname as the default. Press Enter to accept it or
-enter a different valid hostname. The command then delegates to:
+The temporary file is removed after success, failure, or interruption. The key
+is never placed in process arguments or command output. The old
+`hi net <setup-key>` form is intentionally rejected.
+
+For automation, provide either a protected file or an environment value:
 
 ```sh
-netbird up --setup-key "$NETBIRD_SETUP_KEY" --hostname "$DEVICE_HOSTNAME"
+chmod 600 "$NETBIRD_SETUP_KEY_FILE"
+hi net --setup-key-file "$NETBIRD_SETUP_KEY_FILE"
+
+HI_NETBIRD_SETUP_KEY="$NETBIRD_SETUP_KEY" hi net
 ```
 
-The terminal remains attached, and `hi` does not print or store the setup key.
-Running the command without NetBird installed reports that `hi install` is
+`hi net status` preserves `netbird status` output. `hi net down` disconnects
+the peer. `hi net reconnect` runs `netbird down` followed by `netbird up`,
+reusing the peer's stored enrollment without requesting another setup key.
+Running any command without NetBird installed reports that `hi install` is
 required.
 
 ## Workstation setup

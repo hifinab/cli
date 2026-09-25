@@ -3,6 +3,9 @@
 Implementation order for `hi`. Completed releases use `[x]`; planned work uses
 `[ ]`. Detailed behavior and acceptance criteria live in `docs/specs/`.
 
+Only work with an accepted specification in `specs/approved/` is listed below.
+Drafts in `specs/ideas/` remain outside the roadmap until approved.
+
 ## Released
 
 ### v0.1.0 — Initial workstation support
@@ -24,24 +27,19 @@ Implementation order for `hi`. Completed releases use `[x]`; planned work uses
 - [x] Prompt for the NetBird device hostname and show the machine hostname as
   the default.
 
+### v0.5.0 — NetBird security and lifecycle
+
+- [x] Secure NetBird enrollment and add lifecycle commands.
+  Approved spec: [hi_net.md](specs/approved/hi_net.md).
+
 ## Planned
-
-### v0.5.0 — Security and diagnostics
-
-- [ ] Move NetBird setup keys out of shell history and process arguments.
-  See [hi_net.md](specs/approved/hi_net.md).
-- [ ] Add read-only machine diagnostics with human and JSON output.
-  See [hi_doctor.md](specs/ideas/hi_doctor.md).
-
-Dependency: shared machine-state checks established here are reused by later
-service, export, model-serving, and declarative commands.
 
 ### v0.6.0 — Updates and authentication
 
 - [ ] Add atomic, checksummed self-updates.
-  See [hi_update.md](specs/approved/hi_update.md).
+  Approved spec: [hi_update.md](specs/approved/hi_update.md).
 - [ ] Delegate GitHub and OMP authentication to their native tools.
-  See [hi_login.md](specs/approved/hi_login.md).
+  Approved spec: [hi_login.md](specs/approved/hi_login.md).
 
 Dependencies: `hi update` relies on the existing release assets and checksum
 pipeline. Login requires the corresponding installed CLI.
@@ -49,7 +47,7 @@ pipeline. Login requires the corresponding installed CLI.
 ### v0.7.0 — Project bootstrap
 
 - [ ] Add the interactive `hi init` helper and deterministic Python template.
-  See [hi_init.md](specs/approved/hi_init.md).
+  Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: the Python template requires `uv` and establishes the metadata and
 safe-generation contract used by later templates.
@@ -57,51 +55,16 @@ safe-generation contract used by later templates.
 ### v0.8.0 — Specialized project templates
 
 - [ ] Add the quantitative-research template.
-  See [hi_init.md](specs/approved/hi_init.md).
+  Approved spec: [hi_init.md](specs/approved/hi_init.md).
 - [ ] Add the deterministic web-application template.
-  See [hi_init.md](specs/approved/hi_init.md).
+  Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: both templates extend the v0.7.0 planner, conflict detection,
 metadata, agent instructions, and documentation structure.
 
 ### v0.9.0 — Focused machine operations
 
-- [ ] Add a compact managed-service status view.
-  See [hi_services.md](specs/ideas/hi_services.md).
 - [ ] Read and change the machine hostname independently of installation.
-  See [hi_hostname.md](specs/approved/hi_hostname.md).
-- [ ] Add explicit account-creation profiles.
-  See [hi_adduser_profiles.md](specs/approved/hi_adduser_profiles.md).
-- [ ] Export a redacted machine diagnostic bundle.
-  See [hi_export.md](specs/ideas/hi_export.md).
-
-Dependency: service status and export reuse the v0.5.0 doctor detectors rather
-than defining health twice.
-
-### v0.10.0 — Repository intelligence
-
-- [ ] Detect template drift and broken repository contracts.
-  See [hi_repo_doctor.md](specs/ideas/hi_repo_doctor.md).
-- [ ] Produce concise, redacted machine and repository context.
-  See [hi_context.md](specs/ideas/hi_context.md).
-
-Dependencies: these commands consume v0.7.0 template metadata and v0.5.0
-machine detectors.
-
-### v0.11.0 — Hardware-aware model serving
-
-- [ ] Detect AMD, NVIDIA, and supported CPU serving profiles.
-- [ ] Pull, serve, inspect, log, and stop validated model containers.
-  See [hi_model.md](specs/ideas/hi_model.md).
-
-Dependencies: model serving requires doctor-grade hardware detection, Docker or
-Podman, service lifecycle behavior, and a small validated recipe catalog.
-
-### v1.0.0 — Declarative machine state
-
-- [ ] Preview and converge a versioned `hi.yaml` with `hi apply`.
-  See [hi_apply.md](specs/ideas/hi_apply.md).
-
-Dependencies: `hi apply` is last because it composes proven detectors and
-independently usable mutation commands. It must not hide imperative scripts
-behind a declarative label.
+  Approved spec: [hi_hostname.md](specs/approved/hi_hostname.md).
+- [ ] Inspect users and login history; manage accounts, groups, and sudo access.
+  Approved spec: [hi_user.md](specs/approved/hi_user.md).
