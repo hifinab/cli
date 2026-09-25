@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hi — Hifin workstations</title>
+<meta name="description" content="hi turns a fresh Ubuntu machine into a Hifin AI workstation: Claude Code, Codex, omp, herdr, ROCm, Docker and NetBird in one command.">
+<meta name="theme-color" content="#07060d">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23ff4fd8'/><stop offset='1' stop-color='%2336e4ff'/></linearGradient></defs><rect width='64' height='64' rx='16' fill='%2307060d'/><text x='32' y='44' font-family='monospace' font-size='34' font-weight='700' text-anchor='middle' fill='url(%23g)'>hi</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07060d;
+    --bg-raised: #100e1b;
+    --bg-card: rgba(22, 19, 38, 0.72);
+    --line: rgba(255, 255, 255, 0.09);
+    --line-strong: rgba(255, 255, 255, 0.18);
+    --text: #f3f1ff;
+    --muted: #a39fbd;
+    --dim: #6f6a8c;
+    --pink: #ff4fd8;
+    --violet: #8b5cff;
+    --cyan: #36e4ff;
+    --lime: #b6ff5c;
+    --amber: #ffb547;
+    --coral: #ff6b5c;
+    --grad: linear-gradient(100deg, var(--pink), var(--violet) 45%, var(--cyan));
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; }
+  ::selection { background: var(--pink); color: var(--bg); }
+
+  /* Ambient glow and grid */
+  .glow { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
+  .glow span {
+    position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%;
+    filter: blur(90px); opacity: 0.32; animation: drift 26s ease-in-out infinite alternate;
+  }
+  .glow span:nth-child(1) { background: var(--pink); top: -18vmax; left: -12vmax; }
+  .glow span:nth-child(2) { background: var(--violet); top: 20vh; right: -20vmax; animation-delay: -8s; }
+  .glow span:nth-child(3) { background: var(--cyan); bottom: -26vmax; left: 20vw; opacity: 0.2; animation-delay: -16s; }
+  @keyframes drift { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
+  .grid {
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0; gap: 16px;
+  }
+  .logo { font: 700 22px var(--mono); text-decoration: none; letter-spacing: -0.02em; }
+  .logo b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  nav ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; font-size: 15px; }
+  nav ul a { color: var(--muted); text-decoration: none; transition: color .2s; }
+  nav ul a:hover { color: var(--text); }
+
+  /* Hero */
+  .hero { padding: 72px 0 40px; text-align: center; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border: 1px solid var(--line-strong); border-radius: 999px;
+    font: 500 13px var(--mono); color: var(--muted); background: rgba(255,255,255,0.03);
+    text-decoration: none;
+  }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px var(--lime); }
+  h1 {
+    font-size: clamp(44px, 8vw, 88px); line-height: 1.02; letter-spacing: -0.045em;
+    margin: 26px auto 20px; max-width: 900px; font-weight: 700;
+  }
+  h1 em {
+    font-style: normal; background: var(--grad); background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shimmer 6s linear infinite;
+  }
+  @keyframes shimmer { to { background-position: 200% center; } }
+  .lede { max-width: 640px; margin: 0 auto; color: var(--muted); font-size: 19px; }
+
+  /* Terminal */
+  .term {
+    max-width: 780px; margin: 44px auto 0; text-align: left;
+    border-radius: 16px; background: rgba(12, 10, 22, 0.88);
+    border: 1px solid var(--line-strong);
+    box-shadow: 0 0 0 1px rgba(139,92,255,0.15), 0 30px 80px -20px rgba(255,79,216,0.35), 0 20px 60px -30px rgba(54,228,255,0.4);
+    overflow: hidden; position: relative;
+  }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .dots { display: flex; gap: 7px; margin-right: 8px; }
+  .dots i { width: 11px; height: 11px; border-radius: 50%; }
+  .dots i:nth-child(1) { background: var(--coral); }
+  .dots i:nth-child(2) { background: var(--amber); }
+  .dots i:nth-child(3) { background: var(--lime); }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tabs button {
+    font: 500 13px var(--mono); color: var(--dim); background: none; border: 0;
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: all .2s;
+  }
+  .tabs button:hover { color: var(--text); }
+  .tabs button[aria-selected="true"] { color: var(--text); background: rgba(255,255,255,0.08); }
+  .term-body { padding: 22px 20px 24px; font: 15px/1.7 var(--mono); }
+  .cmdline { display: flex; align-items: flex-start; gap: 12px; }
+  .cmdline code { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+  .cmdline .ps { color: var(--pink); user-select: none; }
+  .cmdline .arg { color: var(--cyan); }
+  .copy {
+    flex: none; font: 600 12px var(--mono); color: var(--bg); background: var(--grad);
+    border: 0; border-radius: 8px; padding: 7px 12px; cursor: pointer; transition: transform .15s, filter .2s;
+  }
+  .copy:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .note { color: var(--dim); margin: 14px 0 0; font-size: 13.5px; }
+  .note b { color: var(--lime); font-weight: 600; }
+
+  /* Sections */
+  section.wrap { margin-top: 104px; }
+  .eyebrow { font: 600 13px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--pink); }
+  h2 { font-size: clamp(32px, 5vw, 48px); letter-spacing: -0.035em; line-height: 1.08; margin: 10px 0 12px; }
+  .sub { color: var(--muted); max-width: 620px; margin: 0 0 36px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+  .card {
+    position: relative; display: flex; flex-direction: column; gap: 10px;
+    padding: 24px; border-radius: 18px; text-decoration: none;
+    background: var(--bg-card); border: 1px solid var(--line);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    transition: transform .25s, border-color .25s, box-shadow .25s;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(140deg, var(--c), transparent 55%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; opacity: .55; transition: opacity .25s;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px -24px var(--c); }
+  .card:hover::before { opacity: 1; }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .badge {
+    width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
+    font: 700 16px var(--mono); color: var(--bg); background: var(--c);
+    box-shadow: 0 0 24px -4px var(--c);
+  }
+  .arrow { color: var(--dim); font: 18px var(--mono); transition: transform .25s, color .25s; }
+  .card:hover .arrow { color: var(--c); transform: translate(3px, -3px); }
+  .card h3 { margin: 6px 0 0; font-size: 22px; letter-spacing: -0.02em; }
+  .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  .card .bin { margin-top: auto; padding-top: 10px; font: 13px var(--mono); color: var(--c); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-radius: 999px; font: 500 14px var(--mono); text-decoration: none;
+    border: 1px solid var(--line-strong); background: rgba(255,255,255,0.03); transition: all .2s;
+  }
+  .chip:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(54,228,255,0.06); }
+  .chip small { color: var(--dim); font-size: 12px; }
+
+  .cmds { border-radius: 18px; border: 1px solid var(--line); background: var(--bg-card); overflow: hidden; }
+  .cmd { display: grid; grid-template-columns: minmax(200px, 300px) 1fr; gap: 20px; padding: 16px 22px; border-top: 1px solid var(--line); align-items: baseline; }
+  .cmd:first-child { border-top: 0; }
+  .cmd code { font: 600 14.5px var(--mono); color: var(--cyan); }
+  .cmd code span { color: var(--pink); }
+  .cmd p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+  .strix {
+    display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: center;
+    padding: 36px; border-radius: 24px; border: 1px solid var(--line-strong);
+    background:
+      radial-gradient(circle at 100% 0%, rgba(255,107,92,0.22), transparent 55%),
+      radial-gradient(circle at 0% 100%, rgba(139,92,255,0.22), transparent 55%),
+      var(--bg-raised);
+  }
+  .strix h2 { margin-top: 6px; }
+  .strix .eyebrow { color: var(--coral); }
+  .strix ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
+  .strix li {
+    counter-increment: s; display: flex; gap: 14px; align-items: flex-start;
+    font-size: 15.5px; color: var(--muted);
+  }
+  .strix li::before {
+    content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 8px;
+    display: grid; place-items: center; font: 700 13px var(--mono);
+    color: var(--bg); background: var(--coral);
+  }
+  .strix li code, .sub code, .note code { font: 13.5px var(--mono); color: var(--text); background: rgba(255,255,255,0.07); padding: 2px 6px; border-radius: 5px; }
+
+  footer { margin-top: 100px; padding: 36px 0 48px; border-top: 1px solid var(--line); color: var(--dim); font-size: 14px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer a { color: var(--muted); text-decoration: none; margin-left: 18px; }
+  footer a:first-child { margin-left: 0; }
+  footer a:hover { color: var(--text); }
+
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+
+  @media (max-width: 760px) {
+    nav ul { display: none; }
+    .hero { padding-top: 40px; }
+    .cmd { grid-template-columns: 1fr; gap: 4px; }
+    .strix { grid-template-columns: 1fr; padding: 24px; }
+    .term-body { font-size: 13.5px; padding: 18px 16px 20px; }
+    .cmdline { flex-direction: column; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="glow" aria-hidden="true"><span></span><span></span><span></span></div>
+<div class="grid" aria-hidden="true"></div>
+
+<header class="wrap">
+  <nav>
+    <a class="logo" href="#"><b>hi</b>fin.sh</a>
+    <ul>
+      <li><a href="#ai">AI toolkit</a></li>
+      <li><a href="#stack">Stack</a></li>
+      <li><a href="#commands">Commands</a></li>
+      <li><a href="https://github.com/hifinab/cli">GitHub</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <a class="pill" href="https://github.com/hifinab/cli/releases/latest"><i></i><span id="ver">latest release</span></a>
+    <h1>Fresh Ubuntu to <em>AI workstation</em> in one command.</h1>
+    <p class="lede">
+      <code style="font-family:var(--mono)">hi</code> installs Claude Code, Codex, omp and herdr,
+      wires up ROCm, Docker and NetBird, then checks everything is working. It's a single static
+      binary with no runtime to install.
+    </p>
+
+    <div class="term" role="region" aria-label="Install command">
+      <div class="term-bar">
+        <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="true" data-tab="strix">Strix Halo</button>
+          <button role="tab" aria-selected="false" data-tab="ws">Workstation</button>
+          <button role="tab" aria-selected="false" data-tab="cli">CLI only</button>
+        </div>
+      </div>
+      <div class="term-body">
+        <div class="cmdline">
+          <span class="ps">$</span>
+          <code id="cmd"></code>
+          <button class="copy" id="copy" type="button">copy</button>
+        </div>
+        <p class="note" id="note"></p>
+      </div>
+    </div>
+  </div>
+
+  <section id="ai" class="wrap reveal">
+    <div class="eyebrow">// AI toolkit</div>
+    <h2>Your agents, ready at first login.</h2>
+    <p class="sub">Every workstation gets the same set of coding agents and GPU tooling, installed per user in <code>~/.local/bin</code>.</p>
+    <div class="cards">
+      <a class="card" style="--c: var(--coral)" href="https://code.claude.com/docs">
+        <div class="card-top"><span class="badge">✳</span><span class="arrow">↗</span></div>
+        <h3>Claude Code</h3>
+        <p>Anthropic's agentic coding tool. It reads your codebase, edits files and runs commands from the terminal.</p>
+        <span class="bin">$ claude</span>
+      </a>
+      <a class="card" style="--c: var(--lime)" href="https://developers.openai.com/codex/cli">
+        <div class="card-top"><span class="badge">&gt;_</span><span class="arrow">↗</span></div>
+        <h3>Codex CLI</h3>
+        <p>OpenAI's coding agent for the terminal. <code style="font:13px var(--mono)">hi</code> installs it without prompts, so setup never stalls.</p>
+        <span class="bin">$ codex</span>
+      </a>
+      <a class="card" style="--c: var(--violet)" href="https://omp.sh">
+        <div class="card-top"><span class="badge">◎</span><span class="arrow">↗</span></div>
+        <h3>omp</h3>
+        <p>A terminal coding agent with the IDE wired in: subagents, plan mode, LSP, DAP and hindsight memory.</p>
+        <span class="bin">$ omp</span>
+      </a>
+      <a class="card" style="--c: var(--cyan)" href="https://herdr.dev">
+        <div class="card-top"><span class="badge">⋈</span><span class="arrow">↗</span></div>
+        <h3>herdr</h3>
+        <p>The runtime coding agents run on, for keeping several agents working side by side.</p>
+        <span class="bin">$ herdr</span>
+      </a>
+      <a class="card" style="--c: var(--pink)" href="https://rocm.docs.amd.com">
+        <div class="card-top"><span class="badge">▲</span><span class="arrow">↗</span></div>
+        <h3>AMD ROCm 10</h3>
+        <p>GPU compute for Strix Halo (<code style="font:13px var(--mono)">gfx1151</code>), plus render and video group access to run local models.</p>
+        <span class="bin">hi install strix</span>
+      </a>
+      <a class="card" style="--c: var(--amber)" href="https://pypi.org/project/amd-debug-tools/">
+        <div class="card-top"><span class="badge">⚙</span><span class="arrow">↗</span></div>
+        <h3>amd-debug-tools</h3>
+        <p>AMD's diagnostics for sleep, power and GPU state on Ryzen AI machines, installed with pipx.</p>
+        <span class="bin">hi install strix</span>
+      </a>
+    </div>
+  </section>
+
+  <section id="stack" class="wrap reveal">
+    <div class="eyebrow" style="color:var(--cyan)">// Also installed</div>
+    <h2>The rest of the stack.</h2>
+    <p class="sub">Ubuntu 26.04 packages and upstream repositories, all signed and upgraded in one pass.</p>
+    <div class="chips">
+      <a class="chip" href="https://docs.astral.sh/uv/">uv <small>python</small></a>
+      <a class="chip" href="https://pipx.pypa.io">pipx <small>python</small></a>
+      <a class="chip" href="https://nodejs.org">Node.js + npm</a>
+      <a class="chip" href="https://docs.docker.com/engine/">Docker Engine + Compose</a>
+      <a class="chip" href="https://cli.github.com">GitHub CLI</a>
+      <a class="chip" href="https://netbird.io">NetBird <small>mesh VPN</small></a>
+      <a class="chip" href="https://github.com/aristocratos/btop">btop</a>
+      <a class="chip" href="https://github.com/tmux/tmux">tmux</a>
+    </div>
+  </section>
+
+  <section id="commands" class="wrap reveal">
+    <div class="eyebrow" style="color:var(--lime)">// Commands</div>
+    <h2>Small surface, sharp edges.</h2>
+    <p class="sub">Each command does one thing and delegates to the native tool underneath.</p>
+    <div class="cmds">
+      <div class="cmd"><code>hi install</code><p>Install the workstation software. Offers a hostname change, then asks for sudo once.</p></div>
+      <div class="cmd"><code>hi install <span>strix</span></code><p>Everything above plus ROCm and GPU groups, finishing with a local hardware report.</p></div>
+      <div class="cmd"><code>hi verify <span>strix</span></code><p>Re-run the hardware report after the reboot. Nothing is uploaded.</p></div>
+      <div class="cmd"><code>hi net</code><p>Enroll with NetBird. The setup key is read without echo and never lands in shell history.</p></div>
+      <div class="cmd"><code>hi net <span>status · down · reconnect</span></code><p>Check, disconnect or reconnect an enrolled peer without a new key.</p></div>
+      <div class="cmd"><code>hi adduser <span>&lt;name&gt;</span></code><p>Create a user who already has render and video access.</p></div>
+      <div class="cmd"><code>hi version</code><p>Print the installed version.</p></div>
+    </div>
+  </section>
+
+  <section class="wrap reveal">
+    <div class="strix">
+      <div>
+        <div class="eyebrow">// Strix Halo</div>
+        <h2>Tested on real silicon.</h2>
+        <p class="sub" style="margin:0">Exercised on an AMD Ryzen AI Max+ 395 with Radeon 8060S graphics; the final report detects the GPU through both <code>amd-smi</code> and <code>rocminfo</code>.</p>
+      </div>
+      <ol>
+        <li><span>Run the one-liner above on Ubuntu 26.04 amd64.</span></li>
+        <li><span>Pick a hostname, enter your sudo password, and let it run.</span></li>
+        <li><span>Reboot, then run <code>hi verify strix</code> for the final report.</span></li>
+        <li><span>Run <code>hi net</code> to join the NetBird mesh.</span></li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>hi · static Go binary · Linux amd64 &amp; arm64</span>
+    <span>
+      <a href="https://github.com/hifinab/cli">Source</a>
+      <a href="https://github.com/hifinab/cli/releases">Releases</a>
+      <a href="https://github.com/hifinab/cli/blob/main/docs/roadmap.md">Roadmap</a>
+      <a href="/install.sh">install.sh</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  const base = "curl -fsSL https://hifin.sh/install.sh | sh";
+  const tabs = {
+    strix: {
+      args: " -s -- install strix",
+      note: "Installs <code>hi</code>, then runs <code>hi install strix</code> in the same terminal. <b>Reboot once</b> when it finishes."
+    },
+    ws: {
+      args: " -s -- install",
+      note: "Installs <code>hi</code> and the general workstation software. No GPU setup, no reboot."
+    },
+    cli: {
+      args: "",
+      note: "Just the <code>hi</code> binary, checksum-verified, in <code>~/.local/bin</code>. It prints the full path to run straight away."
+    }
+  };
+  const cmd = document.getElementById("cmd");
+  const note = document.getElementById("note");
+  const copy = document.getElementById("copy");
+  let current = "strix";
+
+  function show(name) {
+    current = name;
+    const t = tabs[name];
+    cmd.innerHTML = base.replace("| sh", '| <span style="color:var(--pink)">sh</span>') +
+      (t.args ? '<span class="arg">' + t.args + "</span>" : "");
+    note.innerHTML = t.note;
+    document.querySelectorAll(".tabs button").forEach(b =>
+      b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  }
+  document.querySelectorAll(".tabs button").forEach(b =>
+    b.addEventListener("click", () => show(b.dataset.tab)));
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(base + tabs[current].args);
+      copy.textContent = "copied ✓";
+    } catch {
+      copy.textContent = "select + copy";
+    }
+    setTimeout(() => (copy.textContent = "copy"), 1600);
+  });
+  show(current);
+
+  const io = new IntersectionObserver(entries => entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+  }), { threshold: 0.12 });
+  document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+  fetch("https://api.github.com/repos/hifinab/cli/releases/latest")
+    .then(r => r.ok ? r.json() : null)
+    .then(r => { if (r && r.tag_name) document.getElementById("ver").textContent = r.tag_name + " is out"; })
+    .catch(() => {});
+</script>
+</body>
+</html>

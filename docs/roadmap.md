@@ -32,6 +32,15 @@ Drafts in `specs/ideas/` remain outside the roadmap until approved.
 - [x] Secure NetBird enrollment and add lifecycle commands.
   Approved spec: [hi_net.md](specs/approved/hi_net.md).
 
+### v0.5.1 — AI coding tools
+
+- [x] Install Claude Code, Codex CLI, and herdr, and verify their commands.
+
+### v0.5.2 — Unattended installation
+
+- [x] Install Codex without its interactive launch prompt.
+- [x] Run `hi` straight from the installer with `sh -s -- <command>`.
+
 ## Planned
 
 ### v0.6.0 — Updates and authentication

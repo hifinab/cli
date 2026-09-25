@@ -128,7 +128,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 curl -fsSL https://pkgs.netbird.io/install.sh | sh
 curl -fsSL https://omp.sh/install | sh
 curl -fsSL https://claude.ai/install.sh | bash
-curl -fsSL https://chatgpt.com/codex/install.sh | sh
+curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh
 curl -fsSL https://herdr.dev/install.sh | sh
 
 log "Configuring GitHub CLI"

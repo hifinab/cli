@@ -11,12 +11,6 @@ Releases install per user to `~/.local/bin/hi`:
 curl -fsSL https://hifin.sh/install.sh | sh
 ```
 
-Until `hifin.sh` serves the installer, use the repository copy:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/hifinab/cli/main/install.sh | sh
-```
-
 To set up a new machine in one step, pass the `hi` command after `sh -s --`:
 
 ```sh
@@ -46,7 +40,9 @@ hi help            Show help
 
 `hi install` first offers to change the current hostname; pressing Enter keeps
 it unchanged. It then asks for `sudo` once before installing the general
-workstation software. Open a new shell afterward to apply `PATH` changes.
+workstation software. Every installer runs unattended; Codex is installed with
+`CODEX_NON_INTERACTIVE=1` so its "Start Codex now?" prompt cannot stall setup.
+Open a new shell afterward to apply `PATH` changes.
 
 `hi install strix` installs the same software plus the Strix Halo hardware
 support. It ends with a local report covering packages, commands, services,
@@ -95,18 +91,23 @@ required.
 Both installation profiles currently require Ubuntu 26.04. `hi install`
 installs:
 
-- uv and pipx
-- Node.js and npm
-- GitHub CLI
-- Docker Engine and Docker Compose
-- Claude Code, Codex CLI, and herdr
-- NetBird, OMP, btop, and tmux
+- AI coding tools, installed per user in `~/.local/bin`:
+  - [Claude Code](https://code.claude.com/docs) (`claude`)
+  - [Codex CLI](https://developers.openai.com/codex/cli) (`codex`)
+  - [omp](https://omp.sh) (`omp`)
+  - [herdr](https://herdr.dev) (`herdr`)
+- [uv](https://docs.astral.sh/uv/) and [pipx](https://pipx.pypa.io)
+- [Node.js](https://nodejs.org) and npm
+- [GitHub CLI](https://cli.github.com)
+- [Docker Engine](https://docs.docker.com/engine/) and Docker Compose
+- [NetBird](https://netbird.io), [btop](https://github.com/aristocratos/btop),
+  and [tmux](https://github.com/tmux/tmux)
 - Available Ubuntu package upgrades
 
 `hi install strix` installs everything above and adds:
 
-- AMD ROCm 10 for `gfx1151`
-- amd-debug-tools
+- [AMD ROCm](https://rocm.docs.amd.com) 10 for `gfx1151`
+- [amd-debug-tools](https://pypi.org/project/amd-debug-tools/)
 - `render` and `video` group membership
 
 The Strix profile requires amd64 and a reboot.
@@ -125,3 +126,9 @@ go build -o hi .
 Pushing a `v*` tag builds amd64 and arm64 Linux binaries, writes SHA-256
 checksums, and publishes them in a GitHub release. The setup script is embedded
 in each binary, so script changes ship with the next release.
+
+## Website
+
+GitHub Pages serves the repository root at <https://hifin.sh>. `index.html` is
+the landing page and `install.sh` is the CLI installer; both go live when
+pushed to `main`, without a release.
