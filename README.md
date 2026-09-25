@@ -17,9 +17,17 @@ Until `hifin.sh` serves the installer, use the repository copy:
 curl -fsSL https://raw.githubusercontent.com/hifinab/cli/main/install.sh | sh
 ```
 
+To set up a new machine in one step, pass the `hi` command after `sh -s --`:
+
+```sh
+curl -fsSL https://hifin.sh/install.sh | sh -s -- install strix
+```
+
 The installer supports Linux on amd64 and arm64, verifies the release checksum,
-and adds `~/.local/bin` to `PATH` in `~/.profile` when needed. Set
-`HI_INSTALL_DIR` to override the destination.
+and adds `~/.local/bin` to `PATH` in `~/.profile` when needed. That change
+applies to new shells; until then the installer prints the full path to run, such
+as `~/.local/bin/hi install strix`. Set `HI_INSTALL_DIR` to override the
+destination.
 
 ## Commands
 
