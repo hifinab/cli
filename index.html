@@ -5,28 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hi — Hifin workstations</title>
 <meta name="description" content="hi turns a fresh Ubuntu machine into a Hifin AI workstation: Claude Code, Codex, omp, herdr, ROCm, Docker and NetBird in one command.">
-<meta name="theme-color" content="#07060d">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%23ff4fd8'/><stop offset='1' stop-color='%2336e4ff'/></linearGradient></defs><rect width='64' height='64' rx='16' fill='%2307060d'/><text x='32' y='44' font-family='monospace' font-size='34' font-weight='700' text-anchor='middle' fill='url(%23g)'>hi</text></svg>">
+<meta name="theme-color" content="#0a0c11">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%239aa0ff'/><stop offset='1' stop-color='%236fd9b8'/></linearGradient></defs><rect width='64' height='64' rx='16' fill='%230a0c11'/><text x='32' y='44' font-family='monospace' font-size='34' font-weight='700' text-anchor='middle' fill='url(%23g)'>hi</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #07060d;
-    --bg-raised: #100e1b;
-    --bg-card: rgba(22, 19, 38, 0.72);
-    --line: rgba(255, 255, 255, 0.09);
-    --line-strong: rgba(255, 255, 255, 0.18);
-    --text: #f3f1ff;
-    --muted: #a39fbd;
-    --dim: #6f6a8c;
-    --pink: #ff4fd8;
-    --violet: #8b5cff;
-    --cyan: #36e4ff;
-    --lime: #b6ff5c;
-    --amber: #ffb547;
-    --coral: #ff6b5c;
-    --grad: linear-gradient(100deg, var(--pink), var(--violet) 45%, var(--cyan));
+    --bg: #0a0c11;
+    --bg-raised: #10131a;
+    --bg-card: #11141c;
+    --line: rgba(255, 255, 255, 0.07);
+    --line-strong: rgba(255, 255, 255, 0.13);
+    --text: #eef0f5;
+    --muted: #9aa1b2;
+    --dim: #687084;
+    --accent: #7c83ff;
+    --accent-soft: rgba(124, 131, 255, 0.12);
+    --mint: #4fd1a5;
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   }
@@ -41,26 +37,24 @@
     overflow-x: hidden;
   }
   a { color: inherit; }
-  ::selection { background: var(--pink); color: var(--bg); }
+  ::selection { background: var(--accent); color: #fff; }
 
-  /* Ambient glow and grid */
-  .glow { position: fixed; inset: 0; z-index: -2; pointer-events: none; overflow: hidden; }
-  .glow span {
-    position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%;
-    filter: blur(90px); opacity: 0.32; animation: drift 26s ease-in-out infinite alternate;
+  /* Soft light behind the hero */
+  .glow {
+    position: absolute; inset: 0 0 auto 0; height: 760px; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(ellipse 60% 55% at 50% 0%, rgba(124, 131, 255, 0.16), transparent 70%),
+      radial-gradient(ellipse 35% 35% at 78% 18%, rgba(79, 209, 165, 0.06), transparent 70%);
   }
-  .glow span:nth-child(1) { background: var(--pink); top: -18vmax; left: -12vmax; }
-  .glow span:nth-child(2) { background: var(--violet); top: 20vh; right: -20vmax; animation-delay: -8s; }
-  .glow span:nth-child(3) { background: var(--cyan); bottom: -26vmax; left: 20vw; opacity: 0.2; animation-delay: -16s; }
-  @keyframes drift { to { transform: translate(8vmax, 6vmax) scale(1.15); } }
-  .grid {
-    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  .glow::after {
+    content: ""; position: absolute; inset: 0;
     background-image:
       linear-gradient(var(--line) 1px, transparent 1px),
       linear-gradient(90deg, var(--line) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
-    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+    background-size: 64px 64px;
+    opacity: .5;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 20%, transparent 70%);
   }
 
   .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
@@ -69,138 +63,124 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: 22px 0; gap: 16px;
   }
-  .logo { font: 700 22px var(--mono); text-decoration: none; letter-spacing: -0.02em; }
-  .logo b { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  nav ul { display: flex; gap: 22px; list-style: none; margin: 0; padding: 0; font-size: 15px; }
+  .logo { font: 700 21px var(--mono); text-decoration: none; letter-spacing: -0.02em; }
+  .logo b { color: var(--accent); }
+  nav ul { display: flex; gap: 24px; list-style: none; margin: 0; padding: 0; font-size: 15px; }
   nav ul a { color: var(--muted); text-decoration: none; transition: color .2s; }
   nav ul a:hover { color: var(--text); }
 
   /* Hero */
-  .hero { padding: 72px 0 40px; text-align: center; }
+  .hero { position: relative; padding: 72px 0 40px; text-align: center; }
   .pill {
     display: inline-flex; align-items: center; gap: 8px;
     padding: 6px 14px; border: 1px solid var(--line-strong); border-radius: 999px;
-    font: 500 13px var(--mono); color: var(--muted); background: rgba(255,255,255,0.03);
-    text-decoration: none;
+    font: 500 13px var(--mono); color: var(--muted); background: rgba(255,255,255,0.02);
+    text-decoration: none; transition: border-color .2s, color .2s;
   }
-  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 12px var(--lime); }
+  .pill:hover { border-color: var(--accent); color: var(--text); }
+  .pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); }
   h1 {
-    font-size: clamp(44px, 8vw, 88px); line-height: 1.02; letter-spacing: -0.045em;
-    margin: 26px auto 20px; max-width: 900px; font-weight: 700;
+    font-size: clamp(40px, 7vw, 76px); line-height: 1.05; letter-spacing: -0.04em;
+    margin: 26px auto 20px; max-width: 860px; font-weight: 700;
   }
   h1 em {
-    font-style: normal; background: var(--grad); background-size: 200% auto;
+    font-style: normal;
+    background: linear-gradient(100deg, #9aa0ff, var(--accent) 50%, #6fd9b8);
     -webkit-background-clip: text; background-clip: text; color: transparent;
-    animation: shimmer 6s linear infinite;
   }
-  @keyframes shimmer { to { background-position: 200% center; } }
-  .lede { max-width: 640px; margin: 0 auto; color: var(--muted); font-size: 19px; }
+  .lede { max-width: 620px; margin: 0 auto; color: var(--muted); font-size: 18.5px; }
+  .lede code { font: 16px var(--mono); color: var(--text); }
 
   /* Terminal */
   .term {
     max-width: 780px; margin: 44px auto 0; text-align: left;
-    border-radius: 16px; background: rgba(12, 10, 22, 0.88);
+    border-radius: 14px; background: #0d1016;
     border: 1px solid var(--line-strong);
-    box-shadow: 0 0 0 1px rgba(139,92,255,0.15), 0 30px 80px -20px rgba(255,79,216,0.35), 0 20px 60px -30px rgba(54,228,255,0.4);
-    overflow: hidden; position: relative;
+    box-shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(124,131,255,0.06), 0 30px 80px -40px rgba(124,131,255,0.35);
+    overflow: hidden;
   }
-  .term-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .dots { display: flex; gap: 7px; margin-right: 8px; }
-  .dots i { width: 11px; height: 11px; border-radius: 50%; }
-  .dots i:nth-child(1) { background: var(--coral); }
-  .dots i:nth-child(2) { background: var(--amber); }
-  .dots i:nth-child(3) { background: var(--lime); }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.14); }
   .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
   .tabs button {
     font: 500 13px var(--mono); color: var(--dim); background: none; border: 0;
-    padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: all .2s;
+    padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: color .2s, background .2s;
   }
   .tabs button:hover { color: var(--text); }
-  .tabs button[aria-selected="true"] { color: var(--text); background: rgba(255,255,255,0.08); }
+  .tabs button[aria-selected="true"] { color: var(--text); background: rgba(255,255,255,0.07); }
   .term-body { padding: 22px 20px 24px; font: 15px/1.7 var(--mono); }
   .cmdline { display: flex; align-items: flex-start; gap: 12px; }
   .cmdline code { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
-  .cmdline .ps { color: var(--pink); user-select: none; }
-  .cmdline .arg { color: var(--cyan); }
+  .cmdline .ps { color: var(--dim); user-select: none; }
+  .cmdline .arg { color: var(--accent); }
   .copy {
-    flex: none; font: 600 12px var(--mono); color: var(--bg); background: var(--grad);
-    border: 0; border-radius: 8px; padding: 7px 12px; cursor: pointer; transition: transform .15s, filter .2s;
+    flex: none; font: 600 12px var(--mono); color: #fff; background: var(--accent);
+    border: 0; border-radius: 7px; padding: 7px 12px; cursor: pointer; transition: filter .2s;
   }
-  .copy:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .copy:hover { filter: brightness(1.12); }
   .note { color: var(--dim); margin: 14px 0 0; font-size: 13.5px; }
-  .note b { color: var(--lime); font-weight: 600; }
+  .note b { color: var(--text); font-weight: 600; }
 
   /* Sections */
   section.wrap { margin-top: 104px; }
-  .eyebrow { font: 600 13px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--pink); }
-  h2 { font-size: clamp(32px, 5vw, 48px); letter-spacing: -0.035em; line-height: 1.08; margin: 10px 0 12px; }
+  .eyebrow { font: 600 12.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  h2 { font-size: clamp(30px, 4.5vw, 44px); letter-spacing: -0.03em; line-height: 1.1; margin: 10px 0 12px; }
   .sub { color: var(--muted); max-width: 620px; margin: 0 0 36px; }
 
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
   .card {
-    position: relative; display: flex; flex-direction: column; gap: 10px;
-    padding: 24px; border-radius: 18px; text-decoration: none;
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 24px; border-radius: 14px; text-decoration: none;
     background: var(--bg-card); border: 1px solid var(--line);
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    transition: transform .25s, border-color .25s, box-shadow .25s;
+    transition: border-color .2s, background .2s;
   }
-  .card::before {
-    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
-    background: linear-gradient(140deg, var(--c), transparent 55%);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor; mask-composite: exclude; opacity: .55; transition: opacity .25s;
-  }
-  .card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px -24px var(--c); }
-  .card:hover::before { opacity: 1; }
+  .card:hover { border-color: rgba(124,131,255,0.45); background: #131723; }
   .card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .badge {
-    width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center;
-    font: 700 16px var(--mono); color: var(--bg); background: var(--c);
-    box-shadow: 0 0 24px -4px var(--c);
+    width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
+    font: 700 15px var(--mono); color: var(--accent); background: var(--accent-soft);
   }
-  .arrow { color: var(--dim); font: 18px var(--mono); transition: transform .25s, color .25s; }
-  .card:hover .arrow { color: var(--c); transform: translate(3px, -3px); }
-  .card h3 { margin: 6px 0 0; font-size: 22px; letter-spacing: -0.02em; }
+  .arrow { color: var(--dim); font: 16px var(--mono); transition: color .2s; }
+  .card:hover .arrow { color: var(--accent); }
+  .card h3 { margin: 6px 0 0; font-size: 21px; letter-spacing: -0.02em; }
   .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
-  .card .bin { margin-top: auto; padding-top: 10px; font: 13px var(--mono); color: var(--c); }
+  .card p code { font: 13px var(--mono); color: var(--text); }
+  .card .bin { margin-top: auto; padding-top: 10px; font: 13px var(--mono); color: var(--dim); }
 
   .chips { display: flex; flex-wrap: wrap; gap: 10px; }
   .chip {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 16px; border-radius: 999px; font: 500 14px var(--mono); text-decoration: none;
-    border: 1px solid var(--line-strong); background: rgba(255,255,255,0.03); transition: all .2s;
+    padding: 8px 15px; border-radius: 999px; font: 500 14px var(--mono); text-decoration: none;
+    border: 1px solid var(--line-strong); background: rgba(255,255,255,0.02); transition: border-color .2s, color .2s;
   }
-  .chip:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(54,228,255,0.06); }
+  .chip:hover { border-color: var(--accent); color: var(--text); }
   .chip small { color: var(--dim); font-size: 12px; }
 
-  .cmds { border-radius: 18px; border: 1px solid var(--line); background: var(--bg-card); overflow: hidden; }
+  .cmds { border-radius: 14px; border: 1px solid var(--line); background: var(--bg-card); overflow: hidden; }
   .cmd { display: grid; grid-template-columns: minmax(200px, 300px) 1fr; gap: 20px; padding: 16px 22px; border-top: 1px solid var(--line); align-items: baseline; }
   .cmd:first-child { border-top: 0; }
-  .cmd code { font: 600 14.5px var(--mono); color: var(--cyan); }
-  .cmd code span { color: var(--pink); }
+  .cmd code { font: 600 14.5px var(--mono); color: var(--text); }
+  .cmd code span { color: var(--accent); }
   .cmd p { margin: 0; color: var(--muted); font-size: 15.5px; }
 
   .strix {
     display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: center;
-    padding: 36px; border-radius: 24px; border: 1px solid var(--line-strong);
-    background:
-      radial-gradient(circle at 100% 0%, rgba(255,107,92,0.22), transparent 55%),
-      radial-gradient(circle at 0% 100%, rgba(139,92,255,0.22), transparent 55%),
-      var(--bg-raised);
+    padding: 36px; border-radius: 18px; border: 1px solid var(--line-strong);
+    background: radial-gradient(circle at 0% 0%, rgba(124,131,255,0.10), transparent 60%), var(--bg-raised);
   }
   .strix h2 { margin-top: 6px; }
-  .strix .eyebrow { color: var(--coral); }
   .strix ol { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
   .strix li {
     counter-increment: s; display: flex; gap: 14px; align-items: flex-start;
     font-size: 15.5px; color: var(--muted);
   }
   .strix li::before {
-    content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 8px;
-    display: grid; place-items: center; font: 700 13px var(--mono);
-    color: var(--bg); background: var(--coral);
+    content: counter(s); flex: none; width: 26px; height: 26px; border-radius: 7px;
+    display: grid; place-items: center; font: 700 12.5px var(--mono);
+    color: var(--accent); background: var(--accent-soft);
   }
-  .strix li code, .sub code, .note code { font: 13.5px var(--mono); color: var(--text); background: rgba(255,255,255,0.07); padding: 2px 6px; border-radius: 5px; }
+  .strix li code, .sub code, .note code { font: 13.5px var(--mono); color: var(--text); background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 5px; }
 
   footer { margin-top: 100px; padding: 36px 0 48px; border-top: 1px solid var(--line); color: var(--dim); font-size: 14px; }
   footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -208,7 +188,7 @@
   footer a:first-child { margin-left: 0; }
   footer a:hover { color: var(--text); }
 
-  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+  .reveal { opacity: 0; transform: translateY(8px); transition: opacity .5s ease, transform .5s ease; }
   .reveal.in { opacity: 1; transform: none; }
 
   @media (max-width: 760px) {
@@ -220,14 +200,13 @@
     .cmdline { flex-direction: column; }
   }
   @media (prefers-reduced-motion: reduce) {
-    *, *::before { animation: none !important; transition: none !important; }
+    *, *::before { transition: none !important; }
     .reveal { opacity: 1; transform: none; }
   }
 </style>
 </head>
 <body>
-<div class="glow" aria-hidden="true"><span></span><span></span><span></span></div>
-<div class="grid" aria-hidden="true"></div>
+<div class="glow" aria-hidden="true"></div>
 
 <header class="wrap">
   <nav>
@@ -246,7 +225,7 @@
     <a class="pill" href="https://github.com/hifinab/cli/releases/latest"><i></i><span id="ver">latest release</span></a>
     <h1>Fresh Ubuntu to <em>AI workstation</em> in one command.</h1>
     <p class="lede">
-      <code style="font-family:var(--mono)">hi</code> installs Claude Code, Codex, omp and herdr,
+      <code>hi</code> installs Claude Code, Codex, omp and herdr,
       wires up ROCm, Docker and NetBird, then checks everything is working. It's a single static
       binary with no runtime to install.
     </p>
@@ -276,37 +255,37 @@
     <h2>Your agents, ready at first login.</h2>
     <p class="sub">Every workstation gets the same set of coding agents and GPU tooling, installed per user in <code>~/.local/bin</code>.</p>
     <div class="cards">
-      <a class="card" style="--c: var(--coral)" href="https://code.claude.com/docs">
+      <a class="card" href="https://code.claude.com/docs">
         <div class="card-top"><span class="badge">✳</span><span class="arrow">↗</span></div>
         <h3>Claude Code</h3>
         <p>Anthropic's agentic coding tool. It reads your codebase, edits files and runs commands from the terminal.</p>
         <span class="bin">$ claude</span>
       </a>
-      <a class="card" style="--c: var(--lime)" href="https://developers.openai.com/codex/cli">
+      <a class="card" href="https://developers.openai.com/codex/cli">
         <div class="card-top"><span class="badge">&gt;_</span><span class="arrow">↗</span></div>
         <h3>Codex CLI</h3>
-        <p>OpenAI's coding agent for the terminal. <code style="font:13px var(--mono)">hi</code> installs it without prompts, so setup never stalls.</p>
+        <p>OpenAI's coding agent for the terminal. <code>hi</code> installs it without prompts, so setup never stalls.</p>
         <span class="bin">$ codex</span>
       </a>
-      <a class="card" style="--c: var(--violet)" href="https://omp.sh">
+      <a class="card" href="https://omp.sh">
         <div class="card-top"><span class="badge">◎</span><span class="arrow">↗</span></div>
         <h3>omp</h3>
         <p>A terminal coding agent with the IDE wired in: subagents, plan mode, LSP, DAP and hindsight memory.</p>
         <span class="bin">$ omp</span>
       </a>
-      <a class="card" style="--c: var(--cyan)" href="https://herdr.dev">
+      <a class="card" href="https://herdr.dev">
         <div class="card-top"><span class="badge">⋈</span><span class="arrow">↗</span></div>
         <h3>herdr</h3>
         <p>The runtime coding agents run on, for keeping several agents working side by side.</p>
         <span class="bin">$ herdr</span>
       </a>
-      <a class="card" style="--c: var(--pink)" href="https://rocm.docs.amd.com">
+      <a class="card" href="https://rocm.docs.amd.com">
         <div class="card-top"><span class="badge">▲</span><span class="arrow">↗</span></div>
         <h3>AMD ROCm 10</h3>
-        <p>GPU compute for Strix Halo (<code style="font:13px var(--mono)">gfx1151</code>), plus render and video group access to run local models.</p>
+        <p>GPU compute for Strix Halo (<code>gfx1151</code>), plus render and video group access to run local models.</p>
         <span class="bin">hi install strix</span>
       </a>
-      <a class="card" style="--c: var(--amber)" href="https://pypi.org/project/amd-debug-tools/">
+      <a class="card" href="https://pypi.org/project/amd-debug-tools/">
         <div class="card-top"><span class="badge">⚙</span><span class="arrow">↗</span></div>
         <h3>amd-debug-tools</h3>
         <p>AMD's diagnostics for sleep, power and GPU state on Ryzen AI machines, installed with pipx.</p>
@@ -316,7 +295,7 @@
   </section>
 
   <section id="stack" class="wrap reveal">
-    <div class="eyebrow" style="color:var(--cyan)">// Also installed</div>
+    <div class="eyebrow">// Also installed</div>
     <h2>The rest of the stack.</h2>
     <p class="sub">Ubuntu 26.04 packages and upstream repositories, all signed and upgraded in one pass.</p>
     <div class="chips">
@@ -332,7 +311,7 @@
   </section>
 
   <section id="commands" class="wrap reveal">
-    <div class="eyebrow" style="color:var(--lime)">// Commands</div>
+    <div class="eyebrow">// Commands</div>
     <h2>Small surface, sharp edges.</h2>
     <p class="sub">Each command does one thing and delegates to the native tool underneath.</p>
     <div class="cmds">
@@ -399,7 +378,7 @@
   function show(name) {
     current = name;
     const t = tabs[name];
-    cmd.innerHTML = base.replace("| sh", '| <span style="color:var(--pink)">sh</span>') +
+    cmd.innerHTML = base +
       (t.args ? '<span class="arg">' + t.args + "</span>" : "");
     note.innerHTML = t.note;
     document.querySelectorAll(".tabs button").forEach(b =>
@@ -425,7 +404,7 @@
 
   fetch("https://api.github.com/repos/hifinab/cli/releases/latest")
     .then(r => r.ok ? r.json() : null)
-    .then(r => { if (r && r.tag_name) document.getElementById("ver").textContent = r.tag_name + " is out"; })
+    .then(r => { if (r && r.tag_name) document.getElementById("ver").textContent = r.tag_name + " released"; })
     .catch(() => {});
 </script>
 </body>
