@@ -2,20 +2,39 @@
 
 Status: Approved
 
-Dependencies: existing `hi install` script; Anthropic's Claude Code apt
-repository; npm; pipx 1.5 or newer with `--global`.
+Dependencies: existing `hi install` script and bootstrap installer;
+Anthropic's Claude Code apt repository; npm; pipx 1.5 or newer with
+`--global`; the `hi update` replacement rules.
 
 ## Goal
 
-Make every tool installed by `hi install` usable by every account on the
-machine, including accounts created later, instead of only by the user who ran
-the installer.
+Make `hi` itself and every tool installed by `hi install` usable by every
+account on the machine, including accounts created later, instead of only by
+the user who ran the installer.
 
 ## Current state
 
 apt packages are already system-wide: Node.js and npm, GitHub CLI, Docker,
 NetBird, btop, tmux, and ROCm. The remaining tools use per-user installers that
-write to the installing user's `~/.local/bin` and home directory.
+write to the installing user's `~/.local/bin` and home directory. The bootstrap
+installer also puts `hi` in `~/.local/bin/hi`.
+
+## Installing `hi`
+
+The bootstrap installer (`https://hifin.sh/install.sh`) installs `hi` to
+`/usr/local/bin/hi`, owned by root with mode `0755`, using `sudo` after the
+checksum is verified. It asks for `sudo` once, before downloading, and says
+why. `HI_INSTALL_DIR` still selects a per-user location for machines where the
+user has no administrator access; that install is visible only to that user.
+
+Because `/usr/local/bin` is already on every user's `PATH`, the installer no
+longer edits `~/.profile`, and `hi` works in the current shell straight away.
+
+`hi update` replaces the shared binary with `sudo` when it is not writable by
+the running user, keeping root ownership and mode `0755`. Non-administrators
+can run read-only commands such as `hi version`, `hi help`, and
+`hi net status`; commands that change the machine still require `sudo` and
+report that clearly.
 
 ## Installation changes
 
@@ -46,6 +65,8 @@ shadowed by `~/.local/bin`, which precedes `/usr/local/bin` on `PATH`:
 - `~/.local/bin/omp`, `~/.local/bin/herdr`, `~/.local/bin/uv`, and
   `~/.local/bin/uvx`
 - the per-user pipx `amd-debug-tools` environment
+- `~/.local/bin/hi`, once `/usr/local/bin/hi` is installed, and the PATH line
+  the old installer added to `~/.profile` if nothing else uses `~/.local/bin`
 
 It never removes `~/.claude`, `~/.codex` configuration, credentials, or
 history. It lists what it removed.
@@ -90,15 +111,30 @@ directory, and reports a shadowing per-user copy as a failure.
 7. **Docker access is not part of this.** Every user can run the `docker`
    command, but only `docker` group members can use it without `sudo`. Group
    membership is root-equivalent and stays a deliberate per-user choice.
-8. **`hi` itself stays per-user.** Only administrators can run `hi install`,
-   so `hi` remains in the installer's `~/.local/bin`.
+8. **Installing `hi` now needs `sudo`.** `curl … | sh` currently works
+   without administrator access. After this change it prompts for a password
+   up front; users without `sudo` must set `HI_INSTALL_DIR` and get a private
+   copy. The prompt must read from the terminal, since the script arrives on
+   stdin.
+9. **`hi update` changes shape.** The approved `hi update` spec refuses
+   root/user ownership transitions and assumes a writable executable
+   directory. Updating `/usr/local/bin/hi` requires `sudo` and must keep root
+   ownership; build both specs together or update `hi update` first.
+10. **Old per-user copies shadow the shared one.** `~/.local/bin` precedes
+    `/usr/local/bin` on `PATH`, so an existing `~/.local/bin/hi` wins until it
+    is removed, and `hi version` can report a stale version.
+11. **Other users see commands they cannot run.** Every account will have
+    `hi`, but `hi install`, `hi adduser`, and `hi net` need `sudo`. Their
+    errors must say so rather than failing partway through.
 
 ## Acceptance criteria
 
-1. A user created after `hi install` can run `claude`, `codex`, `omp`,
+1. A user created after `hi install` can run `hi`, `claude`, `codex`, `omp`,
    `herdr`, `uv`, and `amd-debug-tools` without any per-user setup.
 2. Every one of these commands resolves under `/usr/bin` or `/usr/local/bin`.
-3. Rerunning `hi install` upgrades the shared tools.
-4. Migration removes the running user's per-user program copies and leaves
+3. The bootstrap installer puts `hi` in `/usr/local/bin` after one `sudo`
+   prompt, and `hi` runs in the same shell without a new login.
+4. Rerunning `hi install` upgrades the shared tools.
+5. Migration removes the running user's per-user program copies and leaves
    their settings and credentials unchanged.
-5. `hi verify strix` fails when a per-user copy shadows a shared tool.
+6. `hi verify strix` fails when a per-user copy shadows a shared tool.

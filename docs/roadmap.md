@@ -77,12 +77,13 @@ metadata, agent instructions, and documentation structure.
   Approved spec: [hi_hostname.md](specs/approved/hi_hostname.md).
 - [ ] Inspect users and login history; manage accounts, groups, and sudo access.
   Approved spec: [hi_user.md](specs/approved/hi_user.md).
-- [ ] Install the AI and developer tools for all users, including accounts
-  created later. Review the caveats before starting.
+- [ ] Install `hi` and the AI and developer tools for all users, including
+  accounts created later. Review the caveats before starting.
   Approved spec: [hi_install_shared.md](specs/approved/hi_install_shared.md).
 
 Dependency: shared tools no longer update themselves, so they rely on
-rerunning `hi install` or on the v0.6.0 `hi update` to stay current.
+rerunning `hi install` or on the v0.6.0 `hi update` to stay current. A shared
+`hi` also changes how `hi update` replaces the binary.
 
 ### v0.10.0 — Remote compute jobs
 
