@@ -29,9 +29,14 @@ GitHub runs `gh auth login` with the terminal attached and then reports
 `gh auth status`. OMP discovers providers through `omp auth-broker list` and
 runs `omp auth-broker login [provider]`.
 
-`hi` must not parse, copy, print, persist, migrate, or refresh provider tokens.
-It may report dependency absence and the native command needed to install or
-retry the provider tool.
+`hi` must not copy, print, persist, migrate, or refresh provider tokens. It may
+report dependency absence and the native command needed to install or retry the
+provider tool.
+
+Exception for API-based commands such as `hi job`: `hi` may read a provider's
+token from that provider's documented environment variable or token file, in
+memory, to authenticate a single API request. The token is never written,
+logged, or passed on the command line.
 
 ## Errors and output
 

@@ -88,16 +88,26 @@ rerunning `hi install` or on the v0.6.0 `hi update` to stay current. A shared
 ### v0.10.0 — Remote compute jobs
 
 - [ ] Install the `hf` CLI and add `hi login hf`.
-- [ ] Run, list, follow, wait for, and cancel Hugging Face Jobs with `hi job`.
+- [ ] Run, list, follow, wait for, and cancel Hugging Face Jobs with `hi job`,
+  calling the Jobs REST API directly.
   Approved spec: [hi_job.md](specs/approved/hi_job.md).
 
-Dependencies: login follows the v0.6.0 delegation rules. Script jobs run
+Dependencies: login follows the v0.6.0 delegation rules, with the token-read
+exception in [hi_login.md](specs/approved/hi_login.md). Script jobs run
 through `uv`, matching the v0.7.0 Python template.
 
-### v0.11.0 — More compute providers
+### v0.11.0 — RunPod jobs
 
-- [ ] Add a SkyPilot provider for RunPod, Lambda, AWS, GCP, Azure, and
-  Kubernetes without changing the `hi job` commands.
+- [ ] Add a RunPod driver through its REST API without changing the `hi job`
+  commands.
   Approved spec: [hi_job.md](specs/approved/hi_job.md).
 
-Dependency: extends the v0.10.0 provider interface and job identifiers.
+Dependency: extends the v0.10.0 driver interface and job identifiers.
+
+### Deferred — Modal jobs
+
+- [ ] Add a Modal driver through Modal's official Go SDK.
+  Approved spec: [hi_job.md](specs/approved/hi_job.md).
+
+Waiting until Modal's Go SDK leaves beta and its package path settles. Not
+scheduled to a version yet.
