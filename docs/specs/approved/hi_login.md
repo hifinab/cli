@@ -33,7 +33,7 @@ runs `omp auth-broker login [provider]`.
 report dependency absence and the native command needed to install or retry the
 provider tool.
 
-Exception for API-based commands such as `hi job`: `hi` may read a provider's
+Exception for API-based commands such as `hi compute`: `hi` may read a provider's
 token from that provider's documented environment variable or token file, in
 memory, to authenticate a single API request. The token is never written,
 logged, or passed on the command line.

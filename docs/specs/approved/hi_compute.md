@@ -1,21 +1,38 @@
 # `hi compute` specification
 
-Status: Draft
+Status: Approved for batch runs and the shared lifecycle commands (`run`,
+`ls`, `status`, `logs`, `wait`, `stop`, `hardware`, `providers`) on Hugging
+Face and RunPod. Everything marked **(draft)** is not yet approved: interactive
+instances, the TUI, compute files, templates, serving, and further providers.
 
-Dependencies: the provider layer defined here and shared with
-[hi_job.md](../approved/hi_job.md); OpenSSH; `hi login`; the recipe catalog
-from [hi_model.md](hi_model.md) for `serve`.
+Dependencies: provider APIs and SDKs as listed under Provider integration;
+the `hf` CLI for login only; `hi login`; `uv` for script runs; OpenSSH for
+interactive instances; the recipe catalog from
+[hi_model.md](../ideas/hi_model.md) for `serve`.
 
 ## Goal
 
-Rent an interactive remote machine, use it as if it were local, and give it
-back, with the same commands on every provider. Colleagues should not have to
-learn Hugging Face, Colab, RunPod, and Modal separately just to get a GPU, open
-a shell on it, reach a port from their laptop, or try a model.
+Use rented remote compute from a workstation with one command set on every
+provider. Colleagues should not have to learn Hugging Face, Colab, RunPod, and
+Modal separately just to run a training script on a GPU, open a shell on one,
+reach a port from their laptop, or try a model.
 
-`hi job` covers work that runs to completion and exits. `hi compute` covers
-machines that stay up until you are done with them: debugging sessions, model
-servers, notebooks, and experiments.
+`hi compute` covers two kinds of work with the same commands:
+
+- **Runs** execute one command or script and stop by themselves when it
+  finishes: training, evaluation, batch inference, data processing.
+  `hi compute run` starts one.
+- **Instances** stay up until you stop them or a limit is reached: debugging
+  sessions, model servers, notebooks, experiments. `hi compute up` starts one.
+  **(draft)**
+
+Both appear in the same `ls`, share `logs`, `wait`, and `stop`, and obey the
+same limits and cost confirmation. A run is an instance whose lifetime is its
+command.
+
+The name `compute` was chosen over `job`, which fits only runs, and over
+`remote`, `cloud`, and `gpu`, which clash with git and SSH vocabulary, suggest
+infrastructure management, or exclude CPU work.
 
 ## Lessons from colab-runner
 
@@ -58,7 +75,7 @@ the design:
   mistake; "stop all" now confirms. After a tunnel closes, colab-runner offers
   to stop the instance so it does not keep billing.
 
-## How far to unify
+## How far to unify (draft)
 
 Unify what is the same everywhere, and stop there:
 
@@ -119,67 +136,124 @@ without a tunnel.
 
 ### Credentials
 
-`hi login <provider>` delegates to the provider's own login where one exists
-(`hf auth login`, `colab`'s OAuth flow). For API providers, `hi` reads the
-token from the provider's standard location or environment variable
-(`HF_TOKEN`, then `~/.cache/huggingface/token`; `RUNPOD_API_KEY`; and so on)
-in memory for each call. It never copies, prints, or stores it. This relaxes
-the `hi login` rule that `hi` never parses tokens, and needs that spec updated
-before the first API driver ships.
+`hi install` installs the `hf` CLI. `hi login <provider>` delegates to the
+provider's own login where one exists (`hf auth login`, then `hf auth whoami`;
+`colab`'s OAuth flow). For API providers, `hi` reads the token from the
+provider's standard location or environment variable in memory for each
+request, under the exception in [hi_login.md](hi_login.md). It never copies,
+prints, or stores it.
+
+- Hugging Face: `HF_TOKEN`, then the file named by `HF_TOKEN_PATH`, then
+  `$HF_HOME/token` (default `~/.cache/huggingface/token`), matching
+  `huggingface_hub`.
+- RunPod: `RUNPOD_API_KEY`, or the key `runpodctl` stores.
+
+`--secret KEY` reads `KEY` from the local environment and sends it in the
+provider's encrypted secrets field. The value never appears in `hi` arguments,
+output, or files.
+
+### Hugging Face Jobs API
+
+Hugging Face is called through its REST API at
+`https://huggingface.co/api/jobs` (documented with an OpenAPI spec) rather
+than by wrapping the `hf` CLI.
+
+| `hi compute`      | Hugging Face Jobs API                              |
+|-------------------|----------------------------------------------------|
+| `run <image>`     | `POST /api/jobs/{namespace}` with `dockerImage`    |
+| `run <script.py>` | `POST /api/jobs/{namespace}` running `uv run`      |
+| `up` **(draft)**  | Same, with SSH enabled, exposed ports, and a long-running command |
+| `ls`              | `GET /api/jobs/{namespace}`                        |
+| `status`          | `GET /api/jobs/{namespace}/{id}`                   |
+| `logs`            | `GET /api/jobs/{namespace}/{id}/logs` (SSE stream) |
+| `wait`            | Poll `status` until a final stage                  |
+| `stop`            | `POST /api/jobs/{namespace}/{id}/cancel`           |
+| `hardware`        | `GET /api/jobs/hardware`, including prices         |
+
+The API documentation is thinner than the Python client's, so request and
+response shapes are pinned in tests against the OpenAPI spec, with the
+`huggingface_hub` source as the reference. Log streams send keep-alives and
+may be empty early in a run's life; both are handled without error.
+`--dry-run` also prints the equivalent `hf jobs` command for users who want to
+run it by hand.
 
 ### Phasing
 
-1. **Hugging Face** through its API. It is already first for `hi job`, bills
-   per minute, and has SSH and HTTPS ports.
-2. **Colab** through its CLI. The team already has Pro+ units and the proven
-   colab-runner flow; this ports it into `hi`.
-3. **RunPod** through its API. It has the cheapest broad GPU range and needs
-   the `hi` watchdog, which Lambda and Vast reuse later.
+1. **Hugging Face** through its API: runs first, then instances. It bills per
+   minute and has SSH and HTTPS ports.
+2. **RunPod** through its API: runs, then instances. It has a broad GPU range
+   and needs the `hi` watchdog, which Lambda and Vast reuse later.
+3. **Colab** through its CLI **(draft)**. The team already has Pro+ units and
+   the proven colab-runner flow; Colab suits instances more than runs.
 4. **Modal** through its Go SDK. It is on the roadmap, but implementation
    waits until the SDK leaves beta and its package path settles.
-5. **Lambda, Vast.ai, and SkyPilot** on demand. SkyPilot overlaps with the
-   drivers above, so it is only worth adding for clouds `hi` does not cover.
+5. **Lambda, Vast.ai, and SkyPilot** on demand **(draft)**. SkyPilot overlaps
+   with the drivers above, so it is only worth adding for clouds `hi` does not
+   cover.
 
 ## Commands
 
 ```text
-hi compute                              Step-by-step TUI over everything below
-hi compute <file.yaml>                  Start what a compute file describes
-hi compute templates                    List ready-made compute templates
-hi compute new <template> [<file>]      Write a template to a compute file to edit
-hi compute providers                    Installed, authenticated, and capable providers
-hi compute gpus [--on <provider>]       Hardware flavors and prices
-hi compute up [<file.yaml>] [options]   Start an instance
-hi compute ls                           Instances started through hi, with cost so far
-hi compute ssh <name> [-- <command>]    Open a shell or run one command
-hi compute tunnel <name> <port>[:<local>]
-                                        Forward a remote port to localhost
-hi compute push <name> <path> [<dest>]  Copy files to the instance
-hi compute pull <name> <path> [<dest>]  Copy files back
-hi compute logs <name> [--follow]       Setup and server logs from the state contract
-hi compute serve [<recipe>] [options]   Start an instance, serve a model, tunnel it
-hi compute down <name> | --all          Stop and release instances
+hi compute run [options] <image> -- <command> [args...]
+hi compute run [options] <script.py> [-- args...]
+                                        Run to completion, streaming logs
+hi compute ls [--all]                   Runs and instances started through hi
+hi compute status <name>                State, hardware, limits, and cost so far
+hi compute logs <name> [--follow]       Output of a run, or setup and server logs
+hi compute wait <name>...               Wait until runs finish; exit with their status
+hi compute stop <name> | --all          Stop runs or instances
+hi compute hardware [--on <provider>]   Hardware flavors and prices
+hi compute providers                    Configured and authenticated providers
 ```
 
-`up` and `serve` options:
+Draft commands for instances and guided use:
 
 ```text
---on <provider>      hf, colab, runpod, modal, ...; default from config
---gpu <flavor>       Provider flavor, or a size filter such as 24gb
---name <name>        Local handle; generated when omitted
---image <image>      Container image where the provider supports one
---idle <duration>    Stop after this long without SSH, tunnel, or HTTP traffic
---max <duration>     Hard lifetime limit, always enforced
---set <key>=<value>  Override any compute-file field, such as ports.0=8080
---yes                Skip the cost confirmation
---dry-run            Print the resolved setup and provider calls; start nothing
+hi compute                              Step-by-step TUI over everything     (draft)
+hi compute <file.yaml>                  Start what a compute file describes  (draft)
+hi compute templates                    List ready-made compute templates    (draft)
+hi compute new <template> [<file>]      Write a template to edit             (draft)
+hi compute up [<file.yaml>] [options]   Start an instance                    (draft)
+hi compute ssh <name> [-- <command>]    Open a shell or run one command      (draft)
+hi compute tunnel <name> <port>[:<local>]
+                                        Forward a remote port to localhost   (draft)
+hi compute push <name> <path> [<dest>]  Copy files to the instance           (draft)
+hi compute pull <name> <path> [<dest>]  Copy files back                      (draft)
+hi compute serve [<recipe>] [options]   Serve a model and tunnel it          (draft)
+hi compute proxy <name>                 SSH ProxyCommand used by ssh config  (draft)
 ```
 
-Instance names are local handles mapped to provider IDs, such as
-`hf/68498e23…` or `colab/qwen`. `hi compute ls` reconciles with the provider on
-every call; the provider is the source of truth.
+Until the TUI is approved, bare `hi compute` prints help.
 
-## Three ways in
+Options for `run` and `up`:
+
+```text
+--on <provider>      hf, runpod, ...; default from config, else hf
+--gpu <flavor>       Provider flavor, such as a10g-small or cpu-basic
+--name <name>        Local handle; generated when omitted
+--env KEY=VALUE      Plain environment variable; repeatable
+--secret KEY         Secret read from the local environment; repeatable
+--max <duration>     Hard lifetime limit, such as 30m or 4h; always enforced
+--detach             run only: return after submission instead of streaming logs
+--yes                Skip the cost confirmation
+--dry-run            Print the resolved setup and provider requests; start nothing
+--image <image>      up only: container image where supported             (draft)
+--idle <duration>    up only: stop after this long without traffic        (draft)
+--set <key>=<value>  Override a compute-file field                        (draft)
+```
+
+For `run`, a `.py` argument runs as a uv script, so its inline dependencies
+are installed remotely. Anything else is a container image, and the command
+after `--` runs inside it. `run` streams logs unless `--detach` is given and
+exits with the run's final status. `--max` is the run's timeout; without it
+the provider's default applies and is shown.
+
+Names are local handles mapped to provider IDs, such as `hf/68498e23…` or
+`runpod/qwen`, so follow-up commands need no `--on`. `hi compute ls`
+reconciles with the provider on every call; the provider is the source of
+truth. It shows runs and instances together, with a kind column.
+
+## Three ways in (draft)
 
 Every `up` and `serve` is resolved from the same settings, which can come from
 three places. They mix freely, and the result is identical whichever way the
@@ -292,7 +366,7 @@ directly and opens the TUI for anything it cannot default, such as the model.
 Teams add their own templates in `~/.config/hi/compute/templates/` or a
 project's `.hi/compute/` directory; project templates are listed first.
 
-## Connectivity
+## Connectivity (draft)
 
 Every instance is reachable as an SSH host. `hi` writes a `Host hi-<name>`
 block to a managed include file (`~/.ssh/config.d/hi`) whose `ProxyCommand` is
@@ -309,7 +383,7 @@ TCP connection, `ssh.hf.jobs`, or `colab ssh --proxy-mode`. Plain `ssh`,
   teammates reach it by name. It is unavailable where the provider has no
   `/dev/net/tun`, such as Colab, unless NetBird runs in netstack mode.
 
-## Remote state contract
+## Remote state contract (draft)
 
 Setup and serving on the instance follow one contract, taken from
 colab-runner's `remote/serve.sh`:
@@ -325,7 +399,7 @@ colab-runner's `remote/serve.sh`:
 - `hi compute logs` shows these logs, so failures are debuggable without
   opening a shell.
 
-## Serving models
+## Serving models (draft)
 
 `hi compute serve <recipe>` combines `up`, setup, the health check, and
 `tunnel`, then prints an OpenAI-compatible base URL on localhost:
@@ -362,19 +436,27 @@ provider's secret mechanism and never printed.
 
 ## Cost safety
 
-- Every instance has a maximum lifetime; `--idle` defaults to 30 minutes and
-  `--max` to 4 hours unless configured otherwise.
-- `up` and `serve` show provider, flavor, price per hour, and limits, and ask
-  for confirmation on paid hardware. Prices come from the provider's API where
+- Every run and instance has a maximum lifetime. For instances, `--idle`
+  defaults to 30 minutes and `--max` to 4 hours unless configured otherwise.
+  `--yes` and `--detach` never remove a limit.
+- `run`, `up`, and `serve` show provider, flavor, price per hour, and limits,
+  and ask for confirmation on paid hardware. Prices come from the provider's API where
   available and are shown in the provider's own unit.
 - `hi compute ls` shows running time and estimated cost so far.
 - Any `hi` command prints a one-line reminder while instances started through
-  `hi` are still running.
+  `hi` are still running. **(draft)**
 - Where the provider has no native limit, `hi` installs a small watchdog on the
   instance that stops it through the provider API after the idle or maximum
   limit, so a closed laptop never leaves a GPU running. `hi compute ls` also
   stops instances whose limits have passed.
-- `down --all` lists what it will stop and asks for confirmation.
+- `stop --all` lists what it will stop and asks for confirmation.
+
+## Errors and output
+
+Unknown providers, unknown hardware, and malformed `--env` values fail before
+any provider request. A missing or rejected token names the `hi login` command
+to run. Every provider call has its own time limit, and a failed poll is
+retried rather than reported as a failed run.
 
 ## Configuration
 
@@ -385,8 +467,6 @@ the project.
 
 ## Relationship to other commands
 
-- **`hi job`:** shares drivers, identifiers, credentials, and cost
-  confirmation. A job is an instance that runs one command and stops itself.
 - **`hi model`:** shares recipes and health checks; `hi model` serves locally,
   `hi compute serve` remotely.
 - **`hi net`:** supplies the optional mesh connectivity.
@@ -395,43 +475,59 @@ the project.
 
 ## Open questions
 
-1. Whether `hi job` and `hi compute` should merge into one command with `run`
-   and `up` subcommands, now that both share one driver layer.
-2. Whether the Hugging Face SSH gateway works on every flavor and forwards
+1. Whether the Hugging Face SSH gateway works on every flavor and forwards
    arbitrary ports; the docs show `ssh -L` but do not list restrictions.
-3. How Colab drives setup inside a runtime that cannot run a custom image:
+2. How Colab drives setup inside a runtime that cannot run a custom image:
    build on first use and cache on Google Drive, or download prebuilt binaries.
-4. Shared team defaults and budgets: per-user config only, or a checked-in
+3. Shared team defaults and budgets: per-user config only, or a checked-in
    team config with spend limits.
-5. Whether the watchdog should be opt-out, given it runs code on the instance
+4. Whether the watchdog should be opt-out, given it runs code on the instance
    with a provider API key that can stop it.
-6. TUI library: a Go framework such as Bubble Tea keeps `hi` a single static
+5. TUI library: a Go framework such as Bubble Tea keeps `hi` a single static
    binary; confirm size and accessibility before choosing.
-7. Whether compute files should allow several instances, such as a server plus
+6. Whether compute files should allow several instances, such as a server plus
    a client, or stay one instance per file.
 
 ## Acceptance criteria
 
-1. `hi compute up --on hf --gpu a10g-small` starts an instance, prints its
-   name, price, and limits, and `hi compute ssh <name>` opens a shell on it.
-2. `ssh hi-<name>`, `rsync`, and VS Code Remote-SSH work for every provider
-   that supports SSH, without provider-specific setup by the user.
-3. `hi compute tunnel <name> 8000` makes the remote port reachable only on
-   `127.0.0.1:8000`.
-4. `hi compute serve qwen3.8-flash-next --on colab --gpu G4` reproduces the
-   colab-runner result: a local OpenAI-compatible URL after a passing health
-   check.
-5. A dropped connection during setup does not stop setup, and rerunning
-   `serve` resumes rather than restarts it.
-6. Every instance stops by itself after its idle or maximum limit, including
-   when the laptop is offline.
-7. `hi compute ls` and `down` see only instances started through `hi` and
-   agree with the provider's own listing.
-8. An unknown hardware name fails before any provider call.
-9. The same setup started from the TUI, from flags, and from a compute file
-   produces identical provider calls in `--dry-run`.
-10. Without a terminal, missing settings fail with the list of required flags
+Runs (approved):
+
+1. `hi compute run python:3.12 -- python -c "print(1)"` runs on Hugging Face
+   and exits with the run's status.
+2. `hi compute run train.py --gpu a10g-small` runs as a uv script on an A10G.
+3. `--dry-run` prints the resolved request and the equivalent `hf jobs`
+   command, and starts nothing.
+4. Paid hardware requires confirmation unless `--yes` is given.
+5. `ls`, `status`, `logs --follow`, `wait`, and `stop` accept the name
+   returned by `run`.
+6. Secret values and tokens never appear in process arguments, output, or
+   files written by `hi`.
+7. A missing or rejected token produces the `hi login` command and a non-zero
+   exit.
+8. Runs work on a workstation without Python or the `hf` CLI once a token is
+   available.
+9. An unknown hardware name fails before any provider request.
+10. Adding a provider requires a new driver only, with no change to the
+    command surface.
+
+Instances **(draft)**:
+
+11. `hi compute up --on hf --gpu a10g-small` starts an instance, prints its
+    name, price, and limits, and `hi compute ssh <name>` opens a shell on it.
+12. `ssh hi-<name>`, `rsync`, and VS Code Remote-SSH work for every provider
+    that supports SSH, without provider-specific setup by the user.
+13. `hi compute tunnel <name> 8000` makes the remote port reachable only on
+    `127.0.0.1:8000`.
+14. `hi compute serve qwen3.8-flash-next --on colab --gpu G4` reproduces the
+    colab-runner result: a local OpenAI-compatible URL after a passing health
+    check.
+15. A dropped connection during setup does not stop setup, and rerunning
+    `serve` resumes rather than restarts it.
+16. Every instance stops by itself after its idle or maximum limit, including
+    when the laptop is offline.
+17. `ls` and `stop` see only runs and instances started through `hi` and agree
+    with the provider's own listing.
+18. The same setup started from the TUI, from flags, and from a compute file
+    produces identical provider requests in `--dry-run`.
+19. Without a terminal, missing settings fail with the list of required flags
     instead of prompting.
-11. Credentials and API keys never appear in `hi` output, arguments, or files.
-12. Adding a provider requires a new driver only, with no change to the
-    `hi compute` command surface.

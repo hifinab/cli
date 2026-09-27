@@ -85,29 +85,33 @@ Dependency: shared tools no longer update themselves, so they rely on
 rerunning `hi install` or on the v0.6.0 `hi update` to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
-### v0.10.0 — Remote compute jobs
+### v0.10.0 — Remote compute runs
 
 - [ ] Install the `hf` CLI and add `hi login hf`.
-- [ ] Run, list, follow, wait for, and cancel Hugging Face Jobs with `hi job`,
-  calling the Jobs REST API directly.
-  Approved spec: [hi_job.md](specs/approved/hi_job.md).
+- [ ] Run, list, follow, wait for, and stop Hugging Face Jobs with
+  `hi compute run`, calling the Jobs REST API directly.
+  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
 Dependencies: login follows the v0.6.0 delegation rules, with the token-read
-exception in [hi_login.md](specs/approved/hi_login.md). Script jobs run
-through `uv`, matching the v0.7.0 Python template.
+exception in [hi_login.md](specs/approved/hi_login.md). Script runs use `uv`,
+matching the v0.7.0 Python template.
 
-### v0.11.0 — RunPod jobs
+### v0.11.0 — RunPod runs
 
-- [ ] Add a RunPod driver through its REST API without changing the `hi job`
-  commands.
-  Approved spec: [hi_job.md](specs/approved/hi_job.md).
+- [ ] Add a RunPod driver through its REST API without changing the
+  `hi compute` commands.
+  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
-Dependency: extends the v0.10.0 driver interface and job identifiers.
+Dependency: extends the v0.10.0 driver interface and names.
 
-### Deferred — Modal jobs
+### Deferred — Modal runs
 
 - [ ] Add a Modal driver through Modal's official Go SDK.
-  Approved spec: [hi_job.md](specs/approved/hi_job.md).
+  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
 Waiting until Modal's Go SDK leaves beta and its package path settles. Not
 scheduled to a version yet.
+
+Interactive instances (`hi compute up`, SSH, tunnels, serving, the TUI, and
+compute files) are specified in the same file but still marked draft, so they
+stay off the roadmap until approved.
