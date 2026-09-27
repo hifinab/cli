@@ -95,9 +95,9 @@ func (f *fakeHF) serve(w http.ResponseWriter, r *http.Request) {
 		if spec["expose"] != nil {
 			status["exposeUrls"] = []string{"https://" + id + "--8000.hf.jobs"}
 		}
-		job := map[string]any{"id": id, "createdAt": fmt.Sprintf("2026-09-27T10:%02d:00Z", f.nextID),
-			"flavor": spec["flavor"], "labels": spec["labels"], "owner": map[string]string{"name": namespace},
-			"status": status}
+		job := map[string]any{"id": id, "createdAt": time.Now().UTC().Format(time.RFC3339),
+			"timeout": spec["timeoutSeconds"], "flavor": spec["flavor"], "labels": spec["labels"],
+			"owner": map[string]string{"name": namespace}, "status": status}
 		f.jobs[id] = job
 		f.namespaces[id] = namespace
 		writeJSON(job)
@@ -118,6 +118,9 @@ func (f *fakeHF) serve(w http.ResponseWriter, r *http.Request) {
 		writeJSON(job)
 		// The next poll sees the job finished.
 		job["status"].(map[string]any)["stage"] = f.finalStage
+		if f.finalStage == "ERROR" {
+			job["status"].(map[string]any)["message"] = "Job failed with exit code: 3. Reason: Error."
+		}
 	case len(parts) == 5 && parts[4] == "logs":
 		w.Header().Set("Content-Type", "text/event-stream")
 		for _, line := range f.logLines {
@@ -216,8 +219,8 @@ func TestHFRunImageAndExitCodes(t *testing.T) {
 	fake := newFakeHF(t)
 	fake.finalStage = "ERROR"
 	code, _, stderr := runComputeTest("run", "--on", "hf", "python:3.12", "--", "python", "-c", "raise SystemExit(1)")
-	if code != 1 {
-		t.Fatalf("exit code = %d, want 1 for a failed job; stderr: %s", code, stderr)
+	if code != 3 {
+		t.Fatalf("exit code = %d, want the job's own 3; stderr: %s", code, stderr)
 	}
 	spec := fake.lastSpec()
 	if spec["dockerImage"] != "python:3.12" || fmt.Sprint(spec["command"]) != "[python -c raise SystemExit(1)]" {
@@ -231,13 +234,26 @@ func TestHFRunImageAndExitCodes(t *testing.T) {
 func TestHFRunDetachAndWait(t *testing.T) {
 	fake := newFakeHF(t)
 	code, stdout, _ := runComputeTest("run", "--on", "hf", "--detach", "--name", "later", "python:3.12", "--", "true")
-	if code != 0 || !strings.Contains(stdout, "hi compute logs hf/job0001 --follow") {
+	if code != 0 || !strings.Contains(stdout, "hi compute logs later --follow") {
 		t.Fatalf("exit code = %d, stdout:\n%s", code, stdout)
 	}
+	code, stdout, _ = runComputeTest("ls")
+	if code != 0 || !strings.Contains(stdout, "later") || strings.Contains(stdout, "not started by hi") ||
+		!strings.Contains(stdout, "1h") {
+		t.Fatalf("a detached hi job should be listed as managed with its limit:\n%s", stdout)
+	}
 	fake.finalStage = "CANCELED"
-	code, stdout, stderr := runComputeTest("wait", "hf/later")
+	code, stdout, stderr := runComputeTest("wait", "later")
 	if code != 130 || !strings.Contains(stdout, "later canceled") {
 		t.Fatalf("wait exit code = %d, stdout = %s, stderr = %s", code, stdout, stderr)
+	}
+	// Finished jobs are still found by name.
+	code, stdout, stderr = runComputeTest("status", "later")
+	if code != 0 || !strings.Contains(stdout, "State:     canceled") {
+		t.Fatalf("status of a finished job: exit code = %d, stdout = %s, stderr = %s", code, stdout, stderr)
+	}
+	if code, _, stderr = runComputeTest("logs", "later", "-n", "5"); code != 0 {
+		t.Fatalf("logs of a finished job failed: %s", stderr)
 	}
 }
 

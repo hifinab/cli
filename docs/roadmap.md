@@ -61,8 +61,6 @@ Drafts in `specs/ideas/` remain outside the roadmap until approved.
 Dependency: the Colab CLI (`google-colab-cli`) and a Colab Pro or Pro+ plan,
 which SSH requires.
 
-## Planned
-
 ### v0.7.0 — Hugging Face compute
 
 - [x] Install the `hf` CLI and add `hi login hf` (and `hi login colab`).
@@ -72,12 +70,16 @@ which SSH requires.
 - [x] Start and reach Hugging Face instances with `hi compute up`, `ssh`,
   `tunnel`, and `logs`; serve models with `hi compute serve`.
 - [x] Infer the provider from the hardware name when both are signed in.
-- [ ] Verify against a live Hugging Face account before release. Blocked: the
-  test account has no pre-paid Jobs credits (HTTP 402).
+- [x] Verify against a live account (the `hifinab` organization): runs,
+  detached runs, `up`/`stop`, and `serve` on a `t4-small` (ready in about a
+  minute, ~220 tokens/s for Qwen3-0.6B), for under $0.05. SSH through the Jobs
+  gateway still needs a registered key to test.
   Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
 Dependencies: the v0.6.0 driver interface, state, and SSH layer; the
 token-read exception in [hi_login.md](specs/approved/hi_login.md).
+
+## Planned
 
 ### v0.8.0 — RunPod compute
 

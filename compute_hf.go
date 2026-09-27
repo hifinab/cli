@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -64,6 +65,7 @@ type hfJob struct {
 	ID        string            `json:"id"`
 	CreatedAt string            `json:"createdAt"`
 	Flavor    string            `json:"flavor"`
+	Timeout   int               `json:"timeout"`
 	Labels    map[string]string `json:"labels"`
 	Owner     struct {
 		Name string `json:"name"`
@@ -517,14 +519,37 @@ func (p *hfProvider) list() ([]computeInstance, error) {
 	}
 	instances := make([]computeInstance, 0, len(jobs))
 	for _, job := range jobs {
-		instances = append(instances, computeInstance{
-			name:     jobName(job),
-			hardware: job.Flavor,
-			detail:   fmt.Sprintf("%s/jobs/%s/%s", hfEndpoint(), job.Owner.Name, job.ID),
-			state:    strings.ToLower(job.Status.Stage),
-		})
+		instances = append(instances, hfInstance(job))
 	}
 	return instances, nil
+}
+
+func hfInstance(job hfJob) computeInstance {
+	instance := computeInstance{
+		name:     jobName(job),
+		hardware: job.Flavor,
+		detail:   fmt.Sprintf("%s/jobs/%s/%s", hfEndpoint(), job.Owner.Name, job.ID),
+		state:    strings.ToLower(job.Status.Stage),
+		managed:  job.Labels["managed-by"] == "hi",
+	}
+	if created, err := time.Parse(time.RFC3339, job.CreatedAt); err == nil {
+		instance.created = created
+		if job.Timeout > 0 && hfJobActive(job.Status.Stage) {
+			instance.deadline = created.Add(time.Duration(job.Timeout) * time.Second)
+		}
+	}
+	if job.Status.Message != "" {
+		instance.state += ": " + job.Status.Message
+	}
+	return instance
+}
+
+func (p *hfProvider) lookup(name string) (computeInstance, error) {
+	job, err := p.findJob(name)
+	if err != nil {
+		return computeInstance{}, err
+	}
+	return hfInstance(job), nil
 }
 
 // findJob resolves a hi name or job ID. Active jobs are checked first, then
@@ -614,7 +639,12 @@ func (p *hfProvider) ssh(name string) (sshTarget, error) {
 	if port := address.Port(); port != "" {
 		options = append(options, "-p", port)
 	}
-	return sshTarget{options: options, destination: address.User.Username() + "@" + address.Hostname()}, nil
+	return sshTarget{
+		options:     options,
+		destination: address.User.Username() + "@" + address.Hostname(),
+		hint: "hi: Hugging Face only accepts SSH keys registered on your account; add your public key " +
+			"(~/.ssh/id_ed25519.pub) at https://huggingface.co/settings/keys",
+	}, nil
 }
 
 // streamLogs prints the job's logs from the Server-Sent Events endpoint. With
@@ -722,12 +752,21 @@ func (p *hfProvider) logs(name string, follow bool, lines int, stdin io.Reader, 
 	return p.streamLogs(job, follow, lines, stdout)
 }
 
+var hfExitCodePattern = regexp.MustCompile(`exit code: (\d+)`)
+
+// hfExitCode passes a failed job's own exit code through when Hugging Face
+// reports it, as in "Job failed with exit code: 3. Reason: Error."
 func hfExitCode(job hfJob) int {
 	switch job.Status.Stage {
 	case "COMPLETED":
 		return 0
 	case "CANCELED":
 		return 130
+	}
+	if match := hfExitCodePattern.FindStringSubmatch(job.Status.Message); match != nil {
+		if code, err := strconv.Atoi(match[1]); err == nil && code > 0 && code < 256 {
+			return code
+		}
 	}
 	return 1
 }
@@ -776,7 +815,12 @@ func (p *hfProvider) runJob(request runRequest, stdin io.Reader, stdout, stderr 
 	}
 	fmt.Fprintf(stdout, "Started job %s: %s/jobs/%s/%s\n", job.ID, hfEndpoint(), namespace, job.ID)
 	if request.detach {
-		fmt.Fprintf(stdout, "Follow it with: hi compute logs hf/%s --follow\n", job.ID)
+		handle := "hf/" + job.ID
+		if request.name != "" {
+			handle = request.name
+		}
+		fmt.Fprintf(stdout, "Follow it with: hi compute logs %s --follow\n", handle)
+		fmt.Fprintf(stdout, "Wait for it:    hi compute wait %s\n", handle)
 		return 0, nil
 	}
 	if err := p.streamLogs(job, true, 0, stdout); err != nil {
@@ -792,7 +836,11 @@ func (p *hfProvider) serverState(name string) (string, error) {
 		return "", err
 	}
 	if !hfJobActive(job.Status.Stage) {
-		return fmt.Sprintf("failed: the job is %s %s", strings.ToLower(job.Status.Stage), job.Status.Message), nil
+		message := "failed: the job ended (" + strings.ToLower(job.Status.Stage) + ")"
+		if job.Status.Message != "" {
+			message += ": " + strings.TrimSuffix(job.Status.Message, ".")
+		}
+		return message, nil
 	}
 	if job.Status.Stage != "RUNNING" {
 		return "waiting for hardware (" + strings.ToLower(job.Status.Stage) + ")", nil

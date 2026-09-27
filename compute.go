@@ -73,6 +73,17 @@ type computeInstance struct {
 	shape    string
 	detail   string
 	state    string
+	// managed, created, and deadline come from the provider when it records
+	// them itself, such as Hugging Face job labels and timeouts.
+	managed  bool
+	created  time.Time
+	deadline time.Time
+}
+
+// historyProvider can also find instances that have finished, for logs,
+// wait, and status after the fact.
+type historyProvider interface {
+	lookup(name string) (computeInstance, error)
 }
 
 type upRequest struct {
@@ -106,6 +117,16 @@ type runRequest struct {
 type sshTarget struct {
 	options     []string
 	destination string
+	// hint explains the most likely cause when ssh fails, such as a key
+	// that is not registered with the provider.
+	hint string
+}
+
+func withSSHHint(target sshTarget, err error) error {
+	if err != nil && target.hint != "" {
+		return fmt.Errorf("%w\n%s", err, target.hint)
+	}
+	return err
 }
 
 // computeRecord is what hi remembers locally about instances it started.
@@ -590,10 +611,16 @@ func computeListCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 	for _, item := range listed {
 		up, stopsIn := "-", "-"
 		name := item.instance.name
-		if item.record != nil {
+		switch {
+		case item.record != nil:
 			up = formatDuration(now.Sub(item.record.Created))
 			stopsIn = formatDuration(item.record.Deadline.Sub(now))
-		} else {
+		case item.instance.managed && !item.instance.created.IsZero():
+			up = formatDuration(now.Sub(item.instance.created))
+			if !item.instance.deadline.IsZero() {
+				stopsIn = formatDuration(item.instance.deadline.Sub(now))
+			}
+		case !item.instance.managed:
 			name += " (not started by hi)"
 		}
 		hardware := item.instance.hardware
@@ -662,30 +689,53 @@ func computeStatusCommand(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	for _, item := range listed {
-		if item.instance.name != name {
-			continue
+		if item.instance.name == name {
+			printInstanceStatus(item.provider, item.instance, item.record, stdout)
+			return nil
 		}
-		fmt.Fprintf(stdout, "Name:      %s\n", name)
-		fmt.Fprintf(stdout, "Provider:  %s\n", item.provider)
-		fmt.Fprintf(stdout, "Hardware:  %s\n", item.instance.hardware)
-		if item.instance.shape != "" {
-			fmt.Fprintf(stdout, "Shape:     %s\n", item.instance.shape)
+	}
+	provider, _, err := findInstance(args[0])
+	if err != nil {
+		return err
+	}
+	if history, ok := provider.(historyProvider); ok {
+		if instance, err := history.lookup(name); err == nil {
+			printInstanceStatus(provider.name(), instance, nil, stdout)
+			return nil
 		}
-		if item.instance.detail != "" {
-			fmt.Fprintf(stdout, "Endpoint:  %s\n", item.instance.detail)
-		}
-		if item.record != nil {
-			now := computeNow()
-			fmt.Fprintf(stdout, "Started:   %s (%s ago)\n",
-				item.record.Created.Format("2006-01-02 15:04"), formatDuration(now.Sub(item.record.Created)))
-			fmt.Fprintf(stdout, "Stops at:  %s (in %s)\n",
-				item.record.Deadline.Format("2006-01-02 15:04"), formatDuration(item.record.Deadline.Sub(now)))
-		} else {
-			fmt.Fprintln(stdout, "Limits:    none; not started by hi")
-		}
-		return nil
 	}
 	return fmt.Errorf("no instance named %q", name)
+}
+
+func printInstanceStatus(provider string, instance computeInstance, record *computeRecord, stdout io.Writer) {
+	now := computeNow()
+	fmt.Fprintf(stdout, "Name:      %s\n", instance.name)
+	fmt.Fprintf(stdout, "Provider:  %s\n", provider)
+	fmt.Fprintf(stdout, "Hardware:  %s\n", instance.hardware)
+	if instance.state != "" {
+		fmt.Fprintf(stdout, "State:     %s\n", instance.state)
+	}
+	if instance.shape != "" {
+		fmt.Fprintf(stdout, "Shape:     %s\n", instance.shape)
+	}
+	if instance.detail != "" {
+		fmt.Fprintf(stdout, "Details:   %s\n", instance.detail)
+	}
+	created, deadline := instance.created, instance.deadline
+	if record != nil {
+		created, deadline = record.Created, record.Deadline
+	}
+	switch {
+	case !created.IsZero():
+		fmt.Fprintf(stdout, "Started:   %s (%s ago)\n",
+			created.Local().Format("2006-01-02 15:04"), formatDuration(now.Sub(created)))
+		if !deadline.IsZero() {
+			fmt.Fprintf(stdout, "Stops at:  %s (in %s)\n",
+				deadline.Local().Format("2006-01-02 15:04"), formatDuration(deadline.Sub(now)))
+		}
+	case !instance.managed:
+		fmt.Fprintln(stdout, "Limits:    none; not started by hi")
+	}
 }
 
 // instanceName accepts both `qwen` and `colab/qwen`.
@@ -728,6 +778,18 @@ func findInstance(argument string) (computeProvider, string, error) {
 			}
 		}
 	}
+	for _, provider := range computeProviders {
+		history, ok := provider.(historyProvider)
+		if !ok {
+			continue
+		}
+		if status := provider.check(); !status.installed || !status.signedIn {
+			continue
+		}
+		if _, err := history.lookup(name); err == nil {
+			return provider, name, nil
+		}
+	}
 	return nil, "", fmt.Errorf("no instance named %q; see `hi compute ls`", name)
 }
 
@@ -759,7 +821,7 @@ func computeSSHCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	}
 	sshArgs = append(sshArgs, target.destination)
 	sshArgs = append(sshArgs, remote...)
-	return runSSH(sshArgs, stdin, stdout, stderr)
+	return withSSHHint(target, runSSH(sshArgs, stdin, stdout, stderr))
 }
 
 func computeTunnelCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -814,7 +876,7 @@ func computeTunnelCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 	if errors.As(tunnelErr, &exitErr) && len(interrupts) > 0 {
 		return nil
 	}
-	return tunnelErr
+	return withSSHHint(target, tunnelErr)
 }
 
 func instanceRunning(provider computeProvider, name string) (bool, error) {

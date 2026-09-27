@@ -39,7 +39,13 @@ state() {
   echo "[$(date +%T)] $*" >> "$LOGS/serve.log"
   echo "hi-state: $*"
 }
-fail() { state "failed: $*"; exit 1; }
+# Failures also print the end of the relevant log, so provider logs show why.
+fail() {
+  local log=${2:-}
+  [[ -n $log && -f $log ]] && tail -n 30 "$log"
+  state "failed: $1"
+  exit 1
+}
 
 # curl is missing from some images; fall back to bash's /dev/tcp.
 healthy() {
@@ -60,9 +66,9 @@ for candidate in /app/llama-server "$(command -v llama-server 2>/dev/null)" "$LL
   [[ -n $candidate && -x $candidate ]] && { server=$candidate; break; }
 done
 
-# Download with the hf CLI when Python is available; otherwise let
-# llama-server fetch the model itself with -hf.
-if command -v python3 >/dev/null; then download=hf; else download=server; fi
+# A prebuilt llama-server downloads the model itself with -hf. Otherwise
+# llama.cpp is built here, and the hf CLI downloads in parallel.
+if [[ -n $server ]]; then download=server; else download=hf; fi
 
 (
   if [[ -z $server ]]; then
@@ -88,14 +94,14 @@ fi
 
 if [[ -z $server ]]; then
   state "building llama.cpp and downloading $REPO:$QUANT"
-  wait $build_pid || fail "llama.cpp build (see $LOGS/build.log)"
+  wait $build_pid || fail "llama.cpp build (see $LOGS/build.log)" "$LOGS/build.log"
   server=$LLAMA/build/bin/llama-server
   state "llama.cpp built, downloading $REPO:$QUANT"
 fi
 
 if [[ $download == hf ]]; then
   [[ -n ${download_pid:-} ]] && state "downloading $REPO:$QUANT"
-  wait "$download_pid" || fail "download (see $LOGS/download.log)"
+  wait "$download_pid" || fail "download (see $LOGS/download.log)" "$LOGS/download.log"
   model=$(find "$MODELS" -name "*${QUANT}*-00001-of-*.gguf" | sort | head -1)
   [[ -n $model ]] || model=$(find "$MODELS" -name "*${QUANT}*.gguf" | sort | head -1)
   [[ -n $model ]] || fail "no $QUANT .gguf file in $REPO"
@@ -128,8 +134,7 @@ for ((waited = 0; waited < ready_within; waited += 5)); do
     exit 0
   fi
   if ! kill -0 $server_pid 2>/dev/null; then
-    tail -n 20 "$LOGS/server.log"
-    fail "llama-server exited (see $LOGS/server.log)"
+    fail "llama-server exited (see $LOGS/server.log)" "$LOGS/server.log"
   fi
 done
-fail "llama-server not ready after $((ready_within / 60)) minutes (see $LOGS/server.log)"
+fail "llama-server not ready after $((ready_within / 60)) minutes (see $LOGS/server.log)" "$LOGS/server.log"

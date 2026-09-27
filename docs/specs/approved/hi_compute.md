@@ -2,7 +2,7 @@
 
 Status: Approved for runs, instances, SSH, tunnels, logs, and serving on
 Colab, Hugging Face, and RunPod, in that order. Colab is implemented and
-released (v0.6.0); Hugging Face is implemented (v0.7.0) and awaits a live test.
+released (v0.6.0), and so is Hugging Face (v0.7.0).
 Everything marked **(draft)** is not yet approved: the full TUI, compute files,
 templates, file copy, SSH config integration, idle limits, and further
 providers.
@@ -221,30 +221,41 @@ Rules:
 - `--secret KEY` sends `$KEY` in the job's `secrets` field, which Hugging Face
   encrypts. `--dry-run` shows the request with the script and secret values
   replaced by placeholders, and never contacts the API.
-- Jobs map to exit codes: completed is 0, canceled is 130, anything else is 1.
+- Jobs map to exit codes: completed is 0, canceled is 130, and a failed job
+  returns its own exit code when Hugging Face reports it ("Job failed with
+  exit code: 3"), otherwise 1.
+- `ls` marks jobs labelled `managed-by=hi` as started by `hi` and shows their
+  limit from the job's `createdAt` and `timeout`; `status`, `logs`, and
+  `wait` also find finished jobs by name.
 - `ssh` waits for the job to run, then connects to the `sshUrl` the API
   reports. It needs an SSH public key registered at
-  https://huggingface.co/settings/keys.
+  https://huggingface.co/settings/keys; when the gateway refuses the key, `hi`
+  says so.
 - HTTP 402 means the namespace has no pre-paid Jobs credits; `hi` says where
   to add them and suggests `--namespace` for an organization.
 - Machines above $0.10 per hour ask for confirmation.
 
 `hi compute serve` on Hugging Face starts one job that is the server: the
 `ghcr.io/ggml-org/llama.cpp:server-cuda` image runs the serve script in the
-foreground, which uses the prebuilt `llama-server` and its `-hf` downloader
-because the image has no Python. Port 8000 is exposed at
+foreground, which uses the prebuilt `llama-server` and its `-hf` downloader.
+The image has Python but not the `hf` CLI, so a prebuilt server always
+downloads with `-hf`. Port 8000 is exposed at
 `https://<job>--8000.hf.jobs`, which requires a Hugging Face token with read
 access; OpenAI clients pass it as the API key. Progress comes from the
 script's `hi-state:` lines in the job logs. `hi compute tunnel` still gives a
 localhost URL over SSH.
 
-Not yet verified against a live account, because the test account had no Jobs
-credits:
+Verified live on 2026-09-27 in the `hifinab` organization: image and script
+runs with arguments, environment, secrets, and exit codes; `--detach`,
+`logs --follow`, `wait`, and `status` on finished jobs; `up` and `stop`; and
+`serve unsloth/Qwen3-0.6B-GGUF --quant Q4_K_M` on a `t4-small`, ready one
+minute after scheduling at about 220 tokens/s. A job's `command` replaces the
+image's entrypoint, `llama-server -hf` downloads inside the image, and the
+exposed endpoint answers 401 without a token. The whole test cost under
+$0.05.
 
-- that a job's `command` replaces an image's entrypoint (llama.cpp's image
-  sets `/app/llama-server` as its entrypoint);
-- that `llama-server -hf` downloads inside that image;
-- that the SSH gateway allows `-L` port forwarding for `tunnel`.
+Not yet verified: `ssh` and `tunnel` through the Jobs SSH gateway, because the
+test key was not registered on the account.
 
 ### Phasing
 
