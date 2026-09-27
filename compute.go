@@ -33,15 +33,22 @@ const (
 type computeProvider interface {
 	name() string
 	check() providerStatus
-	hardware() []computeHardware
+	hardware() ([]computeHardware, error)
+	// maxLifetime is the provider's own limit, or zero for none.
 	maxLifetime() time.Duration
+	// enforcesLifetime reports whether the provider stops instances at --max
+	// itself; otherwise hi runs a local watcher.
+	enforcesLifetime() bool
 	reservedPorts() map[int]string
 	account() (string, error)
+	validateRun(request runRequest) error
 	create(request upRequest, stdout, stderr io.Writer) error
 	list() ([]computeInstance, error)
 	stop(name string, stdout, stderr io.Writer) error
 	ssh(name string) (sshTarget, error)
-	runScript(request runRequest, stdin io.Reader, stdout, stderr io.Writer) (int, error)
+	runJob(request runRequest, stdin io.Reader, stdout, stderr io.Writer) (int, error)
+	logs(name string, follow bool, lines int, stdin io.Reader, stdout, stderr io.Writer) error
+	wait(name string, stdout, stderr io.Writer) (int, error)
 	upCommand(request upRequest) []string
 	runCommand(request runRequest) []string
 }
@@ -65,23 +72,35 @@ type computeInstance struct {
 	hardware string
 	shape    string
 	detail   string
+	state    string
 }
 
 type upRequest struct {
-	name     string
-	hardware computeHardware
-	highMem  bool
-	max      time.Duration
+	name      string
+	hardware  computeHardware
+	highMem   bool
+	max       time.Duration
+	image     string
+	namespace string
+	// serve, when set, makes the instance run this model server itself.
+	serve *serveRecipe
 }
 
+// runRequest is either a Python script (script, args) or a container image
+// with a command (image, command).
 type runRequest struct {
-	name     string
-	hardware computeHardware
-	highMem  bool
-	max      time.Duration
-	env      []string
-	script   string
-	args     []string
+	name      string
+	hardware  computeHardware
+	highMem   bool
+	max       time.Duration
+	env       []string
+	secrets   []string
+	detach    bool
+	namespace string
+	script    string
+	args      []string
+	image     string
+	command   []string
 }
 
 type sshTarget struct {
@@ -97,10 +116,11 @@ type computeRecord struct {
 	Created    time.Time `json:"created"`
 	Deadline   time.Time `json:"deadline"`
 	WatcherPID int       `json:"watcher_pid,omitempty"`
+	Namespace  string    `json:"namespace,omitempty"`
 }
 
 var (
-	computeProviders = []computeProvider{colabProvider{}}
+	computeProviders = []computeProvider{colabProvider{}, newHFProvider()}
 	computeNow       = time.Now
 	// startComputeWatcher is replaced in tests so no background process starts.
 	startComputeWatcher = spawnComputeWatcher
@@ -146,6 +166,12 @@ func runCompute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(computeServeCommand(rest, stdin, stdout, stderr), stderr)
 	case "logs":
 		return exitCode(computeLogsCommand(rest, stdin, stdout, stderr), stderr)
+	case "wait":
+		code, err := computeWaitCommand(rest, stdout, stderr)
+		if err != nil {
+			return exitCode(err, stderr)
+		}
+		return code
 	case "proxy":
 		return exitCode(computeProxyCommand(rest, stdin, stdout, stderr), stderr)
 	case "__watch":
@@ -195,15 +221,22 @@ Usage:
                                       Serve a model with llama.cpp and tunnel
                                       its OpenAI-compatible API here
   hi compute run [options] <script.py> [-- args...]
-                                      Run a script to completion
+  hi compute run [options] <image> -- <command...>
+                                      Run to completion, streaming logs
+  hi compute wait <name>...           Wait for detached runs to finish
 
 Options for up and run:
-  --on <provider>    Provider (default: the only configured provider)
-  --gpu <hardware>   Hardware name from hi compute hardware (default: cpu)
+  --on <provider>    colab or hf (default: inferred from --gpu, or
+                     $HI_COMPUTE_PROVIDER, or the only signed-in provider)
+  --gpu <hardware>   Hardware name from hi compute hardware (default: CPU)
   --name <name>      Instance name (default: generated)
   --max <duration>   Stop after this long, e.g. 30m or 4h
   --high-mem         Request a high-RAM machine (Colab)
   --env KEY=VALUE    Environment variable for run; repeatable
+  --secret KEY       Pass $KEY as an encrypted secret (Hugging Face)
+  --detach           run: return after starting (Hugging Face)
+  --image <image>    Container image (Hugging Face)
+  --namespace <ns>   Account or organization to bill (Hugging Face)
   --yes              Skip the cost confirmation
   --dry-run          Show what would happen without starting anything
 
@@ -213,8 +246,8 @@ Options for serve (plus --on, --gpu, --name, --max, --yes, --dry-run):
   --port <port>      Local port for the API (default 8080)
   --args "<args>"    Extra llama-server arguments
 
-Providers: colab
-Recipes:   qwen3.8-flash-next (Colab G4)`)
+Providers: colab, hf
+Recipes:   qwen3.8-flash-next (Colab G4, Hugging Face rtx-pro-6000)`)
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +291,12 @@ func computeHardwareCommand(args []string, stdout, stderr io.Writer) error {
 	for _, provider := range providers {
 		table := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(table, "PROVIDER\tHARDWARE\tKIND\tMEMORY\tRATE")
-		for _, hardware := range provider.hardware() {
+		options, err := provider.hardware()
+		if err != nil {
+			fmt.Fprintf(stderr, "hi: %s hardware: %v\n", provider.name(), err)
+			continue
+		}
+		for _, hardware := range options {
 			fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n",
 				provider.name(), hardware.name, hardware.kind, hardware.memory, hardware.rate)
 		}
@@ -287,8 +325,12 @@ func providerNames() string {
 	return strings.Join(names, ", ")
 }
 
-// resolveProvider picks --on, or the only provider that is ready to use.
-func resolveProvider(on string) (computeProvider, error) {
+// resolveProvider picks --on, then $HI_COMPUTE_PROVIDER, then the only ready
+// provider that offers the requested hardware.
+func resolveProvider(on, hardware string) (computeProvider, error) {
+	if on == "" {
+		on = os.Getenv("HI_COMPUTE_PROVIDER")
+	}
 	if on != "" {
 		return providerByName(on)
 	}
@@ -298,25 +340,40 @@ func resolveProvider(on string) (computeProvider, error) {
 			ready = append(ready, provider)
 		}
 	}
+	if len(ready) > 1 && hardware != "" {
+		var offering []computeProvider
+		for _, provider := range ready {
+			if _, err := resolveHardware(provider, hardware); err == nil {
+				offering = append(offering, provider)
+			}
+		}
+		if len(offering) == 1 {
+			return offering[0], nil
+		}
+	}
 	switch len(ready) {
 	case 1:
 		return ready[0], nil
 	case 0:
-		if len(computeProviders) == 1 {
-			return computeProviders[0], nil
-		}
 		return nil, usageError{"no provider is ready; run `hi compute providers`"}
 	default:
-		return nil, usageError{"several providers are ready; choose one with --on"}
+		return nil, usageError{fmt.Sprintf(
+			"several providers are ready (%s); choose one with --on or set HI_COMPUTE_PROVIDER", providerNames())}
 	}
 }
 
+// resolveHardware finds a hardware name; without one it picks the provider's
+// first, cheapest CPU option.
 func resolveHardware(provider computeProvider, name string) (computeHardware, error) {
-	if name == "" {
-		name = "cpu"
+	options, err := provider.hardware()
+	if err != nil {
+		return computeHardware{}, err
+	}
+	if name == "" && len(options) > 0 {
+		return options[0], nil
 	}
 	var names []string
-	for _, hardware := range provider.hardware() {
+	for _, hardware := range options {
 		if strings.EqualFold(hardware.name, name) {
 			return hardware, nil
 		}
@@ -338,18 +395,20 @@ func computeUpCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	highMem := flags.Bool("high-mem", false, "high-RAM machine")
 	yes := flags.Bool("yes", false, "skip confirmation")
 	dryRun := flags.Bool("dry-run", false, "show without starting")
+	image := flags.String("image", "", "container image")
+	namespace := flags.String("namespace", "", "account or organization to bill")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
-		return usageError{"usage: hi compute up [--on P] [--gpu HW] [--name N] [--max D] [--high-mem] [--yes] [--dry-run]"}
+		return usageError{"usage: hi compute up [--on P] [--gpu HW] [--name N] [--max D] [--image I] [--namespace NS] [--high-mem] [--yes] [--dry-run]"}
 	}
 
-	provider, err := resolveProvider(*on)
+	provider, err := resolveProvider(*on, *gpu)
 	if err != nil {
 		return err
 	}
-	request := upRequest{highMem: *highMem, max: *maxLifetime}
+	request := upRequest{highMem: *highMem, max: *maxLifetime, image: *image, namespace: *namespace}
 	if request.hardware, err = resolveHardware(provider, *gpu); err != nil {
 		return err
 	}
@@ -369,6 +428,9 @@ func startInstance(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) error {
+	if provider.name() == "colab" && (request.image != "" || request.namespace != "") {
+		return usageError{"--image and --namespace do not apply to Colab"}
+	}
 	records, err := loadComputeRecords()
 	if err != nil {
 		return err
@@ -400,16 +462,19 @@ func startInstance(
 	}
 
 	record := computeRecord{
-		Name:     request.name,
-		Provider: provider.name(),
-		Hardware: request.hardware.name,
-		Created:  computeNow(),
-		Deadline: deadline,
+		Name:      request.name,
+		Provider:  provider.name(),
+		Hardware:  request.hardware.name,
+		Created:   computeNow(),
+		Deadline:  deadline,
+		Namespace: request.namespace,
 	}
 	if err := saveComputeRecord(record); err != nil {
 		return err
 	}
-	if pid, err := startComputeWatcher(request.name); err != nil {
+	if provider.enforcesLifetime() {
+		// The provider stops the instance at its deadline itself.
+	} else if pid, err := startComputeWatcher(request.name); err != nil {
 		fmt.Fprintf(stderr, "hi: warning: could not start the lifetime watcher: %v\n", err)
 		fmt.Fprintf(stderr, "hi: stop the instance yourself with `hi compute stop %s`\n", request.name)
 	} else if pid > 0 {
@@ -454,6 +519,20 @@ func chooseInstanceName(name, hardware string) (string, error) {
 
 func validInstanceName(name string) bool {
 	if len(name) == 0 || len(name) > 32 || name[0] < 'a' || name[0] > 'z' || name[len(name)-1] == '-' {
+		return false
+	}
+	for _, char := range name {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+// validLookupName also accepts provider IDs such as Hugging Face job IDs,
+// which may start with a digit.
+func validLookupName(name string) bool {
+	if len(name) == 0 || len(name) > 64 {
 		return false
 	}
 	for _, char := range name {
@@ -620,7 +699,7 @@ func instanceName(argument string) string {
 // findInstance returns the provider running the named instance.
 func findInstance(argument string) (computeProvider, string, error) {
 	name := instanceName(argument)
-	if !validInstanceName(name) {
+	if !validLookupName(name) {
 		return nil, "", usageError{fmt.Sprintf("invalid instance name %q", argument)}
 	}
 	if prefix, _, found := strings.Cut(argument, "/"); found {
@@ -882,42 +961,41 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	highMem := flags.Bool("high-mem", false, "high-RAM machine")
 	yes := flags.Bool("yes", false, "skip confirmation")
 	dryRun := flags.Bool("dry-run", false, "show without starting")
+	detach := flags.Bool("detach", false, "return after submission")
+	namespace := flags.String("namespace", "", "account or organization to bill")
 	var env repeatedFlag
 	var secrets repeatedFlag
 	flags.Var(&env, "env", "KEY=VALUE")
 	flags.Var(&secrets, "secret", "secret name")
-	detach := flags.Bool("detach", false, "return after submission")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return 0, err
 	}
 	if flags.NArg() == 0 {
-		return 0, usageError{"usage: hi compute run [options] <script.py> [-- args...]"}
+		return 0, usageError{"usage: hi compute run [options] <script.py> [-- args...]\n" +
+			"       hi compute run [options] <image> -- <command> [args...]"}
 	}
 
-	provider, err := resolveProvider(*on)
-	if err != nil {
-		return 0, err
-	}
 	request := runRequest{
-		highMem: *highMem,
-		max:     *maxLifetime,
-		script:  flags.Arg(0),
-		args:    flags.Args()[1:],
+		highMem:   *highMem,
+		max:       *maxLifetime,
+		detach:    *detach,
+		namespace: *namespace,
+		secrets:   secrets,
 	}
-	if len(request.args) > 0 && request.args[0] == "--" {
-		request.args = request.args[1:]
+	target, rest := flags.Arg(0), flags.Args()[1:]
+	if len(rest) > 0 && rest[0] == "--" {
+		rest = rest[1:]
 	}
-	if !strings.HasSuffix(request.script, ".py") {
-		return 0, usageError{fmt.Sprintf("%s runs Python scripts only; container images are not supported", provider.name())}
-	}
-	if _, err := os.Stat(request.script); err != nil {
-		return 0, fmt.Errorf("script %s: %w", request.script, err)
-	}
-	if len(secrets) > 0 {
-		return 0, usageError{fmt.Sprintf("%s has no secret store; --secret would expose the value in process arguments", provider.name())}
-	}
-	if *detach {
-		return 0, usageError{fmt.Sprintf("%s runs cannot detach; use `hi compute up` and `hi compute ssh` for long work", provider.name())}
+	if strings.HasSuffix(target, ".py") {
+		if _, err := os.Stat(target); err != nil {
+			return 0, fmt.Errorf("script %s: %w", target, err)
+		}
+		request.script, request.args = target, rest
+	} else {
+		if len(rest) == 0 {
+			return 0, usageError{"give the command to run in the image after --, e.g. `hi compute run python:3.12 -- python -c 'print(1)'`"}
+		}
+		request.image, request.command = target, rest
 	}
 	for _, entry := range env {
 		if key, _, ok := strings.Cut(entry, "="); !ok || key == "" {
@@ -925,6 +1003,14 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		}
 	}
 	request.env = env
+
+	provider, err := resolveProvider(*on, *gpu)
+	if err != nil {
+		return 0, err
+	}
+	if err := provider.validateRun(request); err != nil {
+		return 0, err
+	}
 	if request.hardware, err = resolveHardware(provider, *gpu); err != nil {
 		return 0, err
 	}
@@ -937,8 +1023,12 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		}
 	}
 
+	what := request.script
+	if what == "" {
+		what = request.image
+	}
 	fmt.Fprintf(stdout, "Run %s on %s %s (%s), stopping after %s.\n",
-		request.script, provider.name(), request.hardware.name, request.hardware.rate, formatDuration(request.max))
+		what, provider.name(), request.hardware.name, request.hardware.rate, formatDuration(request.max))
 	if *dryRun {
 		fmt.Fprintf(stdout, "Would run: %s\n", strings.Join(provider.runCommand(request), " "))
 		return 0, nil
@@ -951,7 +1041,28 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 			return 0, err
 		}
 	}
-	return provider.runScript(request, stdin, stdout, stderr)
+	return provider.runJob(request, stdin, stdout, stderr)
+}
+
+func computeWaitCommand(args []string, stdout, stderr io.Writer) (int, error) {
+	if len(args) == 0 {
+		return 0, usageError{"usage: hi compute wait <name>..."}
+	}
+	worst := 0
+	for _, argument := range args {
+		provider, name, err := findInstance(argument)
+		if err != nil {
+			return 0, err
+		}
+		code, err := provider.wait(name, stdout, stderr)
+		if err != nil {
+			return 0, err
+		}
+		if code != 0 {
+			worst = code
+		}
+	}
+	return worst, nil
 }
 
 type repeatedFlag []string

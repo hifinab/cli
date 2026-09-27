@@ -53,7 +53,32 @@ func (colabProvider) reservedPorts() map[int]string {
 	return map[int]string{8080: "used by Colab's own proxy"}
 }
 
-func (colabProvider) hardware() []computeHardware { return colabHardware }
+func (colabProvider) hardware() ([]computeHardware, error) { return colabHardware, nil }
+
+// Colab sessions cannot stop themselves, so hi watches the deadline locally.
+func (colabProvider) enforcesLifetime() bool { return false }
+
+func (p colabProvider) validateRun(request runRequest) error {
+	switch {
+	case request.script == "":
+		return usageError{"colab runs Python scripts only; container images are not supported"}
+	case len(request.secrets) > 0:
+		return usageError{"colab has no secret store; --secret would expose the value in process arguments"}
+	case request.detach:
+		return usageError{"colab runs cannot detach; use `hi compute up` and `hi compute ssh` for long work"}
+	case request.namespace != "":
+		return usageError{"--namespace applies to Hugging Face only"}
+	}
+	return nil
+}
+
+func (p colabProvider) logs(name string, follow bool, lines int, stdin io.Reader, stdout, stderr io.Writer) error {
+	return sshLogs(p, name, follow, lines, stdin, stdout, stderr)
+}
+
+func (colabProvider) wait(name string, stdout, stderr io.Writer) (int, error) {
+	return 0, errors.New("colab runs finish in the foreground; there is nothing to wait for")
+}
 
 func colabBinary() (string, error) {
 	if path, err := exec.LookPath("colab"); err == nil {
@@ -208,6 +233,7 @@ func colabAcceleratorArgs(hardware computeHardware, highMem bool) []string {
 }
 
 func (colabProvider) upCommand(request upRequest) []string {
+	// --image and --namespace do not apply to Colab; startInstance rejects them.
 	args := append([]string{"colab", "new", "-s", request.name},
 		colabAcceleratorArgs(request.hardware, request.highMem)...)
 	return args
@@ -297,7 +323,7 @@ func (colabProvider) runCommand(request runRequest) []string {
 	return append(args, request.args...)
 }
 
-func (p colabProvider) runScript(request runRequest, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
+func (p colabProvider) runJob(request runRequest, stdin io.Reader, stdout, stderr io.Writer) (int, error) {
 	binary, err := colabBinary()
 	if err != nil {
 		return 0, err

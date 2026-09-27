@@ -160,7 +160,7 @@ func menuServe(stdin io.Reader, stdout, stderr io.Writer) error {
 	labels := make([]string, 0, len(names)+1)
 	for _, name := range names {
 		recipe := serveRecipes[name]
-		labels = append(labels, fmt.Sprintf("%s  (%s:%s on %s)", name, recipe.repo, recipe.quant, recipe.hardware))
+		labels = append(labels, fmt.Sprintf("%s  (%s:%s on %s)", name, recipe.repo, recipe.quant, recipe.hardware[provider.name()]))
 	}
 	labels = append(labels, "Another GGUF model from Hugging Face")
 	choice, err := menuChoice(stdin, stdout, "Model:", labels)
@@ -200,25 +200,37 @@ func menuServe(stdin io.Reader, stdout, stderr io.Writer) error {
 	return computeServeCommand(args, stdin, stdout, stderr)
 }
 
+// menuProvider offers the providers that are ready, and skips the question
+// when only one is.
 func menuProvider(stdin io.Reader, stdout io.Writer) (computeProvider, error) {
-	if len(computeProviders) == 1 {
-		provider := computeProviders[0]
-		return provider, requireStatus(provider)
+	var ready []computeProvider
+	for _, provider := range computeProviders {
+		if status := provider.check(); status.installed && status.signedIn {
+			ready = append(ready, provider)
+		}
 	}
-	labels := make([]string, len(computeProviders))
-	for i, provider := range computeProviders {
+	switch len(ready) {
+	case 0:
+		return nil, errors.New("no provider is ready; run `hi compute providers`")
+	case 1:
+		return ready[0], nil
+	}
+	labels := make([]string, len(ready))
+	for i, provider := range ready {
 		labels[i] = provider.name()
 	}
 	choice, err := menuChoice(stdin, stdout, "Provider:", labels)
 	if err != nil {
 		return nil, errMenuBack
 	}
-	provider := computeProviders[choice]
-	return provider, requireStatus(provider)
+	return ready[choice], nil
 }
 
 func menuHardware(provider computeProvider, stdin io.Reader, stdout io.Writer) (computeHardware, error) {
-	options := provider.hardware()
+	options, err := provider.hardware()
+	if err != nil {
+		return computeHardware{}, err
+	}
 	labels := make([]string, len(options))
 	for i, hardware := range options {
 		labels[i] = fmt.Sprintf("%-5s %-4s %-11s %s", hardware.name, hardware.kind, hardware.memory, hardware.rate)

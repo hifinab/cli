@@ -1,7 +1,8 @@
 # `hi compute` specification
 
 Status: Approved for runs, instances, SSH, tunnels, logs, and serving on
-Colab, Hugging Face, and RunPod, in that order. Colab is implemented (v0.6.0).
+Colab, Hugging Face, and RunPod, in that order. Colab is implemented and
+released (v0.6.0); Hugging Face is implemented (v0.7.0) and awaits a live test.
 Everything marked **(draft)** is not yet approved: the full TUI, compute files,
 templates, file copy, SSH config integration, idle limits, and further
 providers.
@@ -136,7 +137,9 @@ without a tunnel.
 
 ### Credentials
 
-`hi install` installs the `hf` CLI. `hi login <provider>` delegates to the
+`hi install` installs the `hf` CLI. `hi login hf` runs `hf auth login` and
+then `hf auth whoami`; `hi login colab` runs `colab usage`, which starts
+Colab's browser sign-in. `hi login <provider>` delegates to the
 provider's own login where one exists (`hf auth login`, then `hf auth whoami`;
 `colab`'s OAuth flow). For API providers, `hi` reads the token from the
 provider's standard location or environment variable in memory for each
@@ -186,27 +189,62 @@ Colab-specific rules:
 ### Hugging Face Jobs API
 
 Hugging Face is called through its REST API at
-`https://huggingface.co/api/jobs` (documented with an OpenAPI spec) rather
-than by wrapping the `hf` CLI.
+`https://huggingface.co/api/jobs` rather than by wrapping the `hf` CLI, so it
+needs neither Python nor the CLI once a token exists. The request and
+response shapes follow the `huggingface_hub` 1.32 source, and tests pin them
+with a fake API.
 
-| `hi compute`      | Hugging Face Jobs API                              |
-|-------------------|----------------------------------------------------|
-| `run <image>`     | `POST /api/jobs/{namespace}` with `dockerImage`    |
-| `run <script.py>` | `POST /api/jobs/{namespace}` running `uv run`      |
-| `up` **(draft)**  | Same, with SSH enabled, exposed ports, and a long-running command |
-| `ls`              | `GET /api/jobs/{namespace}`                        |
-| `status`          | `GET /api/jobs/{namespace}/{id}`                   |
-| `logs`            | `GET /api/jobs/{namespace}/{id}/logs` (SSE stream) |
-| `wait`            | Poll `status` until a final stage                  |
-| `stop`            | `POST /api/jobs/{namespace}/{id}/cancel`           |
-| `hardware`        | `GET /api/jobs/hardware`, including prices         |
+| `hi compute`      | Hugging Face Jobs API                                            |
+|-------------------|------------------------------------------------------------------|
+| `run <image>`     | `POST /api/jobs/{namespace}` with `dockerImage` and `command`    |
+| `run <script.py>` | Same, with the uv image running the script shipped in the job    |
+| `up`              | Same, with SSH enabled and `sleep infinity`                      |
+| `serve`           | Same, with llama.cpp's CUDA image running the serve script       |
+| `ls`              | `GET /api/jobs/{namespace}`, keeping jobs that have not finished |
+| `status`, `wait`  | `GET /api/jobs/{namespace}/{id}` until a final stage             |
+| `logs`            | `GET /api/jobs/{namespace}/{id}/logs` (Server-Sent Events)       |
+| `stop`            | `POST /api/jobs/{namespace}/{id}/cancel`                         |
+| `hardware`        | `GET /api/jobs/hardware`, prices converted to dollars per hour   |
 
-The API documentation is thinner than the Python client's, so request and
-response shapes are pinned in tests against the OpenAPI spec, with the
-`huggingface_hub` source as the reference. Log streams send keep-alives and
-may be empty early in a run's life; both are handled without error.
-`--dry-run` also prints the equivalent `hf jobs` command for users who want to
-run it by hand.
+Rules:
+
+- Every job gets `timeoutSeconds` from `--max`, so Hugging Face enforces the
+  limit itself and no local watcher runs. Jobs are labelled
+  `name=<hi name>` and `managed-by=hi`; `ls`, `stop`, and `logs` find jobs by
+  that label or by job ID (`hf/<id>`).
+- The namespace is `--namespace`, then `HI_HF_NAMESPACE`, then the signed-in
+  user. `ls` covers the user, `HI_HF_NAMESPACE`, and every namespace `hi`
+  started an instance in.
+- Scripts are shipped base64-encoded in the job's environment and decoded by
+  the job's command, instead of uploading them to a bucket as the `hf` CLI
+  does. Scripts are limited to 96 KB.
+- `--secret KEY` sends `$KEY` in the job's `secrets` field, which Hugging Face
+  encrypts. `--dry-run` shows the request with the script and secret values
+  replaced by placeholders, and never contacts the API.
+- Jobs map to exit codes: completed is 0, canceled is 130, anything else is 1.
+- `ssh` waits for the job to run, then connects to the `sshUrl` the API
+  reports. It needs an SSH public key registered at
+  https://huggingface.co/settings/keys.
+- HTTP 402 means the namespace has no pre-paid Jobs credits; `hi` says where
+  to add them and suggests `--namespace` for an organization.
+- Machines above $0.10 per hour ask for confirmation.
+
+`hi compute serve` on Hugging Face starts one job that is the server: the
+`ghcr.io/ggml-org/llama.cpp:server-cuda` image runs the serve script in the
+foreground, which uses the prebuilt `llama-server` and its `-hf` downloader
+because the image has no Python. Port 8000 is exposed at
+`https://<job>--8000.hf.jobs`, which requires a Hugging Face token with read
+access; OpenAI clients pass it as the API key. Progress comes from the
+script's `hi-state:` lines in the job logs. `hi compute tunnel` still gives a
+localhost URL over SSH.
+
+Not yet verified against a live account, because the test account had no Jobs
+credits:
+
+- that a job's `command` replaces an image's entrypoint (llama.cpp's image
+  sets `/app/llama-server` as its entrypoint);
+- that `llama-server -hf` downloads inside that image;
+- that the SSH gateway allows `-L` port forwarding for `tunnel`.
 
 ### Phasing
 
@@ -262,7 +300,8 @@ every action. Without a terminal it prints help.
 Options for `run` and `up`:
 
 ```text
---on <provider>      colab, hf, runpod; default: the only provider that is ready
+--on <provider>      colab, hf, runpod; default: $HI_COMPUTE_PROVIDER, else the
+                     one ready provider that offers --gpu, else the only ready one
 --gpu <flavor>       Provider flavor, such as a10g-small or cpu-basic
 --name <name>        Local handle; generated when omitted
 --env KEY=VALUE      Plain environment variable; repeatable

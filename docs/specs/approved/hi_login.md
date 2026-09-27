@@ -2,7 +2,8 @@
 
 Status: Approved
 
-Dependencies: GitHub CLI for GitHub login; OMP for provider login.
+Dependencies: GitHub CLI for GitHub login; OMP for provider login; the `hf`
+CLI for Hugging Face; the Colab CLI for Colab.
 
 ## Goal
 
@@ -17,7 +18,14 @@ hi login
 hi login github
 hi login omp
 hi login omp <provider>
+hi login hf
+hi login colab
 ```
+
+`hi login hf` runs `hf auth login` and then `hf auth whoami`. `hi login colab`
+runs `colab usage`, which starts Colab's browser sign-in and then shows the
+compute-unit balance. Both are implemented (v0.7.0); GitHub and OMP login are
+planned for v0.9.0.
 
 Bare `hi login` starts GitHub authentication. `hi login github` is the explicit
 equivalent. `hi login omp` delegates interactive provider selection, while the

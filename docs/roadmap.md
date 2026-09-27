@@ -65,11 +65,15 @@ which SSH requires.
 
 ### v0.7.0 — Hugging Face compute
 
-- [ ] Install the `hf` CLI and add `hi login hf`.
-- [ ] Run, list, follow, wait for, and stop Hugging Face Jobs with
-  `hi compute run`, calling the Jobs REST API directly.
-- [ ] Start and reach Hugging Face instances with `hi compute up`, `ssh`,
-  `tunnel`, and `serve`.
+- [x] Install the `hf` CLI and add `hi login hf` (and `hi login colab`).
+- [x] Run, list, follow, wait for, and stop Hugging Face Jobs with
+  `hi compute run`, calling the Jobs REST API directly: Python scripts or
+  container images, secrets, `--detach`, and `--namespace`.
+- [x] Start and reach Hugging Face instances with `hi compute up`, `ssh`,
+  `tunnel`, and `logs`; serve models with `hi compute serve`.
+- [x] Infer the provider from the hardware name when both are signed in.
+- [ ] Verify against a live Hugging Face account before release. Blocked: the
+  test account has no pre-paid Jobs credits (HTTP 402).
   Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
 Dependencies: the v0.6.0 driver interface, state, and SSH layer; the

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strconv"
@@ -28,7 +29,7 @@ const (
 var servePollEvery = 10 * time.Second
 
 // serveRecipe is a tested model setup. Flags are hardware-specific, so a
-// recipe lists the hardware it has been run on.
+// recipe names the hardware to use on each provider.
 type serveRecipe struct {
 	name     string
 	repo     string
@@ -36,8 +37,15 @@ type serveRecipe struct {
 	context  int
 	alias    string
 	args     string
-	hardware string
+	hardware map[string]string
 	tested   string
+}
+
+// serveProvider is implemented by providers whose instance runs the server
+// itself and reports progress through their own API instead of SSH.
+type serveProvider interface {
+	serverState(name string) (string, error)
+	serverURL(name string) (string, error)
 }
 
 var serveRecipes = map[string]serveRecipe{
@@ -49,8 +57,9 @@ var serveRecipes = map[string]serveRecipe{
 		alias:   "qwen3.8-flash-next",
 		// The 28.8 GB n-gram table stays fully in host RAM; lazy mode would
 		// stream it from Colab's slow network disk.
-		args:     `-ot per_layer_token_embd\.weight=CPU --lazy-mode off --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0`,
-		hardware: "G4",
+		args: `-ot per_layer_token_embd\.weight=CPU --lazy-mode off --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0`,
+		// Both have 96 GB of VRAM on an RTX PRO 6000.
+		hardware: map[string]string{"colab": "G4", "hf": "rtx-pro-6000"},
 		tested:   "Colab G4, 2026-09-27: ~84 tokens/s through hi compute serve (~103 in colab-runner), 62.9 GB VRAM at 131k context, ready in ~7 min",
 	},
 }
@@ -68,6 +77,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	localPort := flags.Int("port", serveLocalPort, "local port")
 	yes := flags.Bool("yes", false, "skip confirmation")
 	dryRun := flags.Bool("dry-run", false, "show without starting")
+	namespace := flags.String("namespace", "", "account or organization to bill")
 	positional, err := parseInterspersedFlags(flags, args)
 	if err != nil {
 		return err
@@ -81,19 +91,32 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	if err != nil {
 		return err
 	}
-	if *gpu == "" {
-		*gpu = recipe.hardware
-	}
-	if *gpu == "" {
-		return usageError{"choose hardware with --gpu; see `hi compute hardware`"}
-	}
 	if _, err := parsePort(strconv.Itoa(*localPort)); err != nil {
 		return err
 	}
 
-	provider, err := resolveProvider(*on)
+	// Without --gpu, a recipe's own hardware picks the provider when only one
+	// ready provider has an entry for it.
+	if *gpu == "" && *on == "" && os.Getenv("HI_COMPUTE_PROVIDER") == "" {
+		var candidates []string
+		for _, provider := range computeProviders {
+			if status := provider.check(); status.installed && status.signedIn && recipe.hardware[provider.name()] != "" {
+				candidates = append(candidates, provider.name())
+			}
+		}
+		if len(candidates) == 1 {
+			*on = candidates[0]
+		}
+	}
+	provider, err := resolveProvider(*on, *gpu)
 	if err != nil {
 		return err
+	}
+	if *gpu == "" {
+		*gpu = recipe.hardware[provider.name()]
+	}
+	if *gpu == "" {
+		return usageError{"choose hardware with --gpu; see `hi compute hardware`"}
 	}
 	hardware, err := resolveHardware(provider, *gpu)
 	if err != nil {
@@ -121,17 +144,41 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 			}
 		}
 	}
+	server, apiServed := provider.(serveProvider)
 	if running {
+		if apiServed {
+			return fmt.Errorf("%s is already running; stop it first or choose another --name", instance)
+		}
 		fmt.Fprintf(stdout, "Reusing %s/%s.\n", provider.name(), instance)
 	} else {
-		request := upRequest{name: instance, hardware: hardware, max: *maxLifetime}
+		request := upRequest{name: instance, hardware: hardware, max: *maxLifetime, namespace: *namespace}
+		if apiServed {
+			request.serve = &recipe
+		}
 		if err := startInstance(provider, request, *yes, *dryRun, stdin, stdout, stderr); err != nil {
 			return err
 		}
 	}
 	if *dryRun {
-		fmt.Fprintf(stdout, "Would serve %s:%s on port %d and tunnel it to 127.0.0.1:%d.\n",
-			recipe.repo, recipe.quant, serveRemotePort, *localPort)
+		fmt.Fprintf(stdout, "Would serve %s:%s on port %d.\n", recipe.repo, recipe.quant, serveRemotePort)
+		return nil
+	}
+
+	if apiServed {
+		fmt.Fprintf(stdout, "Serving %s:%s on %s; the model downloads while the server starts.\n",
+			recipe.repo, recipe.quant, instance)
+		if err := waitForServer(instance, stdout, func() (string, error) { return server.serverState(instance) }); err != nil {
+			return err
+		}
+		url, err := server.serverURL(instance)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "\nOpenAI-compatible API: %s/v1   model: %s\n", url, recipe.alias)
+		fmt.Fprintf(stdout, "It needs your %s token as the API key, and stops after %s.\n",
+			provider.name(), formatDuration(*maxLifetime))
+		fmt.Fprintf(stdout, "Local tunnel instead: hi compute tunnel %s %d:%d\n", instance, serveRemotePort, *localPort)
+		fmt.Fprintf(stdout, "Stop it:              hi compute stop %s\n", instance)
 		return nil
 	}
 
@@ -144,7 +191,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	if err := startRemoteServer(target, recipe, stderr); err != nil {
 		return err
 	}
-	if err := waitForRemoteServer(target, instance, stdout); err != nil {
+	if err := waitForServer(instance, stdout, func() (string, error) { return sshServerState(target) }); err != nil {
 		return err
 	}
 
@@ -221,36 +268,41 @@ func startRemoteServer(target sshTarget, recipe serveRecipe, stderr io.Writer) e
 	return nil
 }
 
-// waitForRemoteServer polls ~/.hi/state with short SSH calls. A failed poll
-// only means no update this time.
-func waitForRemoteServer(target sshTarget, instance string, stdout io.Writer) error {
+// sshServerState reads the remote state contract over a short SSH call.
+func sshServerState(target sshTarget) (string, error) {
+	output, err := remoteOutput(target, nil, servePollTimeout,
+		"cat ~/.hi/state 2>/dev/null; du -sh /content/hi/models ~/.hi/models 2>/dev/null | head -1 | cut -f1")
+	if err != nil {
+		return "", err
+	}
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	state := strings.TrimSpace(lines[0])
+	if len(lines) > 1 && strings.TrimSpace(lines[1]) != "" && state != "" && !strings.HasPrefix(state, "ready") {
+		state += "  (model on disk: " + strings.TrimSpace(lines[1]) + ")"
+	}
+	return state, nil
+}
+
+// waitForServer polls a server's state until it is ready or failed. A failed
+// poll only means no update this time.
+func waitForServer(instance string, stdout io.Writer, state func() (string, error)) error {
 	deadline := computeNow().Add(serveReadyWithin)
 	last := ""
 	for computeNow().Before(deadline) {
 		time.Sleep(servePollEvery)
-		output, err := remoteOutput(target, nil, servePollTimeout,
-			"cat ~/.hi/state 2>/dev/null; du -sh /content/hi/models ~/.hi/models 2>/dev/null | head -1 | cut -f1")
-		if err != nil {
+		progress, err := state()
+		if err != nil || progress == "" {
 			continue
-		}
-		lines := strings.Split(strings.TrimSpace(output), "\n")
-		state := strings.TrimSpace(lines[0])
-		if state == "" {
-			continue
-		}
-		progress := state
-		if len(lines) > 1 && strings.TrimSpace(lines[1]) != "" && !strings.HasPrefix(state, "ready") {
-			progress += "  (model on disk: " + strings.TrimSpace(lines[1]) + ")"
 		}
 		if progress != last {
 			fmt.Fprintf(stdout, "  [%s] %s\n", computeNow().Format("15:04:05"), progress)
 			last = progress
 		}
-		if strings.HasPrefix(state, "ready") {
+		if strings.HasPrefix(progress, "ready") {
 			return nil
 		}
-		if strings.HasPrefix(state, "failed") {
-			return fmt.Errorf("%s; see `hi compute logs %s`", state, instance)
+		if strings.HasPrefix(progress, "failed") {
+			return fmt.Errorf("%s; see `hi compute logs %s`", progress, instance)
 		}
 	}
 	return fmt.Errorf("the server was not ready after %s; see `hi compute logs %s`",
@@ -295,12 +347,17 @@ func computeLogsCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 	if err != nil {
 		return err
 	}
+	return provider.logs(name, *follow, *lines, stdin, stdout, stderr)
+}
+
+// sshLogs prints the remote state contract's logs over SSH.
+func sshLogs(provider computeProvider, name string, follow bool, lines int, stdin io.Reader, stdout, stderr io.Writer) error {
 	target, err := provider.ssh(name)
 	if err != nil {
 		return err
 	}
-	tail := fmt.Sprintf("tail -n %d", *lines)
-	if *follow {
+	tail := fmt.Sprintf("tail -n %d", lines)
+	if follow {
 		tail += " -F"
 	}
 	command := "cat ~/.hi/state 2>/dev/null; ls ~/.hi/logs/*.log >/dev/null 2>&1 && " + tail +

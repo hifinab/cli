@@ -61,6 +61,12 @@ func newFakeColab(t *testing.T) *fakeColab {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(directory, "state"))
 	t.Setenv("FAKE_DIR", directory)
 	t.Setenv("PATH", filepath.Join(directory, "bin")+":/usr/bin:/bin")
+	t.Setenv("HF_TOKEN", "")
+	t.Setenv("HF_HOME", filepath.Join(directory, "hf"))
+	t.Setenv("HI_COMPUTE_PROVIDER", "")
+	previousProviders := computeProviders
+	computeProviders = []computeProvider{colabProvider{}, newHFProvider()}
+	t.Cleanup(func() { computeProviders = previousProviders })
 
 	previous := startComputeWatcher
 	startComputeWatcher = func(string) (int, error) { return 0, nil }
@@ -319,12 +325,12 @@ func TestComputeRunRejectsSecretsOnColab(t *testing.T) {
 	fake := newFakeColab(t)
 	script := filepath.Join(fake.directory, "train.py")
 	writeTestFile(t, script, "print(1)\n", 0o644)
-	t.Setenv("HF_TOKEN", "hf_secret_value")
-	code, stdout, stderr := runComputeTest("run", "--secret", "HF_TOKEN", "--yes", script)
+	t.Setenv("MY_SECRET", "secret_value_123")
+	code, stdout, stderr := runComputeTest("run", "--secret", "MY_SECRET", "--yes", script)
 	if code != 2 || !strings.Contains(stderr, "no secret store") {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr)
 	}
-	if strings.Contains(stdout+stderr+fake.calls(), "hf_secret_value") {
+	if strings.Contains(stdout+stderr+fake.calls(), "secret_value_123") {
 		t.Fatal("secret value leaked")
 	}
 }

@@ -33,7 +33,8 @@ hi net             Securely enroll this machine with NetBird
 hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
-hi compute         Start, reach, and stop remote GPU machines (Colab)
+hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face)
+hi login <hf|colab>  Sign in to a compute provider
 hi verify strix    Check an installed Strix Halo workstation
 hi version         Print the installed version
 hi help            Show help
@@ -90,13 +91,18 @@ required.
 ## Remote compute
 
 `hi compute` rents a remote machine, lets you use it as if it were local, and
-gives it back. Colab is the first provider; Hugging Face and RunPod follow with
-the same commands. Run `hi compute` in a terminal for a guided menu that prints
-the equivalent command for every step.
+gives it back, with the same commands on every provider: Colab (through its
+CLI) and Hugging Face Jobs (through its API). RunPod is next. Run `hi compute`
+in a terminal for a guided menu that prints the equivalent command for every
+step.
+
+When both providers are signed in, `hi` picks the one that offers the
+hardware you ask for (`G4` is Colab, `a10g-small` is Hugging Face). Otherwise
+pass `--on colab` or `--on hf`, or set `HI_COMPUTE_PROVIDER`.
 
 ```sh
-hi compute providers                      # is Colab installed and signed in?
-hi compute hardware                       # GPUs, rates, and your unit balance
+hi compute providers                      # which providers are signed in?
+hi compute hardware                       # GPUs, prices, and your Colab balance
 hi compute up --gpu T4 --name play        # start a machine (stops after 4h)
 hi compute ssh play                       # shell on it
 hi compute tunnel play 8000               # its port 8000 on 127.0.0.1:8000
@@ -108,7 +114,7 @@ Serve a model with llama.cpp and get an OpenAI-compatible API on
 `http://127.0.0.1:8080/v1`:
 
 ```sh
-hi compute serve qwen3.8-flash-next                     # tested recipe, Colab G4
+hi compute serve qwen3.8-flash-next --on colab          # tested recipe, Colab G4
 hi compute serve unsloth/Qwen3-8B-GGUF --quant Q4_K_M --gpu L4
 hi compute logs <name> --follow                         # build, download, server
 ```
@@ -120,15 +126,39 @@ hi compute run --gpu T4 --max 2h train.py -- --epochs 3
 ```
 
 Every machine has a maximum lifetime (`--max`, default 4 hours for instances
-and 1 hour for runs, at most 24 hours on Colab). `hi` enforces it with a
-detached background watcher and again on every `hi compute ls`. Paid hardware
-asks for confirmation; pass `--yes` in scripts. `--dry-run` shows the Colab
-command without starting anything.
+and 1 hour for runs, at most 24 hours on Colab). Hugging Face enforces it
+itself; for Colab, `hi` runs a detached background watcher and checks again on
+every `hi compute ls`. Paid hardware asks for confirmation; pass `--yes` in
+scripts. `--dry-run` shows the provider command or API request without
+starting anything.
+
+### Hugging Face Jobs
+
+```sh
+hi login hf                                              # once
+hi compute hardware --on hf                              # flavors and $/hour
+hi compute run --gpu a10g-small train.py -- --epochs 3   # uv script, logs streamed
+hi compute run --on hf python:3.12 -- python -c 'print(1)'
+hi compute run --gpu a10g-small --detach --secret WANDB_API_KEY train.py
+hi compute logs <name> --follow
+hi compute wait <name>
+hi compute up --gpu a10g-small --name box                # SSH-able GPU box
+hi compute serve qwen3.8-flash-next --on hf              # RTX PRO 6000, HTTPS URL
+```
+
+Jobs need pre-paid credits on the account or organization that pays; bill an
+organization with `--namespace ORG` or `HI_HF_NAMESPACE`. `--secret` sends a
+value from your environment as an encrypted job secret. `ssh` and `tunnel`
+need an SSH key registered at https://huggingface.co/settings/keys. A served
+model is reachable at `https://<job>--8000.hf.jobs/v1` with your Hugging Face
+token as the API key.
+
+### Colab
 
 Colab setup, once per workstation:
 
 1. `hi install` installs the Colab CLI (`google-colab-cli`).
-2. Run `colab usage` and sign in with the Colab Pro or Pro+ account; SSH and
+2. Run `hi login colab` and sign in with the Colab Pro or Pro+ account; SSH and
    tunnels need a paid plan.
 3. Make sure `~/.ssh/id_ed25519` exists (`ssh-keygen -t ed25519`).
 
@@ -146,8 +176,9 @@ installs:
   - [Codex CLI](https://developers.openai.com/codex/cli) (`codex`)
   - [omp](https://omp.sh) (`omp`)
   - [herdr](https://herdr.dev) (`herdr`)
-  - [Colab CLI](https://github.com/googlecolab/google-colab-cli) (`colab`),
-    used by `hi compute`
+  - [Colab CLI](https://github.com/googlecolab/google-colab-cli) (`colab`) and
+    [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/guides/cli)
+    (`hf`), used by `hi compute` and `hi login`
 - [uv](https://docs.astral.sh/uv/) and [pipx](https://pipx.pypa.io)
 - [Node.js](https://nodejs.org) and npm
 - [GitHub CLI](https://cli.github.com)
