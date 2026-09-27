@@ -72,6 +72,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
+	case "skill":
+		return runSkill(args[1:], stdout, stderr)
 	case "login":
 		if len(args) != 2 {
 			fmt.Fprintln(stderr, "usage: hi login <hf|colab>")
@@ -109,6 +111,7 @@ Usage:
   hi net reconnect              Reconnect an enrolled NetBird peer
   hi compute                    Start and use remote GPU machines (Colab, Hugging Face)
   hi login <hf|colab>           Sign in to a compute provider
+  hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
   hi version                    Print the installed version
   hi help                       Show this help`)

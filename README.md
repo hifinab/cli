@@ -35,6 +35,7 @@ hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
 hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face)
 hi login <hf|colab>  Sign in to a compute provider
+hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
 hi version         Print the installed version
 hi help            Show help
@@ -165,6 +166,22 @@ Colab setup, once per workstation:
 Colab's terms allow SSH on paid plans but forbid public web services, so
 tunnels bind to localhost only. Stop machines when you are done; a G4 uses
 about 9 compute units per hour.
+
+## Agent skill
+
+`hi skill` teaches coding agents such as Claude Code and Codex how to use
+`hi`, including the rules for remote compute: ask before spending, show
+`--dry-run` first, always set `--max`, stop what they start, and never print
+tokens.
+
+```sh
+cd my-project && hi skill    # .agents/skills/hi/SKILL.md and .claude/skills/hi/SKILL.md
+hi skill --global            # the same under ~, for every project
+hi skill --print             # just show it
+```
+
+Commit the project copy so the whole team's agents get it, and rerun
+`hi skill` after updating `hi` to refresh it.
 
 ## Workstation setup
 

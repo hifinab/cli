@@ -79,6 +79,12 @@ which SSH requires.
 Dependencies: the v0.6.0 driver interface, state, and SSH layer; the
 token-read exception in [hi_login.md](specs/approved/hi_login.md).
 
+### v0.7.1 — Agent skill
+
+- [x] Write a `hi` agent skill for Claude Code and Codex with `hi skill`,
+  into the current folder or, with `--global`, the home folder.
+  Approved spec: [hi_skill.md](specs/approved/hi_skill.md).
+
 ## Planned
 
 ### v0.8.0 — RunPod compute
