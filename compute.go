@@ -717,6 +717,13 @@ func computeTunnelCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 	signal.Stop(interrupts)
 	fmt.Fprintln(stdout)
 
+	// A tunnel also ends when its instance is stopped, from another terminal
+	// or by the lifetime watcher; that is not an error.
+	if running, err := instanceRunning(provider, name); err == nil && !running {
+		fmt.Fprintf(stdout, "Tunnel closed: %s is no longer running.\n", name)
+		return nil
+	}
+
 	if isTerminal(stdin) {
 		if confirm(stdin, stdout, false, fmt.Sprintf("Stop %s now?", name)) == nil {
 			return stopInstance(provider, name, stdout, stderr)
@@ -729,6 +736,19 @@ func computeTunnelCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 		return nil
 	}
 	return tunnelErr
+}
+
+func instanceRunning(provider computeProvider, name string) (bool, error) {
+	instances, err := provider.list()
+	if err != nil {
+		return false, err
+	}
+	for _, instance := range instances {
+		if instance.name == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func parsePortPair(value string) (int, int, error) {

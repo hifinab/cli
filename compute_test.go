@@ -478,3 +478,30 @@ func TestServeScriptFindsColabDriverLibraries(t *testing.T) {
 		t.Fatal("serve script does not add Colab's NVIDIA library directory")
 	}
 }
+
+func TestComputeTunnelEndsQuietlyWhenInstanceWasStopped(t *testing.T) {
+	fake := newFakeColab(t)
+	fake.setSessions("[qwen] ep1 | Hardware: G4 | Shape: Standard | Variant: GPU")
+	// The fake ssh "stops" the instance, then fails like a dropped tunnel.
+	writeTestFile(t, filepath.Join(fake.directory, "bin", "ssh"), `#!/bin/sh
+printf 'ssh %s\n' "$*" >> "$FAKE_DIR/calls.log"
+: > "$FAKE_DIR/sessions"
+exit 255
+`, 0o755)
+	code, stdout, stderr := runComputeTest("tunnel", "qwen", "8000")
+	if code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "Tunnel closed: qwen is no longer running.") || strings.Contains(stderr, "255") {
+		t.Fatalf("stdout = %s\nstderr = %s", stdout, stderr)
+	}
+}
+
+func TestComputeTunnelReportsDroppedConnectionToRunningInstance(t *testing.T) {
+	fake := newFakeColab(t)
+	fake.setSessions("[qwen] ep1 | Hardware: G4 | Shape: Standard | Variant: GPU")
+	writeTestFile(t, filepath.Join(fake.directory, "bin", "ssh"), "#!/bin/sh\nexit 255\n", 0o755)
+	if code, _, stderr := runComputeTest("tunnel", "qwen", "8000"); code != 1 || !strings.Contains(stderr, "255") {
+		t.Fatalf("exit code = %d, stderr = %s; want the ssh failure", code, stderr)
+	}
+}
