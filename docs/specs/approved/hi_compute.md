@@ -1,9 +1,10 @@
 # `hi compute` specification
 
-Status: Approved for batch runs and the shared lifecycle commands (`run`,
-`ls`, `status`, `logs`, `wait`, `stop`, `hardware`, `providers`) on Hugging
-Face and RunPod. Everything marked **(draft)** is not yet approved: interactive
-instances, the TUI, compute files, templates, serving, and further providers.
+Status: Approved for runs, instances, SSH, tunnels, logs, and serving on
+Colab, Hugging Face, and RunPod, in that order. Colab is implemented (v0.6.0).
+Everything marked **(draft)** is not yet approved: the full TUI, compute files,
+templates, file copy, SSH config integration, idle limits, and further
+providers.
 
 Dependencies: provider APIs and SDKs as listed under Provider integration;
 the `hf` CLI for login only; `hi login`; `uv` for script runs; OpenSSH for
@@ -24,7 +25,6 @@ reach a port from their laptop, or try a model.
   `hi compute run` starts one.
 - **Instances** stay up until you stop them or a limit is reached: debugging
   sessions, model servers, notebooks, experiments. `hi compute up` starts one.
-  **(draft)**
 
 Both appear in the same `ls`, share `logs`, `wait`, and `stop`, and obey the
 same limits and cost confirmation. A run is an instance whose lifetime is its
@@ -152,6 +152,37 @@ prints, or stores it.
 provider's encrypted secrets field. The value never appears in `hi` arguments,
 output, or files.
 
+### Colab CLI
+
+Colab has no public API, so its driver runs `google-colab-cli`, which
+`hi install` installs with `uv tool install`. It is ready when `colab` is on
+`PATH` or in `~/.local/bin` and `~/.config/colab-cli/token.json` exists; the
+first `colab usage` signs in through a browser.
+
+| `hi compute`   | Colab CLI                                                   |
+|----------------|-------------------------------------------------------------|
+| `up`           | `colab new -s NAME [--gpu X \| --tpu X] [--high-mem]`       |
+| `ls`, `status` | `colab sessions`, parsed only from its documented line format |
+| `stop`         | `colab stop -s NAME`, treating "not found" as an error      |
+| `run`          | `colab run --timeout SECONDS [--env K=V] script.py args`    |
+| `hardware`     | Built-in list with measured rates, plus `colab usage`       |
+| SSH transport  | `colab ssh --proxy-mode -s NAME` as `ProxyCommand`          |
+
+Colab-specific rules:
+
+- Hardware is checked against `cpu`, `T4`, `L4`, `G4`, `A100`, `H100`, `v5e1`,
+  and `v6e1` before any call, and the started session's hardware is checked
+  again afterwards, because the CLI has silently substituted an A100.
+- Every CLI call has its own timeout; `colab new` gets 10 minutes.
+- Port 8080 on the VM belongs to Colab's proxy and is refused for tunnels.
+- `--max` is at most 24 hours, Colab's own session limit.
+- `run` accepts Python scripts only. `--secret` is refused, because Colab's
+  only way to pass values is `--env` on the command line; `--detach` is
+  refused, because `colab run` cannot detach.
+- SSH needs Colab Pro or Pro+ and a local `~/.ssh/id_ed25519` or
+  `id_ecdsa`; `hi compute providers` says which is missing.
+- Colab's terms forbid public web services; tunnels bind to localhost only.
+
 ### Hugging Face Jobs API
 
 Hugging Face is called through its REST API at
@@ -179,12 +210,12 @@ run it by hand.
 
 ### Phasing
 
-1. **Hugging Face** through its API: runs first, then instances. It bills per
-   minute and has SSH and HTTPS ports.
-2. **RunPod** through its API: runs, then instances. It has a broad GPU range
+1. **Colab** through its CLI. The team already has Pro+ units and the proven
+   colab-runner flow; Colab suits instances more than runs.
+2. **Hugging Face** through its API: runs and instances. It bills per minute
+   and has SSH and HTTPS ports.
+3. **RunPod** through its API: runs, then instances. It has a broad GPU range
    and needs the `hi` watchdog, which Lambda and Vast reuse later.
-3. **Colab** through its CLI **(draft)**. The team already has Pro+ units and
-   the proven colab-runner flow; Colab suits instances more than runs.
 4. **Modal** through its Go SDK. It is on the roadmap, but implementation
    waits until the SDK leaves beta and its package path settles.
 5. **Lambda, Vast.ai, and SkyPilot** on demand **(draft)**. SkyPilot overlaps
@@ -194,41 +225,44 @@ run it by hand.
 ## Commands
 
 ```text
-hi compute run [options] <image> -- <command> [args...]
-hi compute run [options] <script.py> [-- args...]
-                                        Run to completion, streaming logs
-hi compute ls [--all]                   Runs and instances started through hi
-hi compute status <name>                State, hardware, limits, and cost so far
-hi compute logs <name> [--follow]       Output of a run, or setup and server logs
-hi compute wait <name>...               Wait until runs finish; exit with their status
-hi compute stop <name> | --all          Stop runs or instances
-hi compute hardware [--on <provider>]   Hardware flavors and prices
+hi compute                              Guided menu in a terminal, else help
 hi compute providers                    Configured and authenticated providers
+hi compute hardware [--on <provider>]   Hardware flavors and prices
+hi compute up [options]                 Start an instance
+hi compute run [options] <script.py> [-- args...]
+hi compute run [options] <image> -- <command> [args...]
+                                        Run to completion, streaming logs
+hi compute ls                           Runs and instances, with limits
+hi compute status <name>                State, hardware, and limits
+hi compute ssh <name> [-- <command>]    Open a shell or run one command
+hi compute tunnel <name> <port>[:<local>]
+                                        Forward a remote port to localhost
+hi compute logs <name> [--follow]       Setup and server logs on the instance
+hi compute serve <recipe | owner/repo-GGUF --quant Q> [options]
+                                        Serve a model and tunnel its API here
+hi compute stop <name> | --all          Stop runs or instances
+hi compute wait <name>...               Wait until runs finish (API providers)
+hi compute proxy <name>                 The provider's SSH transport, for ProxyCommand
 ```
 
-Draft commands for instances and guided use:
+Draft commands:
 
 ```text
-hi compute                              Step-by-step TUI over everything     (draft)
 hi compute <file.yaml>                  Start what a compute file describes  (draft)
 hi compute templates                    List ready-made compute templates    (draft)
 hi compute new <template> [<file>]      Write a template to edit             (draft)
-hi compute up [<file.yaml>] [options]   Start an instance                    (draft)
-hi compute ssh <name> [-- <command>]    Open a shell or run one command      (draft)
-hi compute tunnel <name> <port>[:<local>]
-                                        Forward a remote port to localhost   (draft)
 hi compute push <name> <path> [<dest>]  Copy files to the instance           (draft)
 hi compute pull <name> <path> [<dest>]  Copy files back                      (draft)
-hi compute serve [<recipe>] [options]   Serve a model and tunnel it          (draft)
-hi compute proxy <name>                 SSH ProxyCommand used by ssh config  (draft)
 ```
 
-Until the TUI is approved, bare `hi compute` prints help.
+Until the full TUI is approved, bare `hi compute` in a terminal opens a
+numbered menu over the commands above that prints the equivalent command for
+every action. Without a terminal it prints help.
 
 Options for `run` and `up`:
 
 ```text
---on <provider>      hf, runpod, ...; default from config, else hf
+--on <provider>      colab, hf, runpod; default: the only provider that is ready
 --gpu <flavor>       Provider flavor, such as a10g-small or cpu-basic
 --name <name>        Local handle; generated when omitted
 --env KEY=VALUE      Plain environment variable; repeatable
@@ -237,6 +271,7 @@ Options for `run` and `up`:
 --detach             run only: return after submission instead of streaming logs
 --yes                Skip the cost confirmation
 --dry-run            Print the resolved setup and provider requests; start nothing
+--high-mem           Colab only: request a high-RAM machine
 --image <image>      up only: container image where supported             (draft)
 --idle <duration>    up only: stop after this long without traffic        (draft)
 --set <key>=<value>  Override a compute-file field                        (draft)
@@ -366,10 +401,11 @@ directly and opens the TUI for anything it cannot default, such as the model.
 Teams add their own templates in `~/.config/hi/compute/templates/` or a
 project's `.hi/compute/` directory; project templates are listed first.
 
-## Connectivity (draft)
+## Connectivity
 
-Every instance is reachable as an SSH host. `hi` writes a `Host hi-<name>`
-block to a managed include file (`~/.ssh/config.d/hi`) whose `ProxyCommand` is
+`ssh`, `tunnel`, `logs`, and `serve` all run the system `ssh` with the
+provider's transport. **(draft):** `hi` also writes a `Host hi-<name>` block
+to a managed include file (`~/.ssh/config.d/hi`) whose `ProxyCommand` is
 `hi compute proxy <name>`. That proxy picks the provider's transport: a direct
 TCP connection, `ssh.hf.jobs`, or `colab ssh --proxy-mode`. Plain `ssh`,
 `scp`, `rsync`, and VS Code Remote-SSH then work directly, and `tunnel`,
@@ -383,7 +419,7 @@ TCP connection, `ssh.hf.jobs`, or `colab ssh --proxy-mode`. Plain `ssh`,
   teammates reach it by name. It is unavailable where the provider has no
   `/dev/net/tun`, such as Colab, unless NetBird runs in netstack mode.
 
-## Remote state contract (draft)
+## Remote state contract
 
 Setup and serving on the instance follow one contract, taken from
 colab-runner's `remote/serve.sh`:
@@ -399,7 +435,7 @@ colab-runner's `remote/serve.sh`:
 - `hi compute logs` shows these logs, so failures are debuggable without
   opening a shell.
 
-## Serving models (draft)
+## Serving models
 
 `hi compute serve <recipe>` combines `up`, setup, the health check, and
 `tunnel`, then prints an OpenAI-compatible base URL on localhost:
@@ -434,10 +470,17 @@ variants:
 rather than guessing flags. An API key, when set, is passed through the
 provider's secret mechanism and never printed.
 
+v0.6.0 builds recipes into `hi` and serves any other GGUF repository with
+`hi compute serve owner/Model-GGUF --quant Q4_K_M --gpu L4`. The remote script
+builds llama.cpp with CUDA and downloads the quant in parallel, then starts
+`llama-server` on `127.0.0.1:8000`; `hi` tunnels it to local port 8080 unless
+`--port` says otherwise. The YAML recipe format above and API keys are still
+draft.
+
 ## Cost safety
 
-- Every run and instance has a maximum lifetime. For instances, `--idle`
-  defaults to 30 minutes and `--max` to 4 hours unless configured otherwise.
+- Every run and instance has a maximum lifetime: `--max` defaults to 4 hours
+  for instances and 1 hour for runs. `--idle` (default 30 minutes) is draft.
   `--yes` and `--detach` never remove a limit.
 - `run`, `up`, and `serve` show provider, flavor, price per hour, and limits,
   and ask for confirmation on paid hardware. Prices come from the provider's API where
@@ -449,6 +492,11 @@ provider's secret mechanism and never printed.
   instance that stops it through the provider API after the idle or maximum
   limit, so a closed laptop never leaves a GPU running. `hi compute ls` also
   stops instances whose limits have passed.
+- Colab instances cannot stop themselves from inside, so `hi compute up`
+  starts a detached local watcher (`hi compute __watch`) that checks the wall
+  clock every 30 seconds, surviving closed terminals and suspend. It does not
+  survive a reboot or a powered-off laptop; `hi compute ls` and Colab's own
+  24-hour session limit are the backstops.
 - `stop --all` lists what it will stop and asks for confirmation.
 
 ## Errors and output
@@ -510,7 +558,7 @@ Runs (approved):
 10. Adding a provider requires a new driver only, with no change to the
     command surface.
 
-Instances **(draft)**:
+Instances:
 
 11. `hi compute up --on hf --gpu a10g-small` starts an instance, prints its
     name, price, and limits, and `hi compute ssh <name>` opens a shell on it.
@@ -525,9 +573,9 @@ Instances **(draft)**:
     `serve` resumes rather than restarts it.
 16. Every instance stops by itself after its idle or maximum limit, including
     when the laptop is offline.
-17. `ls` and `stop` see only runs and instances started through `hi` and agree
-    with the provider's own listing.
-18. The same setup started from the TUI, from flags, and from a compute file
+17. `ls` and `stop` agree with the provider's own listing; instances not
+    started through `hi` are listed and marked, and have no limits.
+18. **(draft)** The same setup started from the TUI, from flags, and from a compute file
     produces identical provider requests in `--dry-run`.
 19. Without a terminal, missing settings fail with the list of required flags
     instead of prompting.

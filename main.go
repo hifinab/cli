@@ -72,6 +72,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 1
 		}
 		return 0
+	case "compute":
+		return runCompute(args[1:], stdin, stdout, stderr)
 	case "verify":
 		if len(args) != 2 || args[1] != "strix" {
 			fmt.Fprintln(stderr, "usage: hi verify strix")
@@ -99,6 +101,7 @@ Usage:
   hi net status                 Show NetBird connection status
   hi net down                   Disconnect NetBird
   hi net reconnect              Reconnect an enrolled NetBird peer
+  hi compute                    Start and use remote GPU machines (Colab)
   hi verify strix               Check an installed Strix Halo workstation
   hi version                    Print the installed version
   hi help                       Show this help`)

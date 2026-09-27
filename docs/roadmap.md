@@ -43,7 +43,45 @@ Drafts in `specs/ideas/` remain outside the roadmap until approved.
 
 ## Planned
 
-### v0.6.0 — Updates and authentication
+### v0.6.0 — Colab compute
+
+- [x] Start, list, inspect, reach, and stop Colab instances with `hi compute`:
+  `up`, `ls`, `status`, `ssh`, `tunnel`, `logs`, `stop`, `hardware`, and
+  `providers`, plus a guided menu for bare `hi compute`.
+- [x] Enforce a maximum lifetime with a detached watcher and at every
+  `hi compute ls`; confirm paid hardware; validate hardware names before
+  calling Colab.
+- [x] Run Python scripts to completion with `hi compute run`.
+- [x] Serve a GGUF model with llama.cpp and tunnel its OpenAI-compatible API
+  with `hi compute serve`, including the tested Qwen3.8-Flash-Next recipe.
+- [x] Install the Colab CLI with `hi install`.
+- [ ] Verify against a live Colab account before release.
+  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
+
+Dependency: the Colab CLI (`google-colab-cli`) and a Colab Pro or Pro+ plan,
+which SSH requires.
+
+### v0.7.0 — Hugging Face compute
+
+- [ ] Install the `hf` CLI and add `hi login hf`.
+- [ ] Run, list, follow, wait for, and stop Hugging Face Jobs with
+  `hi compute run`, calling the Jobs REST API directly.
+- [ ] Start and reach Hugging Face instances with `hi compute up`, `ssh`,
+  `tunnel`, and `serve`.
+  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
+
+Dependencies: the v0.6.0 driver interface, state, and SSH layer; the
+token-read exception in [hi_login.md](specs/approved/hi_login.md).
+
+### v0.8.0 — RunPod compute
+
+- [ ] Add a RunPod driver through its REST API, with the on-instance watchdog
+  RunPod needs for lifetime limits.
+  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
+
+Dependency: extends the v0.6.0 and v0.7.0 driver interface.
+
+### v0.9.0 — Updates and authentication
 
 - [ ] Add atomic, checksummed self-updates.
   Approved spec: [hi_update.md](specs/approved/hi_update.md).
@@ -53,7 +91,7 @@ Drafts in `specs/ideas/` remain outside the roadmap until approved.
 Dependencies: `hi update` relies on the existing release assets and checksum
 pipeline. Login requires the corresponding installed CLI.
 
-### v0.7.0 — Project bootstrap
+### v0.10.0 — Project bootstrap
 
 - [ ] Add the interactive `hi init` helper and deterministic Python template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
@@ -61,17 +99,17 @@ pipeline. Login requires the corresponding installed CLI.
 Dependency: the Python template requires `uv` and establishes the metadata and
 safe-generation contract used by later templates.
 
-### v0.8.0 — Specialized project templates
+### v0.11.0 — Specialized project templates
 
 - [ ] Add the quantitative-research template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 - [ ] Add the deterministic web-application template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
-Dependency: both templates extend the v0.7.0 planner, conflict detection,
+Dependency: both templates extend the v0.10.0 planner, conflict detection,
 metadata, agent instructions, and documentation structure.
 
-### v0.9.0 — Focused machine operations
+### v0.12.0 — Focused machine operations
 
 - [ ] Read and change the machine hostname independently of installation.
   Approved spec: [hi_hostname.md](specs/approved/hi_hostname.md).
@@ -82,29 +120,10 @@ metadata, agent instructions, and documentation structure.
   Approved spec: [hi_install_shared.md](specs/approved/hi_install_shared.md).
 
 Dependency: shared tools no longer update themselves, so they rely on
-rerunning `hi install` or on the v0.6.0 `hi update` to stay current. A shared
+rerunning `hi install` or on the v0.9.0 `hi update` to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
-### v0.10.0 — Remote compute runs
-
-- [ ] Install the `hf` CLI and add `hi login hf`.
-- [ ] Run, list, follow, wait for, and stop Hugging Face Jobs with
-  `hi compute run`, calling the Jobs REST API directly.
-  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
-
-Dependencies: login follows the v0.6.0 delegation rules, with the token-read
-exception in [hi_login.md](specs/approved/hi_login.md). Script runs use `uv`,
-matching the v0.7.0 Python template.
-
-### v0.11.0 — RunPod runs
-
-- [ ] Add a RunPod driver through its REST API without changing the
-  `hi compute` commands.
-  Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
-
-Dependency: extends the v0.10.0 driver interface and names.
-
-### Deferred — Modal runs
+### Deferred — Modal compute
 
 - [ ] Add a Modal driver through Modal's official Go SDK.
   Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
@@ -112,6 +131,5 @@ Dependency: extends the v0.10.0 driver interface and names.
 Waiting until Modal's Go SDK leaves beta and its package path settles. Not
 scheduled to a version yet.
 
-Interactive instances (`hi compute up`, SSH, tunnels, serving, the TUI, and
-compute files) are specified in the same file but still marked draft, so they
-stay off the roadmap until approved.
+The TUI, compute files, and templates in the same spec are still marked draft;
+v0.6.0 ships a numbered menu instead of the full TUI.

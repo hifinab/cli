@@ -125,6 +125,7 @@ if [[ "$profile" == "strix" ]]; then
   pipx install --force amd-debug-tools
 fi
 curl -LsSf https://astral.sh/uv/install.sh | sh
+"$HOME/.local/bin/uv" tool install --upgrade google-colab-cli
 curl -fsSL https://pkgs.netbird.io/install.sh | sh
 curl -fsSL https://omp.sh/install | sh
 curl -fsSL https://claude.ai/install.sh | bash
