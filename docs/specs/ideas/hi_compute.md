@@ -23,17 +23,20 @@ keep authentication, billing, scheduling, and the real instance state.
 ## Commands
 
 ```text
-hi compute                              Interactive menu over the commands below
+hi compute                              Step-by-step TUI over everything below
+hi compute <file.yaml>                  Start what a compute file describes
+hi compute templates                    List ready-made compute templates
+hi compute new <template> [<file>]      Write a template to a compute file to edit
 hi compute providers                    Installed, authenticated, and capable providers
 hi compute gpus [--on <provider>]       Hardware flavors and hourly prices
-hi compute up [options]                 Start an instance
+hi compute up [<file.yaml>] [options]   Start an instance
 hi compute ls                           Instances started through hi, with cost so far
 hi compute ssh <name> [-- <command>]    Open a shell or run one command
 hi compute tunnel <name> <port>[:<local>]
                                         Forward a remote port to localhost
 hi compute push <name> <path> [<dest>]  Copy files to the instance
 hi compute pull <name> <path> [<dest>]  Copy files back
-hi compute serve <recipe> [options]     Start an instance, serve a model, tunnel it
+hi compute serve [<recipe>] [options]   Start an instance, serve a model, tunnel it
 hi compute down <name> | --all          Stop and release instances
 ```
 
@@ -46,13 +49,128 @@ hi compute down <name> | --all          Stop and release instances
 --image <image>      Container image where the provider supports one
 --idle <duration>    Stop after this long without SSH, tunnel, or HTTP traffic
 --max <duration>     Hard lifetime limit, always enforced
+--set <key>=<value>  Override any compute-file field, such as ports.0=8080
 --yes                Skip the cost confirmation
---dry-run            Print the native commands without running them
+--dry-run            Print the resolved setup and native commands; start nothing
 ```
 
-Bare `hi compute` opens a small menu: pick a provider, a GPU, and an action,
-with running instances listed first. It is the same flow as scripted shell
-menus colleagues build today, but backed by the commands above.
+## Three ways in
+
+Every `up` and `serve` is resolved from the same settings, which can come from
+three places. They mix freely, and the result is identical whichever way the
+settings were supplied.
+
+1. **Guided TUI.** Bare `hi compute` walks through each decision step by step.
+2. **Flags.** `hi compute up --on hf --gpu a10g-small --idle 30m` for quick,
+   scriptable one-liners.
+3. **Compute files.** `hi compute modal.yaml` for setups too involved for
+   flags: images, setup commands, volumes, secrets, several ports, a model to
+   serve.
+
+Precedence, highest first: flags and `--set`, then the compute file, then
+`~/.config/hi/compute.toml` defaults, then provider defaults. When required
+settings are still missing and a terminal is attached, the TUI opens at the
+first missing step with everything else prefilled. Without a terminal, `hi`
+never prompts; it fails and lists the missing settings and the flags that
+supply them.
+
+### Guided TUI
+
+Bare `hi compute` starts with running instances, if any, so the first choice
+is to reconnect, tunnel, or stop something already costing money. Starting
+something new then goes step by step:
+
+1. **What for:** shell, serve a model, notebook, or start from a template or
+   compute file.
+2. **Provider:** only installed providers are selectable; unauthenticated ones
+   offer the `hi login` step inline.
+3. **Hardware:** flavors the provider offers, with memory and hourly price,
+   filtered to what the chosen model or template needs.
+4. **Image and setup:** a sensible default per purpose, or a custom image.
+5. **Limits:** idle and maximum lifetime, prefilled from config.
+6. **Review:** the full setup, estimated cost per hour and at the maximum
+   lifetime, and the equivalent flag command and compute file.
+
+The review step offers **Start**, **Save as compute file**, **Copy command**,
+and **Back**. Saving writes the same YAML a template would, so a setup built
+once in the TUI becomes a file that can be committed and shared. Every screen
+works with arrow keys and Enter, shows its keyboard shortcuts, and supports
+Esc to go back. Printing the flag command at the end teaches the non-TUI form.
+
+### Compute files
+
+A compute file is versioned YAML describing one instance. Only `provider` and
+`hardware` are required; everything else has defaults.
+
+```yaml
+# modal.yaml
+version: 1
+name: qwen-playground
+provider: modal
+hardware:
+  gpu: a100-40gb
+image: vllm/vllm-openai:v0.10.0
+limits:
+  idle: 30m
+  max: 4h
+env:
+  HF_HUB_ENABLE_HF_TRANSFER: "1"
+secrets:
+  - HF_TOKEN            # names only; values come from the local environment
+volumes:
+  - name: hf-cache
+    path: /root/.cache/huggingface
+setup:
+  - pip install hf_transfer
+serve:
+  recipe: qwen3-8b      # or command: [vllm, serve, Qwen/Qwen3-8B]
+  port: 8000
+  health: /v1/models
+tunnels:
+  - 8000
+sync:
+  push:
+    - ./prompts:/workspace/prompts
+provider_options:       # passed through to this provider only
+  modal:
+    region: us-east
+```
+
+Rules:
+
+- Secret values never appear in a compute file. `hi` rejects files containing
+  keys that look like credentials.
+- `provider_options` is the escape hatch for provider features `hi` does not
+  model. Fields for other providers are ignored, so one file can carry options
+  for several providers and switch with `--on`.
+- Fields a provider cannot honor fail validation before anything starts.
+- `hi compute <file> --dry-run` prints the fully resolved setup and the
+  native commands, which makes files easy to review in pull requests.
+- A JSON Schema is published with each release for editor completion and
+  validation.
+
+### Templates
+
+Ready-made compute files ship with `hi` for common tasks:
+
+| Template           | What it sets up                                               |
+|--------------------|---------------------------------------------------------------|
+| `shell-gpu`        | A plain GPU box with SSH and the repo pushed to it            |
+| `serve-vllm`       | An OpenAI-compatible vLLM server tunnelled to localhost        |
+| `serve-llama-cpp`  | A llama.cpp server for GGUF models on smaller GPUs            |
+| `jupyter`          | JupyterLab tunnelled to localhost with a persistent volume    |
+| `finetune-unsloth` | An Unsloth fine-tuning environment with a dataset volume      |
+| `colab-playground` | A Colab runtime with the playground notebook tools            |
+
+`hi compute templates` lists them with the providers each supports.
+`hi compute new serve-vllm qwen.yaml` writes a template out for editing, with
+comments explaining every field. `hi compute serve-vllm` runs a template
+directly with its defaults and opens the TUI for anything it cannot default,
+such as which model to serve.
+
+Teams can add their own templates by placing compute files in
+`~/.config/hi/compute/templates/` or in a project's `.hi/compute/` directory;
+project templates take precedence and are listed first.
 
 ## Providers
 
@@ -124,8 +242,9 @@ server through the provider's secret mechanism and never printed.
 ## Configuration
 
 Defaults live in `~/.config/hi/compute.toml`: default provider, GPU, idle and
-max limits, and per-provider settings. A project may add a `[compute]` table
-to the metadata written by `hi init` for its usual image and GPU.
+max limits, and per-provider settings. Projects keep their setups as compute
+files under `.hi/compute/`, which the TUI offers first when run inside the
+project.
 
 ## Relationship to other commands
 
@@ -148,6 +267,10 @@ to the metadata written by `hi init` for its usual image and GPU.
    silently picking an expensive flavor.
 5. Whether the watchdog should be opt-out, given it runs code on the
    instance.
+6. TUI library: a Go framework such as Bubble Tea keeps `hi` a single static
+   binary; confirm size and accessibility before choosing.
+7. Whether compute files should allow several instances, such as a server
+   plus a client, or stay one instance per file.
 
 ## Acceptance criteria
 
@@ -164,3 +287,12 @@ to the metadata written by `hi init` for its usual image and GPU.
 6. `--dry-run` prints the exact native commands and starts nothing.
 7. Credentials and API keys never appear in `hi` output, arguments, or files.
 8. Adding a provider requires no change to the `hi compute` command surface.
+9. Bare `hi compute` in a terminal guides a first-time user from nothing to a
+   running instance without any flags, and its review step shows the
+   equivalent flag command and compute file.
+10. The same setup started from the TUI, from flags, and from a compute file
+    produces identical native commands in `--dry-run`.
+11. Without a terminal, missing settings fail with the list of required flags
+    instead of prompting.
+12. Every built-in template validates, and `hi compute new` writes a file that
+    starts successfully after filling only the fields it marks as required.
