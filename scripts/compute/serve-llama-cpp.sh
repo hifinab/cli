@@ -15,6 +15,13 @@ PORT=${PORT:-8000}
 ALIAS=${ALIAS:-model}
 EXTRA_ARGS=${EXTRA_ARGS:-}
 
+# SSH sessions do not inherit the notebook kernel's environment; on Colab the
+# NVIDIA driver libraries live in /usr/lib64-nvidia.
+for dir in /usr/lib64-nvidia /usr/local/nvidia/lib64; do
+  [[ -d $dir ]] && export LD_LIBRARY_PATH=$dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+done
+export PATH=$PATH:/usr/local/cuda/bin
+
 HI=$HOME/.hi
 LOGS=$HI/logs
 # Colab's large disk is /content; elsewhere keep everything under ~/.hi.
@@ -32,8 +39,7 @@ if curl -sf "localhost:$PORT/health" >/dev/null; then state "ready"; exit 0; fi
 (
   if [[ ! -x $LLAMA/build/bin/llama-server ]]; then
     cuda=OFF
-    command -v nvcc >/dev/null || [[ -x /usr/local/cuda/bin/nvcc ]] && cuda=ON
-    export PATH=$PATH:/usr/local/cuda/bin
+    command -v nvcc >/dev/null && cuda=ON
     { rm -rf "$LLAMA" &&
       git clone --depth 1 https://github.com/ggml-org/llama.cpp "$LLAMA" &&
       cmake -S "$LLAMA" -B "$LLAMA/build" -DGGML_CUDA=$cuda -DCMAKE_CUDA_ARCHITECTURES=native -DLLAMA_CURL=OFF &&

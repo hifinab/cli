@@ -493,6 +493,13 @@ func computeListCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 	if err != nil {
 		return err
 	}
+	defer func() {
+		for _, provider := range computeProviders {
+			if account, err := provider.account(); err == nil && account != "" {
+				fmt.Fprintf(stdout, "\n%s\n", account)
+			}
+		}
+	}()
 	if len(listed) == 0 {
 		fmt.Fprintln(stdout, "No instances are running.")
 		return nil
@@ -517,12 +524,6 @@ func computeListCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n", name, item.provider, hardware, up, stopsIn)
 	}
 	table.Flush()
-
-	for _, provider := range computeProviders {
-		if account, err := provider.account(); err == nil && account != "" {
-			fmt.Fprintf(stdout, "\n%s\n", account)
-		}
-	}
 	return nil
 }
 
@@ -788,15 +789,16 @@ func computeStopCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 	flags := newComputeFlags("stop", stderr)
 	all := flags.Bool("all", false, "stop every instance")
 	yes := flags.Bool("yes", false, "skip confirmation")
-	if err := parseComputeFlags(flags, args); err != nil {
+	positional, err := parseInterspersedFlags(flags, args)
+	if err != nil {
 		return err
 	}
-	if *all == (flags.NArg() == 1) || flags.NArg() > 1 {
+	if *all == (len(positional) == 1) || len(positional) > 1 {
 		return usageError{"usage: hi compute stop <name> | --all [--yes]"}
 	}
 
 	if !*all {
-		provider, name, err := findInstance(flags.Arg(0))
+		provider, name, err := findInstance(positional[0])
 		if err != nil {
 			return err
 		}
@@ -1079,6 +1081,26 @@ func newComputeFlags(name string, stderr io.Writer) *flag.FlagSet {
 	flags := flag.NewFlagSet("hi compute "+name, flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	return flags
+}
+
+// parseInterspersedFlags accepts flags before and after positional
+// arguments, as in `hi compute logs qwen -n 100`.
+func parseInterspersedFlags(flags *flag.FlagSet, args []string) ([]string, error) {
+	var positional []string
+	for {
+		if err := parseComputeFlags(flags, args); err != nil {
+			return nil, err
+		}
+		args = flags.Args()
+		if len(args) == 0 {
+			return positional, nil
+		}
+		if args[0] == "--" {
+			return append(positional, args[1:]...), nil
+		}
+		positional = append(positional, args[0])
+		args = args[1:]
+	}
 }
 
 func parseComputeFlags(flags *flag.FlagSet, args []string) error {

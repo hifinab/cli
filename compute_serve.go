@@ -51,7 +51,7 @@ var serveRecipes = map[string]serveRecipe{
 		// stream it from Colab's slow network disk.
 		args:     `-ot per_layer_token_embd\.weight=CPU --lazy-mode off --temp 1.0 --top-p 0.95 --top-k 20 --min-p 0.0`,
 		hardware: "G4",
-		tested:   "Colab G4, 2026-09-27: ~103 tokens/s, 62.9 GB VRAM at 131k context, ready in ~7 min",
+		tested:   "Colab G4, 2026-09-27: ~84 tokens/s through hi compute serve (~103 in colab-runner), 62.9 GB VRAM at 131k context, ready in ~7 min",
 	},
 }
 
@@ -68,15 +68,16 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	localPort := flags.Int("port", serveLocalPort, "local port")
 	yes := flags.Bool("yes", false, "skip confirmation")
 	dryRun := flags.Bool("dry-run", false, "show without starting")
-	if err := parseComputeFlags(flags, args); err != nil {
+	positional, err := parseInterspersedFlags(flags, args)
+	if err != nil {
 		return err
 	}
-	if flags.NArg() != 1 {
+	if len(positional) != 1 {
 		return usageError{"usage: hi compute serve [options] <recipe | owner/repo-GGUF --quant Q>\n" +
 			"recipes: " + strings.Join(serveRecipeNames(), ", ")}
 	}
 
-	recipe, err := resolveServeRecipe(flags.Arg(0), *quant, *contextSize, *alias, *extra)
+	recipe, err := resolveServeRecipe(positional[0], *quant, *contextSize, *alias, *extra)
 	if err != nil {
 		return err
 	}
@@ -283,13 +284,14 @@ func computeLogsCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 	flags := newComputeFlags("logs", stderr)
 	follow := flags.Bool("follow", false, "keep printing new lines")
 	lines := flags.Int("n", 40, "lines per log")
-	if err := parseComputeFlags(flags, args); err != nil {
+	positional, err := parseInterspersedFlags(flags, args)
+	if err != nil {
 		return err
 	}
-	if flags.NArg() != 1 {
+	if len(positional) != 1 {
 		return usageError{"usage: hi compute logs <name> [--follow] [-n lines]"}
 	}
-	provider, name, err := findInstance(flags.Arg(0))
+	provider, name, err := findInstance(positional[0])
 	if err != nil {
 		return err
 	}

@@ -41,8 +41,6 @@ Drafts in `specs/ideas/` remain outside the roadmap until approved.
 - [x] Install Codex without its interactive launch prompt.
 - [x] Run `hi` straight from the installer with `sh -s -- <command>`.
 
-## Planned
-
 ### v0.6.0 — Colab compute
 
 - [x] Start, list, inspect, reach, and stop Colab instances with `hi compute`:
@@ -55,11 +53,15 @@ Drafts in `specs/ideas/` remain outside the roadmap until approved.
 - [x] Serve a GGUF model with llama.cpp and tunnel its OpenAI-compatible API
   with `hi compute serve`, including the tested Qwen3.8-Flash-Next recipe.
 - [x] Install the Colab CLI with `hi install`.
-- [ ] Verify against a live Colab account before release.
+- [x] Verify against a live Colab account: CPU `up`, `ssh`, `tunnel`, `run`,
+  and `stop`, and the Qwen3.8-Flash-Next recipe on a G4 (about 7 minutes to
+  ready, ~84 tokens/s, 0.93 units for the whole test).
   Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
 Dependency: the Colab CLI (`google-colab-cli`) and a Colab Pro or Pro+ plan,
 which SSH requires.
+
+## Planned
 
 ### v0.7.0 — Hugging Face compute
 

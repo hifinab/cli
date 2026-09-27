@@ -459,3 +459,22 @@ func TestComputeServeValidatesModelAndHardware(t *testing.T) {
 		t.Fatal("an instance started despite invalid input")
 	}
 }
+
+func TestComputeLogsAcceptsFlagsAfterTheName(t *testing.T) {
+	fake := newFakeColab(t)
+	fake.setSessions("[qwen] ep1 | Hardware: G4 | Shape: Standard | Variant: GPU")
+	code, _, stderr := runComputeTest("logs", "qwen", "-n", "3")
+	if code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	if !strings.Contains(fake.calls(), "tail -n 3 ~/.hi/logs/*.log") {
+		t.Fatalf("logs did not use -n 3:\n%s", fake.calls())
+	}
+}
+
+func TestServeScriptFindsColabDriverLibraries(t *testing.T) {
+	// SSH sessions on Colab lack the kernel's LD_LIBRARY_PATH (found live).
+	if !strings.Contains(string(serveLlamaCppScript), "/usr/lib64-nvidia") {
+		t.Fatal("serve script does not add Colab's NVIDIA library directory")
+	}
+}
