@@ -79,7 +79,7 @@ which SSH requires.
 Dependencies: the v0.6.0 driver interface, state, and SSH layer; the
 token-read exception in [hi_login.md](specs/approved/hi_login.md).
 
-### v0.7.1 — Agent skill and billing
+### v0.7.1 — Agent skill, billing, guide, and self-update
 
 - [x] Write a `hi` agent skill for Claude Code and Codex with `hi skill`,
   into the current folder or, with `--global`, the home folder; one copy in
@@ -91,6 +91,8 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
   stays up; verify Hugging Face SSH and tunnels live.
 - [x] Publish a searchable, multi-page guide at https://hifin.sh/guide/ with
   step-by-step setup, examples, and a command reference.
+- [x] Add atomic, checksummed self-updates with `hi update`.
+  Approved spec: [hi_update.md](specs/approved/hi_update.md).
 
 ## Planned
 
@@ -102,15 +104,12 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
 
 Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 
-### v0.9.0 — Updates and authentication
+### v0.9.0 — Authentication
 
-- [ ] Add atomic, checksummed self-updates.
-  Approved spec: [hi_update.md](specs/approved/hi_update.md).
 - [ ] Delegate GitHub and OMP authentication to their native tools.
   Approved spec: [hi_login.md](specs/approved/hi_login.md).
 
-Dependencies: `hi update` relies on the existing release assets and checksum
-pipeline. Login requires the corresponding installed CLI.
+Dependency: login requires the corresponding installed CLI.
 
 ### v0.10.0 — Project bootstrap
 
@@ -141,7 +140,7 @@ metadata, agent instructions, and documentation structure.
   Approved spec: [hi_install_shared.md](specs/approved/hi_install_shared.md).
 
 Dependency: shared tools no longer update themselves, so they rely on
-rerunning `hi install` or on the v0.9.0 `hi update` to stay current. A shared
+rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
 ### Deferred — Modal compute

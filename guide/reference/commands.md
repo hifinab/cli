@@ -14,6 +14,7 @@ description: Every hi command and option in one place.
 | `hi verify strix`                | Check a Strix Halo workstation                         |
 | `hi net`                         | Enroll in NetBird; `status`, `down`, `reconnect`       |
 | `hi adduser <name>`              | Create a user with GPU access                          |
+| `hi update [--check] [--version <tag>]` | Update `hi` to the latest or a given release     |
 | `hi version`, `hi help`          | Version and help                                       |
 
 ## hi compute

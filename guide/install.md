@@ -79,13 +79,29 @@ hf       ready
 and the `hf` CLI. If you only installed `hi` itself, `hi login` tells you how
 to install the one it needs.
 
-## Update or remove
+## Update
 
-To update, run the installer again; it replaces `hi` with the latest release.
+```sh
+hi update            # install the latest release
+hi update --check    # only say whether a newer release exists
+hi update --version v0.7.0
+```
+
+`hi update` downloads the release for your machine, checks its SHA-256
+checksum, and replaces the binary in one step; if anything fails, the old
+binary stays as it was. `--version` can also go back to an older release.
 After updating, refresh any [agent skills](/guide/reference/skill/) you wrote
 with `hi skill`.
 
-To remove `hi`, delete the binary and its local state:
+`hi update` arrived in v0.7.1. Older versions update once with the installer:
+
+```sh
+curl -fsSL https://hifin.sh/install.sh | sh
+```
+
+## Remove
+
+Delete the binary and its local state:
 
 ```sh
 rm ~/.local/bin/hi

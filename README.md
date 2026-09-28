@@ -26,6 +26,8 @@ applies to new shells; until then the installer prints the full path to run, suc
 as `~/.local/bin/hi install strix`. Set `HI_INSTALL_DIR` to override the
 destination.
 
+To update later, run `hi update` (v0.7.1 and newer).
+
 ## Commands
 
 ```text
@@ -40,6 +42,7 @@ hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Fa
 hi login <hf|colab>  Sign in to a compute provider
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
+hi update          Update hi to the latest release (--check, --version)
 hi version         Print the installed version
 hi help            Show help
 ```

@@ -1,6 +1,6 @@
 # `hi update` specification
 
-Status: Approved
+Status: Implemented for v0.7.1
 
 Dependencies: GitHub release assets and published SHA-256 checksums.
 
@@ -13,10 +13,16 @@ Update the installed `hi` binary safely without rerunning the bootstrap script.
 ```text
 hi update
 hi update --version v0.4.0
+hi update --check
 ```
 
-Bare update selects the latest non-draft, non-prerelease version. An explicit
-version selects that immutable release.
+Bare update selects the latest non-draft, non-prerelease version from
+GitHub's latest-release API. An explicit version selects that immutable
+release, including an older one. `--check` reports whether a newer release
+exists and changes nothing.
+
+Releases before v0.7.1 have no `hi update`; they update once with the
+installer, `curl -fsSL https://hifin.sh/install.sh | sh`.
 
 ## Update flow
 
@@ -37,6 +43,18 @@ Refuse symlink surprises, unsupported platforms, checksum mismatches, unwritable
 destinations, and root/user ownership transitions. Never replace the binary
 before verification. Temporary files are removed after every failure. Network
 or GitHub errors leave the existing executable untouched.
+
+## Implementation notes
+
+- The binary is downloaded to a temporary file in the executable's own
+  directory, so the final rename is atomic, and the temporary file is removed
+  on every failure.
+- The executable is resolved through symlinks and must be a regular file
+  owned by the running user; otherwise `hi update` refuses and names the path.
+- After replacing, `hi update` runs the new binary's `version` and reports
+  it, and reminds the user to refresh a global agent skill if one exists.
+- Verified on 2026-09-28 against the real v0.7.0 release: a v0.6.0 build
+  updated itself and its SHA-256 matched the published checksum.
 
 ## Acceptance criteria
 

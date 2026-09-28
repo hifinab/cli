@@ -146,4 +146,5 @@ These change the machine and need sudo; run them only when asked.
   (and AMD ROCm for Strix Halo). `hi verify strix` checks it afterwards.
 - `hi net`: enroll the machine in NetBird (it prompts for the setup key).
   `hi net status` is read-only and safe to run.
-- `hi version`: the installed version.
+- `hi version`: the installed version. `hi update --check` says whether a
+  newer release exists; `hi update` installs it (ask first).
