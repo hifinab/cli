@@ -87,21 +87,23 @@ command or API request without starting anything.
 
 ## The guided menu
 
-Run `hi compute` with no arguments in a terminal for a numbered menu. It lists
-what is running first, then walks through each choice, and prints the
-equivalent command before every action so you learn the flags as you go.
+Run `hi compute` with no arguments in a terminal for a guided menu:
 
-```text
-What do you want to do?
-  1) Start an instance
-  2) Open a shell on an instance
-  3) Forward a port to this machine
-  4) Stop an instance
-  5) Run a Python script to completion
-  6) Serve a model and tunnel its API here
-  7) Show hardware and balance
-  8) Quit
-```
+- A **Running** panel at the top shows your machines and how long each has
+  left; `no time limit` is highlighted.
+- Choose with the arrow keys and Enter. In long lists such as Hugging Face's
+  hardware, press `/` and type to filter, for example `/a10`.
+- Text answers are checked as you type them, so a lifetime like `soon` is
+  flagged before anything happens.
+- Each answer stays on screen as a `✔` line, so you can see the choices you
+  made.
+- Before anything costs money, a summary card shows the provider, hardware,
+  price, who pays, the time limit, and the equivalent command. The default
+  answer is **No**. Machines without a time limit get an amber warning.
+- Esc goes back a step; Ctrl+C leaves the menu.
+
+Every action prints the command it runs, so you learn the flags as you go.
+When the input is not a terminal, the menu falls back to numbered questions.
 
 ## Commands at a glance
 

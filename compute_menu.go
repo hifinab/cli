@@ -11,40 +11,31 @@ import (
 var errMenuBack = errors.New("back")
 
 // computeMenu is the guided flow behind a bare `hi compute`. Every action
-// prints the equivalent command so the menu also teaches the flags.
+// shows the equivalent command so the menu also teaches the flags.
 func computeMenu(stdin io.Reader, stdout, stderr io.Writer) error {
-	for {
-		fmt.Fprintln(stdout)
-		listed, err := listInstances(stdout, stderr)
-		if err != nil {
-			fmt.Fprintf(stderr, "hi: %v\n", err)
-		}
-		if len(listed) > 0 {
-			fmt.Fprintln(stdout, "Running:")
-			for _, item := range listed {
-				line := fmt.Sprintf("  %s/%s  %s", item.provider, item.instance.name, item.instance.hardware)
-				if item.record != nil {
-					if item.record.Deadline.IsZero() {
-						line += "  no time limit"
-					} else {
-						line += "  stops in " + formatDuration(item.record.Deadline.Sub(computeNow()))
-					}
-				}
-				fmt.Fprintln(stdout, line)
-			}
-			fmt.Fprintln(stdout)
-		}
+	return runMenu(newMenuUI(stdin, stdout), stdin, stdout, stderr)
+}
 
-		choice, err := menuChoice(stdin, stdout, "What do you want to do?", []string{
-			"Start an instance",
-			"Open a shell on an instance",
-			"Forward a port to this machine",
-			"Stop an instance",
-			"Run a Python script to completion",
-			"Serve a model and tunnel its API here",
-			"Show hardware and balance",
-			"Quit",
-		})
+func runMenu(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
+	for {
+		var listed []listedInstance
+		var listErr error
+		ui.busy("Checking what is running…", func() { listed, listErr = listInstances(stdout, stderr) })
+		if listErr != nil {
+			ui.failure(listErr)
+		}
+		ui.header(listed)
+
+		choice, err := ui.choose("What do you want to do?", []string{
+			"▶  Start an instance",
+			"⌁  Open a shell on an instance",
+			"⇄  Forward a port to this machine",
+			"■  Stop an instance",
+			"◆  Run a Python script to completion",
+			"✦  Serve a model and tunnel its API here",
+			"≡  Show hardware and balance",
+			"✕  Quit",
+		}, false)
 		if err != nil {
 			return nil
 		}
@@ -52,19 +43,19 @@ func computeMenu(stdin io.Reader, stdout, stderr io.Writer) error {
 		var actionErr error
 		switch choice {
 		case 0:
-			actionErr = menuStart(stdin, stdout, stderr)
+			actionErr = menuStart(ui, stdin, stdout, stderr)
 		case 1:
-			actionErr = menuWithInstance(listed, stdin, stdout, func(name string) error {
-				fmt.Fprintf(stdout, "$ hi compute ssh %s\n", name)
+			actionErr = menuWithInstance(ui, listed, func(name string) error {
+				ui.command("hi compute ssh " + name)
 				return computeSSHCommand([]string{name}, stdin, stdout, stderr)
 			})
 		case 2:
-			actionErr = menuWithInstance(listed, stdin, stdout, func(name string) error {
-				remote, err := ask(stdin, stdout, "Port on the instance", "8000")
+			actionErr = menuWithInstance(ui, listed, func(name string) error {
+				remote, err := ui.input("Port on the instance", "8000", validPort)
 				if err != nil {
 					return err
 				}
-				local, err := ask(stdin, stdout, "Local port", remote)
+				local, err := ui.input("Port on this machine", remote, validPort)
 				if err != nil {
 					return err
 				}
@@ -72,38 +63,100 @@ func computeMenu(stdin io.Reader, stdout, stderr io.Writer) error {
 				if local != remote {
 					ports += ":" + local
 				}
-				fmt.Fprintf(stdout, "$ hi compute tunnel %s %s\n", name, ports)
+				ui.command("hi compute tunnel " + name + " " + ports)
 				return computeTunnelCommand([]string{name, ports}, stdin, stdout, stderr)
 			})
 		case 3:
-			actionErr = menuWithInstance(listed, stdin, stdout, func(name string) error {
-				if err := confirm(stdin, stdout, false, fmt.Sprintf("Stop %s?", name)); err != nil {
-					return err
+			actionErr = menuWithInstance(ui, listed, func(name string) error {
+				yes, err := ui.confirm(fmt.Sprintf("Stop %s?", name), "", false)
+				if err != nil || !yes {
+					return errMenuBack
 				}
-				fmt.Fprintf(stdout, "$ hi compute stop %s\n", name)
+				ui.command("hi compute stop " + name)
 				return computeStopCommand([]string{name}, stdin, stdout, stderr)
 			})
 		case 4:
-			actionErr = menuRun(stdin, stdout, stderr)
+			actionErr = menuRun(ui, stdin, stdout, stderr)
 		case 5:
-			actionErr = menuServe(stdin, stdout, stderr)
+			actionErr = menuServe(ui, stdin, stdout, stderr)
 		case 6:
+			ui.command("hi compute hardware")
 			actionErr = computeHardwareCommand(nil, stdout, stderr)
 		default:
 			return nil
 		}
 		if actionErr != nil && !errors.Is(actionErr, errMenuBack) {
-			fmt.Fprintf(stderr, "hi: %v\n", actionErr)
+			ui.failure(actionErr)
 		}
 	}
 }
 
-func menuStart(stdin io.Reader, stdout, stderr io.Writer) error {
-	provider, err := menuProvider(stdin, stdout)
+func validPort(value string) error {
+	_, err := parsePort(value)
+	return err
+}
+
+func validLifetimeAnswer(value string) error {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	_, err := parseLifetime(value)
+	return err
+}
+
+// askLifetime asks how long a machine may run. A bare number is hours; an
+// empty answer means no limit, which is confirmed before starting.
+func askLifetime(ui menuUI) (string, error) {
+	answer, err := ui.input("Time limit in hours (e.g. 1, 1.5, 30m; empty for no limit)", "", validLifetimeAnswer)
+	if err != nil {
+		return "", err
+	}
+	if answer == "" {
+		return "none", nil
+	}
+	return answer, nil
+}
+
+// confirmStart shows what will start and asks before spending money or
+// removing the time limit. It returns whether to go ahead.
+func confirmStart(ui menuUI, provider computeProvider, hardware computeHardware, namespace, lifetime, command string) (bool, error) {
+	unlimited := lifetime == "none"
+	if !hardware.paid && !unlimited {
+		return true, nil
+	}
+	lines := []string{
+		fmt.Sprintf("Provider   %s", provider.name()),
+		fmt.Sprintf("Hardware   %s (%s)", hardware.name, hardware.rate),
+	}
+	if account := strings.TrimPrefix(billedSuffix(provider, namespace), ", billed to "); account != "" {
+		lines = append(lines, "Billed to  "+account)
+	}
+	if unlimited {
+		lines = append(lines, "Limit      none")
+	} else {
+		duration, _ := parseLifetime(lifetime)
+		lines = append(lines, "Limit      "+formatDuration(duration))
+	}
+	lines = append(lines, "Command    "+command)
+	title := "Start it?"
+	if unlimited {
+		lines = append(lines, "",
+			"Warning: no time limit. It keeps running, and costing money, until you",
+			"stop it, even if you close this terminal or forget about it.")
+		if limit := provider.maxLifetime(); limit > 0 {
+			lines = append(lines, fmt.Sprintf("(%s still ends it after %s.)", provider.name(), formatDuration(limit)))
+		}
+		title = "Start it with no time limit?"
+	}
+	return ui.confirm(title, strings.Join(lines, "\n"), unlimited)
+}
+
+func menuStart(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
+	provider, err := menuProvider(ui)
 	if err != nil {
 		return err
 	}
-	hardware, err := menuHardware(provider, stdin, stdout)
+	hardware, err := menuHardware(ui, provider)
 	if err != nil {
 		return err
 	}
@@ -111,52 +164,75 @@ func menuStart(stdin io.Reader, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if name, err = ask(stdin, stdout, "Name", name); err != nil {
+	if name, err = ui.input("Name", name, func(value string) error {
+		if !validInstanceName(value) {
+			return fmt.Errorf("use 1-32 lowercase letters, digits, or hyphens, starting with a letter")
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
-	lifetime, err := askLifetime(stdin, stdout)
+	lifetime, err := askLifetime(ui)
 	if err != nil {
 		return err
 	}
 
 	args := []string{"--on", provider.name(), "--gpu", hardware.name, "--name", name, "--max", lifetime}
 	if provider.name() == "colab" && (hardware.name == "cpu" || hardware.name == "T4" || hardware.name == "A100") {
-		if confirm(stdin, stdout, false, "Request a high-RAM machine?") == nil {
+		if yes, err := ui.confirm("Request a high-RAM machine?", "", false); err == nil && yes {
 			args = append(args, "--high-mem")
 		}
 	}
-	fmt.Fprintf(stdout, "$ hi compute up %s\n", strings.Join(args, " "))
-	return computeUpCommand(args, stdin, stdout, stderr)
+	command := "hi compute up " + strings.Join(args, " ")
+	if ok, err := confirmStart(ui, provider, hardware, "", lifetime, command); err != nil || !ok {
+		ui.note("Nothing was started.")
+		return errMenuBack
+	}
+	ui.command(command)
+	return computeUpCommand(append(args, "--yes"), stdin, stdout, stderr)
 }
 
-func menuRun(stdin io.Reader, stdout, stderr io.Writer) error {
-	provider, err := menuProvider(stdin, stdout)
+func menuRun(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
+	provider, err := menuProvider(ui)
 	if err != nil {
 		return err
 	}
-	script, err := ask(stdin, stdout, "Python script", "")
+	script, err := ui.input("Python script to run", "", func(value string) error {
+		if value == "" {
+			return errors.New("enter the path to a .py file")
+		}
+		if !strings.HasSuffix(value, ".py") {
+			return errors.New("the script must be a .py file")
+		}
+		return nil
+	})
 	if err != nil || script == "" {
 		return errMenuBack
 	}
-	hardware, err := menuHardware(provider, stdin, stdout)
+	hardware, err := menuHardware(ui, provider)
 	if err != nil {
 		return err
 	}
-	lifetime, err := askLifetime(stdin, stdout)
+	lifetime, err := askLifetime(ui)
 	if err != nil {
 		return err
 	}
 	args := []string{"--on", provider.name(), "--gpu", hardware.name, "--max", lifetime, script}
-	fmt.Fprintf(stdout, "$ hi compute run %s\n", strings.Join(args, " "))
-	code, err := computeRunCommand(args, stdin, stdout, stderr)
+	command := "hi compute run " + strings.Join(args, " ")
+	if ok, err := confirmStart(ui, provider, hardware, "", lifetime, command); err != nil || !ok {
+		ui.note("Nothing was started.")
+		return errMenuBack
+	}
+	ui.command(command)
+	code, err := computeRunCommand(append([]string{"--yes"}, args...), stdin, stdout, stderr)
 	if err == nil && code != 0 {
 		return fmt.Errorf("%s exited with status %d", script, code)
 	}
 	return err
 }
 
-func menuServe(stdin io.Reader, stdout, stderr io.Writer) error {
-	provider, err := menuProvider(stdin, stdout)
+func menuServe(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
+	provider, err := menuProvider(ui)
 	if err != nil {
 		return err
 	}
@@ -167,46 +243,59 @@ func menuServe(stdin io.Reader, stdout, stderr io.Writer) error {
 		labels = append(labels, fmt.Sprintf("%s  (%s:%s on %s)", name, recipe.repo, recipe.quant, recipe.hardware[provider.name()]))
 	}
 	labels = append(labels, "Another GGUF model from Hugging Face")
-	choice, err := menuChoice(stdin, stdout, "Model:", labels)
+	choice, err := ui.choose("Model", labels, false)
 	if err != nil {
 		return errMenuBack
 	}
 
 	args := []string{"--on", provider.name()}
 	model := ""
+	var hardware computeHardware
 	if choice < len(names) {
 		model = names[choice]
+		if hardware, err = resolveHardware(provider, serveRecipes[model].hardware[provider.name()]); err != nil {
+			return err
+		}
 	} else {
-		if model, err = ask(stdin, stdout, "Repository (owner/Model-GGUF)", ""); err != nil || model == "" {
+		if model, err = ui.input("Repository (owner/Model-GGUF)", "", func(value string) error {
+			if owner, repo, ok := strings.Cut(value, "/"); !ok || owner == "" || repo == "" {
+				return errors.New("use owner/Model-GGUF")
+			}
+			return nil
+		}); err != nil || model == "" {
 			return errMenuBack
 		}
-		quant, err := ask(stdin, stdout, "Quant", "Q4_K_M")
+		quant, err := ui.input("Quant", "Q4_K_M", nil)
 		if err != nil {
 			return err
 		}
 		args = append(args, "--quant", quant)
-		hardware, err := menuHardware(provider, stdin, stdout)
-		if err != nil {
+		if hardware, err = menuHardware(ui, provider); err != nil {
 			return err
 		}
 		args = append(args, "--gpu", hardware.name)
 	}
-	lifetime, err := askLifetime(stdin, stdout)
+	lifetime, err := askLifetime(ui)
 	if err != nil {
 		return err
 	}
-	port, err := ask(stdin, stdout, "Local port for the API", fmt.Sprint(serveLocalPort))
+	port, err := ui.input("Local port for the API", strconv.Itoa(serveLocalPort), validPort)
 	if err != nil {
 		return err
 	}
 	args = append(args, "--max", lifetime, "--port", port, model)
-	fmt.Fprintf(stdout, "$ hi compute serve %s\n", strings.Join(args, " "))
-	return computeServeCommand(args, stdin, stdout, stderr)
+	command := "hi compute serve " + strings.Join(args, " ")
+	if ok, err := confirmStart(ui, provider, hardware, "", lifetime, command); err != nil || !ok {
+		ui.note("Nothing was started.")
+		return errMenuBack
+	}
+	ui.command(command)
+	return computeServeCommand(append([]string{"--yes"}, args...), stdin, stdout, stderr)
 }
 
 // menuProvider offers the providers that are ready, and skips the question
 // when only one is.
-func menuProvider(stdin io.Reader, stdout io.Writer) (computeProvider, error) {
+func menuProvider(ui menuUI) (computeProvider, error) {
 	var ready []computeProvider
 	for _, provider := range computeProviders {
 		if status := provider.check(); status.installed && status.signedIn {
@@ -221,17 +310,29 @@ func menuProvider(stdin io.Reader, stdout io.Writer) (computeProvider, error) {
 	}
 	labels := make([]string, len(ready))
 	for i, provider := range ready {
-		labels[i] = provider.name()
+		labels[i] = providerLabel(provider.name())
 	}
-	choice, err := menuChoice(stdin, stdout, "Provider:", labels)
+	choice, err := ui.choose("Provider", labels, false)
 	if err != nil {
 		return nil, errMenuBack
 	}
 	return ready[choice], nil
 }
 
-func menuHardware(provider computeProvider, stdin io.Reader, stdout io.Writer) (computeHardware, error) {
-	options, err := provider.hardware()
+func providerLabel(name string) string {
+	switch name {
+	case "colab":
+		return "colab  Google Colab, prepaid compute units"
+	case "hf":
+		return "hf     Hugging Face Jobs, billed per minute"
+	}
+	return name
+}
+
+func menuHardware(ui menuUI, provider computeProvider) (computeHardware, error) {
+	var options []computeHardware
+	var err error
+	ui.busy("Fetching "+provider.name()+" hardware…", func() { options, err = provider.hardware() })
 	if err != nil {
 		return computeHardware{}, err
 	}
@@ -245,26 +346,26 @@ func menuHardware(provider computeProvider, stdin io.Reader, stdout io.Writer) (
 		labels[i] = fmt.Sprintf("%-*s  %-4s %-*s  %s",
 			nameWidth, hardware.name, hardware.kind, memoryWidth, hardware.memory, hardware.rate)
 	}
-	choice, err := menuChoice(stdin, stdout, "Hardware:", labels)
+	choice, err := ui.choose("Hardware", labels, len(options) > 10)
 	if err != nil {
 		return computeHardware{}, errMenuBack
 	}
 	return options[choice], nil
 }
 
-func menuWithInstance(listed []listedInstance, stdin io.Reader, stdout io.Writer, action func(string) error) error {
+func menuWithInstance(ui menuUI, listed []listedInstance, action func(string) error) error {
 	switch len(listed) {
 	case 0:
-		fmt.Fprintln(stdout, "No instances are running.")
+		ui.note("No instances are running.")
 		return errMenuBack
 	case 1:
 		return action(listed[0].instance.name)
 	}
 	labels := make([]string, len(listed))
 	for i, item := range listed {
-		labels[i] = fmt.Sprintf("%s/%s  %s", item.provider, item.instance.name, item.instance.hardware)
+		labels[i] = fmt.Sprintf("%s/%s  %s  %s", item.provider, item.instance.name, item.instance.hardware, limitText(item))
 	}
-	choice, err := menuChoice(stdin, stdout, "Instance:", labels)
+	choice, err := ui.choose("Instance", labels, false)
 	if err != nil {
 		return errMenuBack
 	}
@@ -275,7 +376,11 @@ func menuWithInstance(listed []listedInstance, stdin io.Reader, stdout io.Writer
 // answer or end of input goes back.
 func menuChoice(stdin io.Reader, stdout io.Writer, prompt string, options []string) (int, error) {
 	for {
-		fmt.Fprintln(stdout, prompt)
+		if strings.HasSuffix(prompt, "?") {
+			fmt.Fprintln(stdout, prompt)
+		} else {
+			fmt.Fprintln(stdout, prompt+":")
+		}
 		width := len(strconv.Itoa(len(options)))
 		for i, option := range options {
 			fmt.Fprintf(stdout, "  %*d) %s\n", width, i+1, option)
@@ -293,33 +398,6 @@ func menuChoice(stdin io.Reader, stdout io.Writer, prompt string, options []stri
 			return number - 1, nil
 		}
 		fmt.Fprintf(stdout, "Choose a number from 1 to %d.\n", len(options))
-	}
-}
-
-// askLifetime asks how long a machine may run until it is accepted. A bare
-// number is hours; an empty answer means no limit, which is confirmed later.
-func askLifetime(stdin io.Reader, stdout io.Writer) (string, error) {
-	for {
-		fmt.Fprint(stdout, "Stop automatically after how many hours? (e.g. 1, 1.5, 30m; empty for no limit): ")
-		answer, err := readLine(stdin)
-		answer = strings.TrimSpace(answer)
-		if answer == "" {
-			if err != nil && !errors.Is(err, io.EOF) {
-				return "", err
-			}
-			if err != nil {
-				return "", errMenuBack
-			}
-			return "none", nil
-		}
-		if _, parseErr := parseLifetime(answer); parseErr != nil {
-			fmt.Fprintln(stdout, parseErr.Error())
-			if err != nil {
-				return "", errMenuBack
-			}
-			continue
-		}
-		return answer, nil
 	}
 }
 
