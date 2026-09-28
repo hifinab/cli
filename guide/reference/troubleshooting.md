@@ -32,7 +32,7 @@ what to do next.
 
 | Message                                                     | What to do                                                   |
 |-------------------------------------------------------------|--------------------------------------------------------------|
-| `Hugging Face Jobs need pre-paid credits`                   | Add credits, or bill an account that can pay: see `hi compute billing`. |
+| `Hugging Face Jobs need pre-paid credits` (HTTP 402)        | Add credits, or bill an account that can pay: see `hi compute billing`. |
 | `Hugging Face rejected the token`                           | `hi login hf`                                                |
 | `Permission denied (publickey)`                             | [Add your SSH key to the Hub](/guide/compute/hugging-face/#add-your-ssh-key-to-the-hub). |
 | `Hugging Face refused: …`                                   | No permission on that account; check `--namespace` and `hi compute billing`. |

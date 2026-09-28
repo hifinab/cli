@@ -121,7 +121,7 @@ from.
 | Message                                            | Fix                                                        |
 |----------------------------------------------------|------------------------------------------------------------|
 | `hf not signed in` or `Hugging Face rejected the token` | `hi login hf`                                          |
-| `Hugging Face Jobs need pre-paid credits`          | Add credits, or bill an account that can pay: `hi compute billing` |
+| `Hugging Face Jobs need pre-paid credits` (HTTP 402) | Add credits, or bill an account that can pay: `hi compute billing` |
 | `Permission denied (publickey)`                    | [Add your SSH key to the Hub](#add-your-ssh-key-to-the-hub) |
 | `secret NAME is not set in this shell`             | `export NAME=…` before using `--secret NAME`                |
 | `is larger than 96 KB`                             | Put the code in an image or a repository the script clones  |

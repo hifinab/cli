@@ -135,8 +135,9 @@
     const found = [];
     index.forEach(function (page) {
       let score = 0;
+      let matched = 0;
       let heading = null;
-      for (const term of terms) {
+      terms.forEach(function (term) {
         let termScore = 0;
         if (page.lowerTitle.includes(term)) termScore += 10;
         page.lowerHeadings.forEach(function (h, i) {
@@ -145,11 +146,11 @@
             if (heading === null) heading = { text: page.headings[i], id: (page.ids || [])[i] };
           }
         });
-        const count = page.lowerText.split(term).length - 1;
-        termScore += Math.min(count, 6);
-        if (termScore === 0) return; // every term must match somewhere
+        termScore += Math.min(page.lowerText.split(term).length - 1, 6);
+        if (termScore > 0) matched++;
         score += termScore;
-      }
+      });
+      if (matched === 0) return;
       // The whole query as a phrase counts most, in a heading above all.
       if (terms.length > 1) {
         page.lowerHeadings.forEach(function (h, i) {
@@ -161,10 +162,13 @@
         if (page.lowerTitle.includes(phrase)) score += 20;
         if (page.lowerText.includes(phrase)) score += 5;
       }
-      found.push({ page: page, score: score, heading: heading });
+      found.push({ page: page, score: score, matched: matched, heading: heading });
     });
-    found.sort(function (a, b) { return b.score - a.score; });
-    return found.slice(0, 8).map(function (hit) { hit.terms = terms; return hit; });
+    // Pages matching every word come first; the rest are a fallback.
+    found.sort(function (a, b) { return b.matched - a.matched || b.score - a.score; });
+    const best = found.length ? found[0].matched : 0;
+    return found.filter(function (hit) { return hit.matched === best; }).slice(0, 8)
+      .map(function (hit) { hit.terms = terms; return hit; });
   }
 
   function render(hits, query) {
