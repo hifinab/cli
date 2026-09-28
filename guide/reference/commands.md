@@ -35,7 +35,7 @@ description: Every hi command and option in one place.
 | `hi compute tunnel <name> <port>[:<local>]`          | Forward a remote port to `127.0.0.1`                   |
 | `hi compute logs <name> [--follow] [-n <lines>]`     | Output and setup logs                                  |
 | `hi compute wait <name>…`                            | Wait for runs to end; exits with their status          |
-| `hi compute stop <name> \| --all [--yes]`            | Stop and release                                       |
+| `hi compute stop [<name> \| --all] [--yes]`          | Stop and release; without a name, pick from a list    |
 | `hi compute proxy <name>`                            | The SSH transport, for `ProxyCommand` (Colab)          |
 
 ### Options for up, run, and serve

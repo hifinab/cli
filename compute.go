@@ -241,7 +241,7 @@ Usage:
   hi compute tunnel <name> <port>[:<local>]
                                       Forward a remote port to localhost
   hi compute logs <name> [--follow]   Show setup and server logs
-  hi compute stop <name> | --all      Stop instances
+  hi compute stop [<name> | --all]    Stop instances; without a name, pick from a list
   hi compute serve <recipe | owner/repo-GGUF --quant Q> [options]
                                       Serve a model with llama.cpp and tunnel
                                       its OpenAI-compatible API here
@@ -1096,8 +1096,15 @@ func computeStopCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 	if err != nil {
 		return err
 	}
-	if *all == (len(positional) == 1) || len(positional) > 1 {
-		return usageError{"usage: hi compute stop <name> | --all [--yes]"}
+	if len(positional) > 1 || (*all && len(positional) == 1) {
+		return usageError{"usage: hi compute stop [<name> | --all] [--yes]"}
+	}
+	if !*all && len(positional) == 0 {
+		// Without a name, pick from what is running.
+		if !isTerminal(stdin) {
+			return stopNeedsName(stdout, stderr)
+		}
+		return pickAndStop(newMenuUI(stdin, stdout), stdout, stderr)
 	}
 
 	if !*all {
@@ -1128,6 +1135,75 @@ func computeStopCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 		provider, _ := providerByName(item.provider)
 		if err := stopInstance(provider, item.instance.name, stdout, stderr); err != nil {
 			fmt.Fprintf(stderr, "hi: %v\n", err)
+			failed = append(failed, item.instance.name)
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("could not stop: %s", strings.Join(failed, ", "))
+	}
+	return nil
+}
+
+// stopNeedsName explains a bare stop without a terminal, listing the names.
+func stopNeedsName(stdout, stderr io.Writer) error {
+	listed, err := listInstances(stdout, stderr)
+	if err != nil {
+		return err
+	}
+	if len(listed) == 0 {
+		fmt.Fprintln(stdout, "No instances are running.")
+		return nil
+	}
+	names := make([]string, len(listed))
+	for i, item := range listed {
+		names[i] = item.provider + "/" + item.instance.name
+	}
+	return usageError{"name what to stop, or use --all: " + strings.Join(names, ", ")}
+}
+
+// pickAndStop lists what is running and stops the chosen instance, or all of
+// them, after confirming.
+func pickAndStop(ui menuUI, stdout, stderr io.Writer) error {
+	var listed []listedInstance
+	var err error
+	ui.busy("Checking what is running…", func() { listed, err = listInstances(stdout, stderr) })
+	if err != nil {
+		return err
+	}
+	if len(listed) == 0 {
+		fmt.Fprintln(stdout, "No instances are running.")
+		return nil
+	}
+	labels := make([]string, 0, len(listed)+1)
+	for _, item := range listed {
+		labels = append(labels, fmt.Sprintf("%s/%s  %s  %s",
+			item.provider, item.instance.name, item.instance.hardware, limitText(item)))
+	}
+	if len(listed) > 1 {
+		labels = append(labels, fmt.Sprintf("Stop all %d of them", len(listed)))
+	}
+	choice, err := ui.choose("Which instance do you want to stop?", labels, false)
+	if err != nil {
+		return nil
+	}
+	chosen := listed
+	question := fmt.Sprintf("Stop all %d instances?", len(listed))
+	if choice < len(listed) {
+		chosen = listed[choice : choice+1]
+		question = fmt.Sprintf("Stop %s? It is released along with everything on its disk.", listed[choice].instance.name)
+	}
+	if yes, err := ui.confirm(question, "", false); err != nil || !yes {
+		fmt.Fprintln(stdout, "Nothing was stopped.")
+		return nil
+	}
+	var failed []string
+	for _, item := range chosen {
+		provider, err := providerByName(item.provider)
+		if err == nil {
+			err = stopInstance(provider, item.instance.name, stdout, stderr)
+		}
+		if err != nil {
+			ui.failure(err)
 			failed = append(failed, item.instance.name)
 		}
 	}

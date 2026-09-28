@@ -660,3 +660,49 @@ func mustRecord(t *testing.T, name string) computeRecord {
 	}
 	return record
 }
+
+func TestComputeStopWithoutANameListsWhatIsRunning(t *testing.T) {
+	fake := newFakeColab(t)
+	fake.setSessions(
+		"[a] ep1 | Hardware: T4 | Shape: Standard | Variant: GPU",
+		"[b] ep2 | Hardware: G4 | Shape: Standard | Variant: GPU",
+	)
+	// Without a terminal, it names the choices instead of guessing.
+	code, _, stderr := runComputeTest("stop")
+	if code != 2 || !strings.Contains(stderr, "colab/a, colab/b") {
+		t.Fatalf("exit code = %d, stderr = %s", code, stderr)
+	}
+	if strings.Contains(fake.calls(), "colab stop") {
+		t.Fatal("something was stopped without a choice")
+	}
+
+	// The picker: choose b, then confirm.
+	var stdout, stderr2 bytes.Buffer
+	ui := lineUI{in: strings.NewReader("2\ny\n"), out: &stdout}
+	if err := pickAndStop(ui, &stdout, &stderr2); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"colab/a  T4", "colab/b  G4", "Stop all 2 of them", "Stop b?"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("picker output missing %q:\n%s", want, stdout.String())
+		}
+	}
+	calls := fake.calls()
+	if !strings.Contains(calls, "colab stop -s b") || strings.Contains(calls, "colab stop -s a") {
+		t.Fatalf("the wrong instance was stopped:\n%s", calls)
+	}
+
+	// Choosing "all", then declining, stops nothing.
+	stdout.Reset()
+	fake.setSessions(
+		"[a] ep1 | Hardware: T4 | Shape: Standard | Variant: GPU",
+		"[c] ep3 | Hardware: L4 | Shape: Standard | Variant: GPU",
+	)
+	before := fake.calls()
+	if err := pickAndStop(lineUI{in: strings.NewReader("3\nn\n"), out: &stdout}, &stdout, &stderr2); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(fake.calls(), "colab stop") != strings.Count(before, "colab stop") || !strings.Contains(stdout.String(), "Nothing was stopped.") {
+		t.Fatalf("declining stopped something:\n%s", stdout.String())
+	}
+}

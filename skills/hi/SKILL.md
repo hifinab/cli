@@ -129,7 +129,8 @@ hi compute ls           # everything running, when it stops, and the Colab balan
 hi compute stop <name>
 ```
 
-`ls` also stops instances past their limit. Names can be given as `name` or
+Always pass the name to `stop`: without one it opens an interactive picker,
+which needs a terminal. `ls` also stops instances past their limit. Names can be given as `name` or
 `provider/name`, such as `hf/6ab97c...`.
 
 ## Troubleshooting

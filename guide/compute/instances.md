@@ -103,9 +103,14 @@ shows one machine in detail.
 ## Stop
 
 ```sh
+hi compute stop              # pick from what is running, then confirm
 hi compute stop box
 hi compute stop --all        # asks first; add --yes in scripts
 ```
+
+Without a name, `stop` lists everything running with its hardware and time
+left, plus an option to stop all of them, and asks before stopping. In
+scripts, name the instance or use `--all`.
 
 Stopping releases the machine and everything on its disk.
 

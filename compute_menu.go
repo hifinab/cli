@@ -67,14 +67,8 @@ func runMenu(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
 				return computeTunnelCommand([]string{name, ports}, stdin, stdout, stderr)
 			})
 		case 3:
-			actionErr = menuWithInstance(ui, listed, func(name string) error {
-				yes, err := ui.confirm(fmt.Sprintf("Stop %s?", name), "", false)
-				if err != nil || !yes {
-					return errMenuBack
-				}
-				ui.command("hi compute stop " + name)
-				return computeStopCommand([]string{name}, stdin, stdout, stderr)
-			})
+			ui.command("hi compute stop")
+			actionErr = pickAndStop(ui, stdout, stderr)
 		case 4:
 			actionErr = menuRun(ui, stdin, stdout, stderr)
 		case 5:
