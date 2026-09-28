@@ -19,6 +19,7 @@ type menuUI interface {
 	header(listed []listedInstance)
 	choose(title string, options []string, filter bool) (int, error)
 	input(title, fallback string, validate func(string) error) (string, error)
+	secret(title string) (string, error)
 	confirm(title, card string, warning bool) (bool, error)
 	command(line string)
 	note(text string)
@@ -65,6 +66,15 @@ func (u lineUI) input(title, fallback string, validate func(string) error) (stri
 		}
 		return answer, nil
 	}
+}
+
+func (u lineUI) secret(title string) (string, error) {
+	fmt.Fprintf(u.out, "%s: ", title)
+	answer, err := readLine(u.in)
+	if strings.TrimSpace(answer) == "" && err != nil {
+		return "", errMenuBack
+	}
+	return strings.TrimSpace(answer), nil
 }
 
 func (u lineUI) confirm(title, card string, warning bool) (bool, error) {
@@ -255,6 +265,22 @@ func (u *styledUI) input(title, fallback string, validate func(string) error) (s
 	}
 	u.answered(title, value)
 	return value, nil
+}
+
+func (u *styledUI) secret(title string) (string, error) {
+	value := ""
+	field := huh.NewInput().Title(title).Value(&value).EchoMode(huh.EchoModePassword).
+		Validate(func(answer string) error {
+			if strings.TrimSpace(answer) == "" {
+				return errors.New("paste the key, or press esc to go back")
+			}
+			return nil
+		})
+	if err := u.run(field); err != nil {
+		return "", err
+	}
+	u.answered(title, "(hidden)")
+	return strings.TrimSpace(value), nil
 }
 
 func (u *styledUI) confirm(title, card string, warning bool) (bool, error) {

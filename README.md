@@ -167,7 +167,7 @@ token as the API key.
 ### RunPod
 
 ```sh
-hi login runpod                                  # API key from console.runpod.io
+hi login runpod                                  # paste an API key from console.runpod.io
 hi compute hardware --on runpod                  # GPUs such as rtx-4090, with prices
 hi compute up --gpu rtx-4090 --name box --max 2  # SSH-able pod
 hi compute ssh box

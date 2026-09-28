@@ -4,8 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+
+	"golang.org/x/term"
 )
+
+// runpodForLogin is the registered RunPod provider, so a sign-in refreshes
+// its cached hardware list.
+func runpodForLogin() *runpodProvider {
+	for _, provider := range computeProviders {
+		if runpod, ok := provider.(*runpodProvider); ok {
+			return runpod
+		}
+	}
+	return newRunpodProvider()
+}
 
 // login delegates to each provider's own sign-in; hi never handles the token.
 func login(provider string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -27,14 +41,25 @@ func login(provider string, stdin io.Reader, stdout, stderr io.Writer) error {
 		// Any authenticated command starts Colab's browser sign-in.
 		return runInteractive(stdin, stdout, stderr, colab, "usage")
 	case "runpod":
-		if runpodctl, err := exec.LookPath("runpodctl"); err == nil {
-			// runpodctl asks for the key and stores it in ~/.runpod/config.toml.
-			return runInteractive(stdin, stdout, stderr, runpodctl, "doctor")
+		terminal, ok := stdin.(*os.File)
+		if !ok || !term.IsTerminal(int(terminal.Fd())) {
+			return fmt.Errorf("`hi login runpod` asks for the key in a terminal; in scripts, set RUNPOD_API_KEY instead")
 		}
-		fmt.Fprintf(stdout, "1. Create an API key with read and write access at %s\n", runpodKeysURL)
-		fmt.Fprintln(stdout, "2. Put it in your shell profile, e.g. ~/.profile:  export RUNPOD_API_KEY=...")
-		fmt.Fprintln(stdout, "   or install runpodctl and run `runpodctl doctor`, which saves it in ~/.runpod/config.toml.")
-		fmt.Fprintln(stdout, "3. Check with `hi compute providers`.")
+		fmt.Fprintf(stdout, "Create an API key with read and write access at %s\n", runpodKeysURL)
+		fmt.Fprint(stdout, "RunPod API key (hidden): ")
+		key, err := term.ReadPassword(int(terminal.Fd()))
+		fmt.Fprintln(stdout)
+		if err != nil {
+			return fmt.Errorf("read the API key: %w", err)
+		}
+		path, err := runpodForLogin().signIn(string(key))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "RunPod is ready. The key is saved in %s, readable only by you.\n", path)
+		if os.Getenv("RUNPOD_API_KEY") != "" {
+			fmt.Fprintln(stdout, "Note: RUNPOD_API_KEY is set in this shell and takes precedence over the saved key.")
+		}
 		return nil
 	default:
 		return usageError{fmt.Sprintf("unknown provider %q; use hf, colab, or runpod", provider)}

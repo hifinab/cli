@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -260,5 +261,63 @@ func TestRunpodSlug(t *testing.T) {
 		if got := runpodSlug(input); got != want {
 			t.Errorf("runpodSlug(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+func TestRunpodSignInChecksAndSavesTheKeyForRunpodctl(t *testing.T) {
+	newFakeRunpod(t)
+	t.Setenv("RUNPOD_API_KEY", "")
+	path := filepath.Join(os.Getenv("HOME"), ".runpod", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, path, "apiUrl = \"https://api.runpod.io/graphql\"\napiKey = \"old\"\n", 0o644)
+
+	provider := newRunpodProvider()
+	if _, err := provider.signIn("wrong_key"); err == nil || !strings.Contains(err.Error(), "rejected this key") {
+		t.Fatalf("a wrong key was accepted: %v", err)
+	}
+	if !strings.Contains(readTestFile(t, path), `apiKey = "old"`) {
+		t.Fatal("a rejected key changed the saved one")
+	}
+	saved, err := provider.signIn("  " + fakeRunpodKey + "\n")
+	if err != nil || saved != path {
+		t.Fatalf("signIn = %q, %v", saved, err)
+	}
+	config := readTestFile(t, path)
+	if config != "apiUrl = \"https://api.runpod.io/graphql\"\napiKey = \"rpa_test_key_value\"\n" {
+		t.Fatalf("config.toml =\n%s", config)
+	}
+	if info, _ := os.Stat(path); info.Mode().Perm() != 0o600 {
+		t.Fatalf("config.toml mode = %v, want 0600", info.Mode().Perm())
+	}
+	if runpodToken() != fakeRunpodKey {
+		t.Fatal("the saved key is not the one hi reads")
+	}
+}
+
+func TestComputeMenuSignsInToRunpodWhenChosen(t *testing.T) {
+	newFakeRunpod(t)
+	t.Setenv("RUNPOD_API_KEY", "")
+	computeProviders = []computeProvider{colabProvider{}, newHFProvider(), newRunpodProvider()}
+
+	// Start, provider 3 (RunPod, not signed in), paste the key, then leave
+	// at the hardware question.
+	answers := strings.NewReader("1\n3\n" + fakeRunpodKey + "\n\n")
+	var stdout, stderr bytes.Buffer
+	if err := computeMenu(answers, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "runpod RunPod pods, pay as you go  (not signed in)") ||
+		!strings.Contains(output, "console.runpod.io/user/credentials") ||
+		!strings.Contains(output, "Saved in") || !strings.Contains(output, "rtx-4090") {
+		t.Fatalf("menu output:\n%s\nstderr:\n%s", output, stderr.String())
+	}
+	if runpodToken() != fakeRunpodKey {
+		t.Fatal("the key was not saved")
+	}
+	if strings.Contains(output, fakeRunpodKey) && !strings.Contains(output, "RunPod API key: ") {
+		t.Fatal("the key was echoed")
 	}
 }

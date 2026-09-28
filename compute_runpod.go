@@ -110,6 +110,64 @@ func runpodToken() string {
 	return ""
 }
 
+func runpodConfigPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".runpod", "config.toml"), nil
+}
+
+// signInRunpod checks an API key against RunPod and saves it where
+// runpodctl keeps it, so both tools share one key. RunPod has no sign-in
+// tool of its own for hi to delegate to.
+func (p *runpodProvider) signIn(key string) (string, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", errors.New("the API key is empty")
+	}
+	if strings.ContainsAny(key, "\"\n\r ") {
+		return "", errors.New("that does not look like a RunPod API key")
+	}
+	if err := runpodRequest(key, http.MethodGet, "/catalog/gpus", nil, nil); err != nil {
+		if strings.Contains(err.Error(), "rejected the API key") {
+			return "", errors.New("RunPod rejected this key; check you copied all of it")
+		}
+		return "", err
+	}
+	path, err := runpodConfigPath()
+	if err != nil {
+		return "", err
+	}
+	var lines []string
+	replaced := false
+	if data, err := os.ReadFile(path); err == nil {
+		for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+			if name, _, found := strings.Cut(line, "="); found && strings.TrimSpace(name) == "apiKey" {
+				line = fmt.Sprintf("apiKey = %q", key)
+				replaced = true
+			}
+			lines = append(lines, line)
+		}
+	}
+	if !replaced {
+		lines = append(lines, fmt.Sprintf("apiKey = %q", key))
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		return "", err
+	}
+	p.mu.Lock()
+	p.options = nil
+	p.mu.Unlock()
+	return path, nil
+}
+
 func (*runpodProvider) check() providerStatus {
 	if runpodToken() == "" {
 		return providerStatus{installed: true, hints: []string{"sign in with `hi login runpod`"}}
@@ -139,6 +197,10 @@ func (p *runpodProvider) request(method, path string, body, result any) error {
 	if token == "" {
 		return errors.New("not signed in to RunPod; run `hi login runpod`")
 	}
+	return runpodRequest(token, method, path, body, result)
+}
+
+func runpodRequest(token, method, path string, body, result any) error {
 	var payload io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)

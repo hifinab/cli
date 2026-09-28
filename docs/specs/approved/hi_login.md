@@ -22,6 +22,12 @@ hi login hf
 hi login colab
 ```
 
+`hi login runpod` has no native tool to delegate to, since runpodctl only
+stores a key it is given. It reads an API key without echo, checks it with
+`GET /v2/catalog/gpus`, and saves it as `apiKey` in runpodctl's
+`~/.runpod/config.toml` with mode 0600, keeping the file's other settings. The
+guided menu offers the same prompt when RunPod is chosen while signed out.
+
 `hi login hf` runs `hf auth login` and then `hf auth whoami`. `hi login colab`
 runs `colab usage`, which starts Colab's browser sign-in and then shows the
 compute-unit balance. Both are implemented (v0.7.0); GitHub and OMP login are
@@ -40,6 +46,10 @@ runs `omp auth-broker login [provider]`.
 `hi` must not copy, print, persist, migrate, or refresh provider tokens. It may
 report dependency absence and the native command needed to install or retry the
 provider tool.
+
+Exception for providers without a sign-in tool: `hi` may save an API key the
+user typed into that provider's standard credentials file, as described for
+RunPod above, and nowhere else.
 
 Exception for API-based commands such as `hi compute`: `hi` may read a provider's
 token from that provider's documented environment variable or token file, in

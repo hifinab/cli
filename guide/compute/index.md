@@ -90,6 +90,8 @@ Run `hi compute` with no arguments in a terminal for a guided menu:
 
 - A **Running** panel at the top shows your machines and how long each has
   left; `no time limit` is highlighted.
+- Every provider is listed; choosing one you are not signed in to signs you
+  in first (for RunPod, by asking for the API key).
 - Choose with the arrow keys and Enter. In long lists such as Hugging Face's
   hardware, press `/` and type to filter, for example `/a10`.
 - Text answers are checked as you type them, so a lifetime like `soon` is

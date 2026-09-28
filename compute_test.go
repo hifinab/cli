@@ -349,8 +349,8 @@ func TestComputeProvidersExplainsMissingSignIn(t *testing.T) {
 
 func TestComputeMenuStartsInstanceFromAnswers(t *testing.T) {
 	fake := newFakeColab(t)
-	// Start, hardware 1 (cpu), name "play", 1h lifetime, no high-RAM, then quit.
-	answers := strings.NewReader("1\n1\nplay\n1h\nn\n8\n")
+	// Start, provider 1 (colab), hardware 1 (cpu), name "play", 1h lifetime, no high-RAM, then quit.
+	answers := strings.NewReader("1\n1\n1\nplay\n1h\nn\n8\n")
 	var stdout, stderr bytes.Buffer
 	if err := computeMenu(answers, &stdout, &stderr); err != nil {
 		t.Fatal(err)
@@ -614,7 +614,7 @@ func TestComputeRunWithNoLimitOnColabUsesItsDayLimit(t *testing.T) {
 func TestComputeMenuAcceptsHoursAndRetriesBadLifetimes(t *testing.T) {
 	fake := newFakeColab(t)
 	// Start, hardware 1 (cpu), name "menu1", a bad lifetime, then 1 hour, no high-RAM, quit.
-	answers := strings.NewReader("1\n1\nmenu1\nsoon\n1\nn\n8\n")
+	answers := strings.NewReader("1\n1\n1\nmenu1\nsoon\n1\nn\n8\n")
 	var stdout, stderr bytes.Buffer
 	if err := computeMenu(answers, &stdout, &stderr); err != nil {
 		t.Fatal(err)
@@ -635,7 +635,7 @@ func TestComputeMenuEmptyLifetimeMeansNoLimit(t *testing.T) {
 	fake := newFakeColab(t)
 	// An empty lifetime asks for confirmation, which needs a terminal, so
 	// without one the start is refused and nothing runs.
-	answers := strings.NewReader("1\n1\nmenu2\n\nn\n8\n")
+	answers := strings.NewReader("1\n1\n1\nmenu2\n\nn\n8\n")
 	var stdout, stderr bytes.Buffer
 	if err := computeMenu(answers, &stdout, &stderr); err != nil {
 		t.Fatal(err)

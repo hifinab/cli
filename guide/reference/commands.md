@@ -69,7 +69,7 @@ after names for `logs`, `serve`, `stop`, and `billing`.
 ```sh
 hi login hf       # hf auth login, then hf auth whoami
 hi login colab    # the Colab CLI's browser sign-in, then the balance
-hi login runpod   # runpodctl doctor, or how to set RUNPOD_API_KEY
+hi login runpod   # asks for the API key, checks it, saves it in ~/.runpod/config.toml
 ```
 
 ## hi skill

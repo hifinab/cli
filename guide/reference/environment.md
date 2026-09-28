@@ -26,6 +26,7 @@ description: The environment variables hi reads and the files it writes.
 |---------------------------------------------|------------------------------------------------------|
 | `~/.local/bin/hi`                           | The `hi` binary                                      |
 | `~/.config/hi/compute.json`                 | The account chosen with `hi compute billing`         |
+| `~/.runpod/config.toml`                     | The RunPod API key from `hi login runpod` (`apiKey`, mode 0600), shared with runpodctl |
 | `~/.local/state/hi/compute/instances.json`  | Instances `hi` started: name, provider, start, limit |
 | `~/.local/state/hi/compute/<name>.watch.log` | Log of the Colab lifetime watcher                   |
 | `.agents/skills/hi/SKILL.md`, `.claude/skills/hi` | The agent skill, from `hi skill`               |
@@ -39,7 +40,8 @@ description: The environment variables hi reads and the files it writes.
 | `~/.runpod/config.toml`                     | runpodctl's `apiKey`                                 |
 | `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa`      | Your SSH key, for shells and tunnels                 |
 
-`hi` never copies, prints, or stores provider tokens.
+`hi` never prints provider tokens. It stores one only for RunPod, which has
+no sign-in tool of its own, and then only in RunPod's standard file.
 
 ## On remote machines
 

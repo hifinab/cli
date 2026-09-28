@@ -27,17 +27,20 @@ RunPod's catalog.
 hi login runpod
 ```
 
-With [runpodctl](https://github.com/runpod/runpodctl) installed, this runs
-`runpodctl doctor`, which asks for the key and saves it in
-`~/.runpod/config.toml`. Otherwise it explains the alternative: put the key in
-your shell profile.
+Paste the key when asked; nothing is shown as you type. `hi` checks the key
+with RunPod, then saves it in `~/.runpod/config.toml`, readable only by you.
+That is where RunPod's own `runpodctl` keeps it too, so both tools share one
+key and you do not need runpodctl installed.
+
+The guided menu does the same: choose **RunPod** as the provider in
+`hi compute`, and it asks for the key the first time.
+
+In scripts, set the key in the environment instead; it takes precedence over
+the saved one:
 
 ```sh
 export RUNPOD_API_KEY=...
 ```
-
-`hi` reads `RUNPOD_API_KEY` first, then `apiKey` in `~/.runpod/config.toml`,
-and never prints or stores the key itself.
 
 ### 3. Your SSH key
 

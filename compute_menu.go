@@ -152,7 +152,7 @@ func confirmStart(ui menuUI, provider computeProvider, hardware computeHardware,
 }
 
 func menuStart(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
-	provider, err := menuProvider(ui)
+	provider, err := menuProvider(ui, stdin, stdout, stderr)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func menuStart(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 func menuRun(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
-	provider, err := menuProvider(ui)
+	provider, err := menuProvider(ui, stdin, stdout, stderr)
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func menuRun(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 func menuServe(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
-	provider, err := menuProvider(ui)
+	provider, err := menuProvider(ui, stdin, stdout, stderr)
 	if err != nil {
 		return err
 	}
@@ -293,30 +293,55 @@ func menuServe(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
 	return computeServeCommand(append([]string{"--yes"}, args...), stdin, stdout, stderr)
 }
 
-// menuProvider offers the providers that are ready, and skips the question
-// when only one is.
-func menuProvider(ui menuUI) (computeProvider, error) {
-	var ready []computeProvider
-	for _, provider := range computeProviders {
-		if status := provider.check(); status.installed && status.signedIn {
-			ready = append(ready, provider)
-		}
-	}
-	switch len(ready) {
-	case 0:
-		return nil, errors.New("no provider is ready; run `hi compute providers`")
-	case 1:
-		return ready[0], nil
-	}
-	labels := make([]string, len(ready))
-	for i, provider := range ready {
+// menuProvider offers every provider with its sign-in state, and signs in
+// to the chosen one first when needed.
+func menuProvider(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) (computeProvider, error) {
+	labels := make([]string, len(computeProviders))
+	for i, provider := range computeProviders {
 		labels[i] = providerLabel(provider.name())
+		if status := provider.check(); !status.installed || !status.signedIn {
+			labels[i] += "  (not signed in)"
+		}
 	}
 	choice, err := ui.choose("Provider", labels, false)
 	if err != nil {
 		return nil, errMenuBack
 	}
-	return ready[choice], nil
+	provider := computeProviders[choice]
+	if status := provider.check(); status.installed && status.signedIn {
+		return provider, nil
+	}
+	if err := menuSignIn(ui, provider, stdin, stdout, stderr); err != nil {
+		return nil, err
+	}
+	if status := provider.check(); !status.installed || !status.signedIn {
+		return nil, fmt.Errorf("%s is still not ready; %s", provider.name(), strings.Join(provider.check().hints, "; "))
+	}
+	return provider, nil
+}
+
+// menuSignIn signs in to a provider from inside the menu.
+func menuSignIn(ui menuUI, provider computeProvider, stdin io.Reader, stdout, stderr io.Writer) error {
+	switch runpod := provider.(type) {
+	case *runpodProvider:
+		ui.note("RunPod needs an API key with read and write access. Create one at " + runpodKeysURL)
+		key, err := ui.secret("RunPod API key")
+		if err != nil || key == "" {
+			return errMenuBack
+		}
+		var path string
+		ui.busy("Checking the key with RunPod…", func() { path, err = runpod.signIn(key) })
+		if err != nil {
+			return err
+		}
+		ui.note("Saved in " + path + ", readable only by you.")
+		return nil
+	}
+	if status := provider.check(); !status.installed {
+		return fmt.Errorf("%s is not installed; %s", provider.name(), strings.Join(status.hints, "; "))
+	}
+	ui.command("hi login " + provider.name())
+	return login(provider.name(), stdin, stdout, stderr)
 }
 
 func providerLabel(name string) string {
