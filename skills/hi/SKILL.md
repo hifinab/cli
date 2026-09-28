@@ -7,7 +7,8 @@ description: Use the hi CLI to run work on rented remote machines (Google Colab,
 
 `hi` is the Hifin command-line tool. Its `hi compute` commands rent remote
 machines from Colab or Hugging Face with the same commands on both, and give
-them back. Run `hi compute help` for the full reference.
+them back. Run `hi compute help` for the full reference; the user-facing guide
+is at https://hifin.sh/guide/ if the user needs step-by-step instructions.
 
 ## Rules
 

@@ -1,0 +1,71 @@
+---
+title: Troubleshooting
+description: Error messages from hi and what to do about them, grouped by area.
+---
+
+Search this page for the words in your error message. Most messages also say
+what to do next.
+
+## Starting machines
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `confirmation needed; rerun with --yes`                     | No terminal to ask in, such as a script or an agent. Check the price, then add `--yes`. |
+| `several providers are ready (colab, hf)`                   | Add `--on colab` or `--on hf`, use a hardware name only one has, or set `HI_COMPUTE_PROVIDER`. |
+| `unknown colab hardware "X"` / `unknown hf hardware "X"`    | Use a name from `hi compute hardware`. Names differ: `T4` on Colab, `t4-small` on Hugging Face. |
+| `--max … exceeds the colab limit of 24h`                    | Colab sessions last at most 24 hours.                        |
+| `an instance named "X" already exists`                      | Choose another `--name`, or stop the old one.                |
+| `no provider is ready`                                      | `hi compute providers` shows what is missing.                |
+
+## Colab
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `the Colab CLI is not installed`                            | `hi install`, or `uv tool install google-colab-cli`          |
+| `colab    not signed in`                                    | `hi login colab`                                             |
+| `asked for X but Colab started Y`                           | Your plan or Colab's capacity did not allow X. Stop it and try other hardware. |
+| `port 8080 on colab is used by Colab's own proxy`           | Serve and tunnel another port, such as 8000.                 |
+| `colab has no secret store` / `colab runs cannot detach`    | Use Hugging Face for secrets and detached runs, or an instance. |
+| `colab … did not answer within …`                           | The Colab CLI stalled. Try again.                            |
+
+## Hugging Face
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `Hugging Face Jobs need pre-paid credits`                   | Add credits, or bill an account that can pay: see `hi compute billing`. |
+| `Hugging Face rejected the token`                           | `hi login hf`                                                |
+| `Permission denied (publickey)`                             | [Add your SSH key to the Hub](/guide/compute/hugging-face/#add-your-ssh-key-to-the-hub). |
+| `Hugging Face refused: …`                                   | No permission on that account; check `--namespace` and `hi compute billing`. |
+| `secret X is not set in this shell`                         | `export X=…` first.                                          |
+| `… is larger than 96 KB`                                    | Put the code in an image, or in a repository the script clones. |
+| `401` from an `…hf.jobs` URL                                | Send `Authorization: Bearer <your Hugging Face token>`.      |
+
+## Shells and tunnels
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `no SSH key found`                                          | `ssh-keygen -t ed25519`                                      |
+| `bind … Address already in use`                             | The local port is taken; use `<remote>:<other-local>`, such as `8888:18888`. |
+| `Tunnel closed: X is no longer running.`                    | The machine was stopped, by you or its `--max`. Start it again. |
+| `no instance named "X"`                                     | Check `hi compute ls`; names are case-sensitive and lowercase. |
+
+## Serving
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `failed: download`                                          | Check the repository name and `--quant`; gated models need access on the Hub. |
+| `failed: llama-server exited`                               | Usually out of GPU memory. Choose a smaller quant or bigger GPU. `hi compute logs <name>` shows why. |
+| `failed: llama.cpp build`                                   | Colab only; see `hi compute logs <name>`. Retry the same command. |
+| `serving needs a GPU`                                       | Choose GPU hardware with `--gpu`.                            |
+| An empty answer from a reasoning model                      | Raise `max_tokens`; the thinking uses tokens first.          |
+
+## Installing and signing in
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `hi: command not found` right after installing              | Open a new shell, or run `~/.local/bin/hi`.                  |
+| `the hf CLI is not installed`                               | `hi install`, or `curl -LsSf https://hf.co/cli/install.sh \| bash` |
+| `netbird is not installed; run hi install first`            | `hi install`                                                 |
+
+Still stuck? Open an issue at [github.com/hifinab/cli](https://github.com/hifinab/cli/issues)
+with the command and its output.

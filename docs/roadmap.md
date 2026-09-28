@@ -89,6 +89,8 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
   it with `hi compute billing`.
 - [x] Close tunnels whose instance was stopped even when the SSH gateway
   stays up; verify Hugging Face SSH and tunnels live.
+- [x] Publish a searchable, multi-page guide at https://hifin.sh/guide/ with
+  step-by-step setup, examples, and a command reference.
 
 ## Planned
 

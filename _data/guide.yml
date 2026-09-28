@@ -1,0 +1,57 @@
+# The guide's sidebar, in reading order. Previous/next links follow it.
+- section: Get started
+  pages:
+    - title: Overview
+      url: /guide/
+    - title: Install hi
+      url: /guide/install/
+    - title: Your first remote GPU
+      url: /guide/quickstart/
+- section: Remote compute
+  pages:
+    - title: How hi compute works
+      url: /guide/compute/
+    - title: Run a job to completion
+      url: /guide/compute/run/
+    - title: Interactive machines
+      url: /guide/compute/instances/
+    - title: Serve a model
+      url: /guide/compute/serve/
+    - title: Costs, limits, and billing
+      url: /guide/compute/billing/
+- section: Providers
+  pages:
+    - title: Google Colab
+      url: /guide/compute/colab/
+    - title: Hugging Face Jobs
+      url: /guide/compute/hugging-face/
+- section: Examples
+  pages:
+    - title: Try a 125B model on a 96 GB GPU
+      url: /guide/examples/big-model/
+    - title: Train with uv scripts
+      url: /guide/examples/train/
+    - title: Run a parameter sweep
+      url: /guide/examples/sweep/
+    - title: JupyterLab on a rented GPU
+      url: /guide/examples/jupyter/
+    - title: Let your coding agent use a GPU
+      url: /guide/examples/agent/
+- section: Workstation
+  pages:
+    - title: Set up a workstation
+      url: /guide/workstation/
+    - title: NetBird network
+      url: /guide/workstation/netbird/
+    - title: Users
+      url: /guide/workstation/users/
+- section: Reference
+  pages:
+    - title: Agent skill
+      url: /guide/reference/skill/
+    - title: All commands
+      url: /guide/reference/commands/
+    - title: Troubleshooting
+      url: /guide/reference/troubleshooting/
+    - title: Environment and files
+      url: /guide/reference/environment/

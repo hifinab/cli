@@ -3,6 +3,9 @@
 `hi` prepares Hifin Linux machines and project folders. It is a small, static
 Go binary so installation does not require a language runtime.
 
+**Guide:** step-by-step instructions, examples, and every option at
+<https://hifin.sh/guide/>.
+
 ## Install
 
 Releases install per user to `~/.local/bin/hi`:

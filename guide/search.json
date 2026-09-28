@@ -1,0 +1,23 @@
+---
+layout: null
+---
+[
+{%- assign pages = site.pages | where_exp: "p", "p.url contains '/guide/'" | where_exp: "p", "p.title" -%}
+{%- for p in pages -%}
+  {%- assign section = "" -%}
+  {%- for s in site.data.guide -%}{%- for item in s.pages -%}{%- if item.url == p.url -%}{%- assign section = s.section -%}{%- endif -%}{%- endfor -%}{%- endfor -%}
+  {%- assign html = p.content | markdownify -%}
+  {%- assign parts = html | replace: "<h3", "<h2" | replace: "</h3>", "</h2>" | split: "<h2" -%}
+  {%- capture headings -%}{%- for part in parts offset: 1 -%}{%- assign head = part | split: "</h2>" | first -%}{%- assign prefix = head | split: '">' | first | append: '">' -%}{{ head | remove_first: prefix | strip_html | strip | replace: "|", "/" }}|{%- endfor -%}{%- endcapture -%}
+  {%- capture ids -%}{%- for part in parts offset: 1 -%}{{ part | split: '">' | first | remove: ' id="' | strip }}|{%- endfor -%}{%- endcapture -%}
+  {
+    "title": {{ p.title | jsonify }},
+    "url": {{ p.url | relative_url | jsonify }},
+    "section": {{ section | jsonify }},
+    "description": {{ p.description | default: "" | jsonify }},
+    "headings": {{ headings | split: "|" | jsonify }},
+    "ids": {{ ids | split: "|" | jsonify }},
+    "text": {{ html | strip_html | normalize_whitespace | jsonify }}
+  }{% unless forloop.last %},{% endunless %}
+{%- endfor -%}
+]

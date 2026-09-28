@@ -120,6 +120,9 @@
   }
   .copy:hover { filter: brightness(1.12); }
   .note { color: var(--dim); margin: 14px 0 0; font-size: 13.5px; }
+  .guide-link { margin: 22px 0 0; color: var(--muted); font-size: 15.5px; }
+  .guide-link a { color: var(--accent); text-decoration: none; }
+  .guide-link a:hover { text-decoration: underline; }
   .note b { color: var(--text); font-weight: 600; }
 
   /* Sections */
@@ -215,6 +218,7 @@
       <li><a href="#ai">AI toolkit</a></li>
       <li><a href="#stack">Stack</a></li>
       <li><a href="#commands">Commands</a></li>
+      <li><a href="/guide/">Guide</a></li>
       <li><a href="https://github.com/hifinab/cli">GitHub</a></li>
     </ul>
   </nav>
@@ -248,6 +252,7 @@
         <p class="note" id="note"></p>
       </div>
     </div>
+    <p class="guide-link">New here? <a href="/guide/quickstart/">Rent your first GPU in five minutes</a> or <a href="/guide/">read the guide</a>.</p>
   </div>
 
   <section id="ai" class="wrap reveal">
@@ -329,6 +334,7 @@
       <div class="cmd"><code>hi adduser <span>&lt;name&gt;</span></code><p>Create a user who already has render and video access.</p></div>
       <div class="cmd"><code>hi version</code><p>Print the installed version.</p></div>
     </div>
+    <p class="guide-link">Step-by-step instructions, examples and every option: <a href="/guide/">the hi guide</a>.</p>
   </section>
 
   <section class="wrap reveal">
