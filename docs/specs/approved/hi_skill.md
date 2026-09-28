@@ -1,6 +1,6 @@
 # `hi skill` specification
 
-Status: Implemented for v0.7.1
+Status: Released in v0.7.1
 
 Dependencies: none; the skill is embedded in the `hi` binary.
 

@@ -1,6 +1,6 @@
 # `hi update` specification
 
-Status: Implemented for v0.7.1
+Status: Released in v0.7.1
 
 Dependencies: GitHub release assets and published SHA-256 checksums.
 

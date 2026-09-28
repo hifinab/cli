@@ -93,6 +93,8 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
   step-by-step setup, examples, and a command reference.
 - [x] Add atomic, checksummed self-updates with `hi update`.
   Approved spec: [hi_update.md](specs/approved/hi_update.md).
+- [x] Accept bare hours for `--max`, and `--max none` for no limit after a
+  confirmed warning.
 
 ## Planned
 
