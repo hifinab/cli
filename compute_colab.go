@@ -315,7 +315,11 @@ func (colabProvider) runCommand(request runRequest) []string {
 		args = append(args, "-s", request.name)
 	}
 	args = append(args, colabAcceleratorArgs(request.hardware, request.highMem)...)
-	args = append(args, "--timeout", strconv.Itoa(int(request.max.Seconds())))
+	timeout := request.max
+	if timeout == noLimit {
+		timeout = 24 * time.Hour // Colab's own session limit
+	}
+	args = append(args, "--timeout", strconv.Itoa(int(timeout.Seconds())))
 	for _, entry := range request.env {
 		args = append(args, "--env", entry)
 	}

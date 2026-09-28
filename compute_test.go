@@ -534,3 +534,128 @@ func TestComputeTunnelClosesWhenTheInstanceStopsButSSHStaysUp(t *testing.T) {
 		t.Fatalf("the tunnel took %s to close", elapsed)
 	}
 }
+
+func TestParseLifetime(t *testing.T) {
+	for input, want := range map[string]time.Duration{
+		"1": time.Hour, "1.5": 90 * time.Minute, "0.25": 15 * time.Minute, "30m": 30 * time.Minute,
+		"1h30m": 90 * time.Minute, "2d": 48 * time.Hour, "none": noLimit, " NONE ": noLimit,
+	} {
+		if got, err := parseLifetime(input); err != nil || got != want {
+			t.Errorf("parseLifetime(%q) = %v, %v; want %v", input, got, err, want)
+		}
+	}
+	for _, input := range []string{"0", "-1", "abc", "", "1x", "0d"} {
+		if _, err := parseLifetime(input); err == nil {
+			t.Errorf("parseLifetime(%q) accepted an invalid lifetime", input)
+		}
+	}
+}
+
+func TestComputeUpTakesBareHours(t *testing.T) {
+	newFakeColab(t)
+	if code, _, stderr := runComputeTest("up", "--name", "twohours", "--max", "2"); code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	records, _ := loadComputeRecords()
+	if lifetime := records["twohours"].Deadline.Sub(records["twohours"].Created); lifetime < 119*time.Minute || lifetime > 121*time.Minute {
+		t.Fatalf("--max 2 gave a lifetime of %s, want 2h", lifetime)
+	}
+	code, _, stderr := runComputeTest("up", "--name", "bad", "--max", "soon")
+	if code != 2 || !strings.Contains(stderr, "invalid lifetime") || strings.Contains(stderr, "Usage of") {
+		t.Fatalf("bad --max: exit code = %d, stderr = %s", code, stderr)
+	}
+}
+
+func TestComputeUpWithNoLimitIsConfirmedAndNeverExpires(t *testing.T) {
+	fake := newFakeColab(t)
+	watchers := 0
+	startComputeWatcher = func(string) (int, error) { watchers++; return 0, nil }
+
+	code, stdout, stderr := runComputeTest("up", "--name", "forever", "--max", "none")
+	if code != 1 || !strings.Contains(stdout, "no time limit") || !strings.Contains(stderr, "--yes") {
+		t.Fatalf("unconfirmed no limit: exit code = %d, stdout = %s, stderr = %s", code, stdout, stderr)
+	}
+	if strings.Contains(fake.calls(), "colab new") {
+		t.Fatal("an unlimited instance started without confirmation")
+	}
+
+	code, stdout, stderr = runComputeTest("up", "--name", "forever", "--max", "none", "--yes")
+	if code != 0 || !strings.Contains(stdout, "with no time limit") || !strings.Contains(stdout, "colab still ends it after 24h") {
+		t.Fatalf("confirmed no limit: exit code = %d, stdout = %s, stderr = %s", code, stdout, stderr)
+	}
+	if watchers != 0 {
+		t.Fatal("a lifetime watcher started for an unlimited instance")
+	}
+	if record := mustRecord(t, "forever"); !record.Deadline.IsZero() {
+		t.Fatalf("deadline = %v, want none", record.Deadline)
+	}
+	code, stdout, _ = runComputeTest("ls")
+	if code != 0 || !strings.Contains(stdout, "no limit") || strings.Contains(fake.calls(), "colab stop") {
+		t.Fatalf("ls stopped or mislabelled an unlimited instance:\n%s\ncalls:\n%s", stdout, fake.calls())
+	}
+	if _, stdout, _ = runComputeTest("status", "forever"); !strings.Contains(stdout, "Stops at:  never") {
+		t.Fatalf("status:\n%s", stdout)
+	}
+}
+
+func TestComputeRunWithNoLimitOnColabUsesItsDayLimit(t *testing.T) {
+	fake := newFakeColab(t)
+	script := filepath.Join(fake.directory, "long.py")
+	writeTestFile(t, script, "print(1)\n", 0o644)
+	if code, _, stderr := runComputeTest("run", "--max", "none", "--yes", script); code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	if !strings.Contains(fake.calls(), "--timeout 86400") {
+		t.Fatalf("colab run did not get Colab's 24h limit:\n%s", fake.calls())
+	}
+}
+
+func TestComputeMenuAcceptsHoursAndRetriesBadLifetimes(t *testing.T) {
+	fake := newFakeColab(t)
+	// Start, hardware 1 (cpu), name "menu1", a bad lifetime, then 1 hour, no high-RAM, quit.
+	answers := strings.NewReader("1\n1\nmenu1\nsoon\n1\nn\n8\n")
+	var stdout, stderr bytes.Buffer
+	if err := computeMenu(answers, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "invalid lifetime") ||
+		!strings.Contains(stdout.String(), "$ hi compute up --on colab --gpu cpu --name menu1 --max 1\n") {
+		t.Fatalf("menu output:\n%s\nstderr:\n%s", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(fake.calls(), "colab new -s menu1") {
+		t.Fatal("the instance did not start")
+	}
+	if strings.Contains(stderr.String(), "Usage of") {
+		t.Fatal("the menu printed flag usage")
+	}
+}
+
+func TestComputeMenuEmptyLifetimeMeansNoLimit(t *testing.T) {
+	fake := newFakeColab(t)
+	// An empty lifetime asks for confirmation, which needs a terminal, so
+	// without one the start is refused and nothing runs.
+	answers := strings.NewReader("1\n1\nmenu2\n\nn\n8\n")
+	var stdout, stderr bytes.Buffer
+	if err := computeMenu(answers, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "--max none") || !strings.Contains(stdout.String(), "no time limit") {
+		t.Fatalf("menu output:\n%s", stdout.String())
+	}
+	if strings.Contains(fake.calls(), "colab new") {
+		t.Fatal("an unlimited instance started without a confirmation")
+	}
+}
+
+func mustRecord(t *testing.T, name string) computeRecord {
+	t.Helper()
+	records, err := loadComputeRecords()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, ok := records[name]
+	if !ok {
+		t.Fatalf("no record for %s", name)
+	}
+	return record
+}

@@ -17,7 +17,7 @@ hi compute up --gpu T4 --name box --max 2h
 |--------------------|---------------------------------------------------------------|
 | `--gpu <hardware>` | Hardware from `hi compute hardware`; default is the cheapest CPU |
 | `--name <name>`    | Name to use in later commands; generated if omitted           |
-| `--max <duration>` | Stop after this long; default `4h`, at most `24h` on Colab     |
+| `--max <duration>` | Stop after this long: hours (`2`, `1.5`), `30m`, `2d`, or `none`; default `4h`, at most `24h` on Colab |
 | `--image <image>`  | Container image (Hugging Face); default `python:3.12` on CPU and `pytorch/pytorch:2.6.0-cuda12.4-cudnn9-devel` on GPU |
 | `--high-mem`       | High-RAM machine for `cpu`, `T4`, or `A100` (Colab Pro)        |
 | `--namespace <ns>` | Bill this Hugging Face account                                |

@@ -45,7 +45,7 @@ description: Every hi command and option in one place.
 | `--on <provider>`   | ✓  | ✓   | ✓     | `colab` or `hf`                                      |
 | `--gpu <hardware>`  | ✓  | ✓   | ✓     | Hardware name from `hi compute hardware`             |
 | `--name <name>`     | ✓  | ✓   | ✓     | Name for later commands                              |
-| `--max <duration>`  | ✓  | ✓   | ✓     | Maximum lifetime, such as `30m` or `4h`              |
+| `--max <duration>`  | ✓  | ✓   | ✓     | Maximum lifetime: hours (`2`, `1.5`), `30m`, `2d`, or `none` (asks first) |
 | `--yes`             | ✓  | ✓   | ✓     | Skip the cost confirmation                           |
 | `--dry-run`         | ✓  | ✓   | ✓     | Show the request; start nothing                      |
 | `--namespace <ns>`  | ✓  | ✓   | ✓     | Hugging Face account to bill this once               |

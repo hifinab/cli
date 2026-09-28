@@ -69,7 +69,8 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	on := flags.String("on", "", "provider")
 	gpu := flags.String("gpu", "", "hardware")
 	name := flags.String("name", "", "instance name")
-	maxLifetime := flags.Duration("max", defaultInstanceMax, "maximum lifetime")
+	maxLifetime := &lifetimeFlag{value: defaultInstanceMax}
+	flags.Var(maxLifetime, "max", "maximum lifetime: hours (2), 30m, 2d, or none")
 	quant := flags.String("quant", "", "GGUF quant")
 	contextSize := flags.Int("ctx", 0, "context length")
 	alias := flags.String("alias", "", "model id in the API")
@@ -125,7 +126,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	if hardware.kind != "GPU" {
 		return usageError{fmt.Sprintf("serving needs a GPU; %s is a %s", hardware.name, hardware.kind)}
 	}
-	if err := validateLifetime(provider, *maxLifetime); err != nil {
+	if err := validateLifetime(provider, maxLifetime.value); err != nil {
 		return err
 	}
 	instance, err := chooseInstanceName(*name, hardware.name)
@@ -151,7 +152,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 		}
 		fmt.Fprintf(stdout, "Reusing %s/%s.\n", provider.name(), instance)
 	} else {
-		request := upRequest{name: instance, hardware: hardware, max: *maxLifetime, namespace: *namespace}
+		request := upRequest{name: instance, hardware: hardware, max: maxLifetime.value, namespace: *namespace}
 		if apiServed {
 			request.serve = &recipe
 		}
@@ -175,8 +176,8 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 			return err
 		}
 		fmt.Fprintf(stdout, "\nOpenAI-compatible API: %s/v1   model: %s\n", url, recipe.alias)
-		fmt.Fprintf(stdout, "It needs your %s token as the API key, and stops after %s.\n",
-			provider.name(), formatDuration(*maxLifetime))
+		fmt.Fprintf(stdout, "It needs your %s token as the API key, and runs %s.\n",
+			provider.name(), strings.TrimPrefix(describeLifetime(maxLifetime.value), "stopping "))
 		fmt.Fprintf(stdout, "Local tunnel instead: hi compute tunnel %s %d:%d\n", instance, serveRemotePort, *localPort)
 		fmt.Fprintf(stdout, "Stop it:              hi compute stop %s\n", instance)
 		return nil

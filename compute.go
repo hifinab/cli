@@ -415,7 +415,8 @@ func computeUpCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	on := flags.String("on", "", "provider")
 	gpu := flags.String("gpu", "", "hardware")
 	name := flags.String("name", "", "instance name")
-	maxLifetime := flags.Duration("max", defaultInstanceMax, "maximum lifetime")
+	maxLifetime := &lifetimeFlag{value: defaultInstanceMax}
+	flags.Var(maxLifetime, "max", "maximum lifetime: hours (2), 30m, 2d, or none")
 	highMem := flags.Bool("high-mem", false, "high-RAM machine")
 	yes := flags.Bool("yes", false, "skip confirmation")
 	dryRun := flags.Bool("dry-run", false, "show without starting")
@@ -432,7 +433,7 @@ func computeUpCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	if err != nil {
 		return err
 	}
-	request := upRequest{highMem: *highMem, max: *maxLifetime, image: *image, namespace: *namespace}
+	request := upRequest{highMem: *highMem, max: maxLifetime.value, image: *image, namespace: *namespace}
 	if request.hardware, err = resolveHardware(provider, *gpu); err != nil {
 		return err
 	}
@@ -463,10 +464,13 @@ func startInstance(
 		return fmt.Errorf("an instance named %q already exists; choose another --name", request.name)
 	}
 
-	deadline := computeNow().Add(request.max)
-	fmt.Fprintf(stdout, "Start %s/%s on %s (%s%s), stopping after %s at %s.\n",
+	var deadline time.Time
+	if request.max != noLimit {
+		deadline = computeNow().Add(request.max)
+	}
+	fmt.Fprintf(stdout, "Start %s/%s on %s (%s%s), %s.\n",
 		provider.name(), request.name, request.hardware.name, request.hardware.rate,
-		billedSuffix(provider, request.namespace), formatDuration(request.max), deadline.Format("15:04"))
+		billedSuffix(provider, request.namespace), describeLifetime(request.max))
 
 	if dryRun {
 		fmt.Fprintf(stdout, "Would run: %s\n", strings.Join(provider.upCommand(request), " "))
@@ -475,7 +479,11 @@ func startInstance(
 	if err := requireStatus(provider); err != nil {
 		return err
 	}
-	if request.hardware.paid {
+	if request.max == noLimit {
+		if err := confirmNoLimit(provider, request.name, stdin, stdout, yes); err != nil {
+			return err
+		}
+	} else if request.hardware.paid {
 		if err := confirm(stdin, stdout, yes, "Start it?"); err != nil {
 			return err
 		}
@@ -496,8 +504,8 @@ func startInstance(
 	if err := saveComputeRecord(record); err != nil {
 		return err
 	}
-	if provider.enforcesLifetime() {
-		// The provider stops the instance at its deadline itself.
+	if provider.enforcesLifetime() || deadline.IsZero() {
+		// The provider stops the instance itself, or there is no deadline.
 	} else if pid, err := startComputeWatcher(request.name); err != nil {
 		fmt.Fprintf(stderr, "hi: warning: could not start the lifetime watcher: %v\n", err)
 		fmt.Fprintf(stderr, "hi: stop the instance yourself with `hi compute stop %s`\n", request.name)
@@ -515,8 +523,77 @@ func startInstance(
 	return nil
 }
 
+// noLimit is the lifetime that means "run until stopped".
+const noLimit time.Duration = 0
+
+// parseLifetime reads a --max value: a number of hours ("2", "1.5"), a Go
+// duration ("30m", "1h30m"), days ("2d"), or "none" for no limit.
+func parseLifetime(value string) (time.Duration, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	switch value {
+	case "none", "never", "unlimited", "no-limit":
+		return noLimit, nil
+	}
+	invalid := fmt.Errorf("invalid lifetime %q; use hours such as 2 or 1.5, or 30m, 1h30m, 2d, or none", value)
+	if hours, err := strconv.ParseFloat(value, 64); err == nil {
+		if hours <= 0 {
+			return 0, invalid
+		}
+		return time.Duration(hours * float64(time.Hour)).Round(time.Second), nil
+	}
+	if days, ok := strings.CutSuffix(value, "d"); ok {
+		count, err := strconv.ParseFloat(days, 64)
+		if err != nil || count <= 0 {
+			return 0, invalid
+		}
+		return time.Duration(count * 24 * float64(time.Hour)).Round(time.Second), nil
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration <= 0 {
+		return 0, invalid
+	}
+	return duration, nil
+}
+
+// lifetimeFlag is --max as a flag.Value.
+type lifetimeFlag struct{ value time.Duration }
+
+func (l *lifetimeFlag) String() string {
+	if l == nil || l.value == noLimit {
+		return "none"
+	}
+	return formatDuration(l.value)
+}
+
+func (l *lifetimeFlag) Set(value string) error {
+	duration, err := parseLifetime(value)
+	if err != nil {
+		return err
+	}
+	l.value = duration
+	return nil
+}
+
+func describeLifetime(lifetime time.Duration) string {
+	if lifetime == noLimit {
+		return "with no time limit"
+	}
+	return "stopping after " + formatDuration(lifetime) + " at " + computeNow().Add(lifetime).Format("15:04")
+}
+
+// confirmNoLimit makes sure an unlimited machine is intended; it keeps
+// billing until someone stops it.
+func confirmNoLimit(provider computeProvider, name string, stdin io.Reader, stdout io.Writer, yes bool) error {
+	fmt.Fprintf(stdout, "\nWarning: %s has no time limit. It keeps running, and costing money, until you stop it\n", name)
+	fmt.Fprintf(stdout, "with `hi compute stop %s`, even if you close this terminal or forget about it.\n", name)
+	if limit := provider.maxLifetime(); limit > 0 {
+		fmt.Fprintf(stdout, "(%s still ends it after %s.)\n", provider.name(), formatDuration(limit))
+	}
+	return confirm(stdin, stdout, yes, "Are you sure you want no time limit?")
+}
+
 func validateLifetime(provider computeProvider, lifetime time.Duration) error {
-	if lifetime <= 0 {
+	if lifetime < 0 {
 		return usageError{"--max must be greater than zero"}
 	}
 	if limit := provider.maxLifetime(); limit > 0 && lifetime > limit {
@@ -617,12 +694,10 @@ func computeListCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 		switch {
 		case item.record != nil:
 			up = formatDuration(now.Sub(item.record.Created))
-			stopsIn = formatDuration(item.record.Deadline.Sub(now))
+			stopsIn = stopsInText(item.record.Deadline, now)
 		case item.instance.managed && !item.instance.created.IsZero():
 			up = formatDuration(now.Sub(item.instance.created))
-			if !item.instance.deadline.IsZero() {
-				stopsIn = formatDuration(item.instance.deadline.Sub(now))
-			}
+			stopsIn = stopsInText(item.instance.deadline, now)
 		case !item.instance.managed:
 			name += " (not started by hi)"
 		}
@@ -634,6 +709,13 @@ func computeListCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 	}
 	table.Flush()
 	return nil
+}
+
+func stopsInText(deadline, now time.Time) string {
+	if deadline.IsZero() {
+		return "no limit"
+	}
+	return formatDuration(deadline.Sub(now))
 }
 
 // listInstances reconciles provider listings with local records. It forgets
@@ -658,7 +740,7 @@ func listInstances(stdout, stderr io.Writer) ([]listedInstance, error) {
 			item := listedInstance{provider: provider.name(), instance: instance}
 			if record, ok := records[instance.name]; ok && record.Provider == provider.name() {
 				seen[instance.name] = true
-				if !now.Before(record.Deadline) {
+				if !record.Deadline.IsZero() && !now.Before(record.Deadline) {
 					fmt.Fprintf(stdout, "%s passed its maximum lifetime; stopping it.\n", instance.name)
 					if err := stopInstance(provider, instance.name, stdout, stderr); err != nil {
 						fmt.Fprintf(stderr, "hi: %v\n", err)
@@ -732,7 +814,9 @@ func printInstanceStatus(provider string, instance computeInstance, record *comp
 	case !created.IsZero():
 		fmt.Fprintf(stdout, "Started:   %s (%s ago)\n",
 			created.Local().Format("2006-01-02 15:04"), formatDuration(now.Sub(created)))
-		if !deadline.IsZero() {
+		if deadline.IsZero() {
+			fmt.Fprintln(stdout, "Stops at:  never; no time limit")
+		} else {
 			fmt.Fprintf(stdout, "Stops at:  %s (in %s)\n",
 				deadline.Local().Format("2006-01-02 15:04"), formatDuration(deadline.Sub(now)))
 		}
@@ -1058,7 +1142,8 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	on := flags.String("on", "", "provider")
 	gpu := flags.String("gpu", "", "hardware")
 	name := flags.String("name", "", "run name")
-	maxLifetime := flags.Duration("max", defaultRunMax, "maximum run time")
+	maxLifetime := &lifetimeFlag{value: defaultRunMax}
+	flags.Var(maxLifetime, "max", "maximum run time: hours (2), 30m, 2d, or none")
 	highMem := flags.Bool("high-mem", false, "high-RAM machine")
 	yes := flags.Bool("yes", false, "skip confirmation")
 	dryRun := flags.Bool("dry-run", false, "show without starting")
@@ -1078,7 +1163,7 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 
 	request := runRequest{
 		highMem:   *highMem,
-		max:       *maxLifetime,
+		max:       maxLifetime.value,
 		detach:    *detach,
 		namespace: *namespace,
 		secrets:   secrets,
@@ -1128,9 +1213,9 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	if what == "" {
 		what = request.image
 	}
-	fmt.Fprintf(stdout, "Run %s on %s %s (%s%s), stopping after %s.\n",
+	fmt.Fprintf(stdout, "Run %s on %s %s (%s%s), %s.\n",
 		what, provider.name(), request.hardware.name, request.hardware.rate,
-		billedSuffix(provider, request.namespace), formatDuration(request.max))
+		billedSuffix(provider, request.namespace), describeLifetime(request.max))
 	if *dryRun {
 		fmt.Fprintf(stdout, "Would run: %s\n", strings.Join(provider.runCommand(request), " "))
 		return 0, nil
@@ -1138,7 +1223,15 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	if err := requireStatus(provider); err != nil {
 		return 0, err
 	}
-	if request.hardware.paid {
+	if request.max == noLimit {
+		name := request.name
+		if name == "" {
+			name = "this run"
+		}
+		if err := confirmNoLimit(provider, name, stdin, stdout, *yes); err != nil {
+			return 0, err
+		}
+	} else if request.hardware.paid {
 		if err := confirm(stdin, stdout, *yes, "Start it?"); err != nil {
 			return 0, err
 		}
@@ -1264,7 +1357,7 @@ func watchComputeInstance(name string, stdout, stderr io.Writer) error {
 			return err
 		}
 		record, ok := records[name]
-		if !ok {
+		if !ok || record.Deadline.IsZero() {
 			return nil
 		}
 		if !computeNow().Before(record.Deadline) {
@@ -1365,7 +1458,7 @@ func removeComputeRecord(name string) error {
 
 func newComputeFlags(name string, stderr io.Writer) *flag.FlagSet {
 	flags := flag.NewFlagSet("hi compute "+name, flag.ContinueOnError)
-	flags.SetOutput(stderr)
+	flags.SetOutput(io.Discard)
 	return flags
 }
 

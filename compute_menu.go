@@ -24,7 +24,11 @@ func computeMenu(stdin io.Reader, stdout, stderr io.Writer) error {
 			for _, item := range listed {
 				line := fmt.Sprintf("  %s/%s  %s", item.provider, item.instance.name, item.instance.hardware)
 				if item.record != nil {
-					line += "  stops in " + formatDuration(item.record.Deadline.Sub(computeNow()))
+					if item.record.Deadline.IsZero() {
+						line += "  no time limit"
+					} else {
+						line += "  stops in " + formatDuration(item.record.Deadline.Sub(computeNow()))
+					}
 				}
 				fmt.Fprintln(stdout, line)
 			}
@@ -110,7 +114,7 @@ func menuStart(stdin io.Reader, stdout, stderr io.Writer) error {
 	if name, err = ask(stdin, stdout, "Name", name); err != nil {
 		return err
 	}
-	lifetime, err := ask(stdin, stdout, "Stop automatically after", formatDuration(defaultInstanceMax))
+	lifetime, err := askLifetime(stdin, stdout)
 	if err != nil {
 		return err
 	}
@@ -138,7 +142,7 @@ func menuRun(stdin io.Reader, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	lifetime, err := ask(stdin, stdout, "Stop after", formatDuration(defaultRunMax))
+	lifetime, err := askLifetime(stdin, stdout)
 	if err != nil {
 		return err
 	}
@@ -187,7 +191,7 @@ func menuServe(stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 		args = append(args, "--gpu", hardware.name)
 	}
-	lifetime, err := ask(stdin, stdout, "Stop automatically after", formatDuration(defaultInstanceMax))
+	lifetime, err := askLifetime(stdin, stdout)
 	if err != nil {
 		return err
 	}
@@ -231,9 +235,15 @@ func menuHardware(provider computeProvider, stdin io.Reader, stdout io.Writer) (
 	if err != nil {
 		return computeHardware{}, err
 	}
+	nameWidth, memoryWidth := 0, 0
+	for _, hardware := range options {
+		nameWidth = max(nameWidth, len(hardware.name))
+		memoryWidth = max(memoryWidth, len(hardware.memory))
+	}
 	labels := make([]string, len(options))
 	for i, hardware := range options {
-		labels[i] = fmt.Sprintf("%-5s %-4s %-11s %s", hardware.name, hardware.kind, hardware.memory, hardware.rate)
+		labels[i] = fmt.Sprintf("%-*s  %-4s %-*s  %s",
+			nameWidth, hardware.name, hardware.kind, memoryWidth, hardware.memory, hardware.rate)
 	}
 	choice, err := menuChoice(stdin, stdout, "Hardware:", labels)
 	if err != nil {
@@ -266,8 +276,9 @@ func menuWithInstance(listed []listedInstance, stdin io.Reader, stdout io.Writer
 func menuChoice(stdin io.Reader, stdout io.Writer, prompt string, options []string) (int, error) {
 	for {
 		fmt.Fprintln(stdout, prompt)
+		width := len(strconv.Itoa(len(options)))
 		for i, option := range options {
-			fmt.Fprintf(stdout, "  %d) %s\n", i+1, option)
+			fmt.Fprintf(stdout, "  %*d) %s\n", width, i+1, option)
 		}
 		fmt.Fprint(stdout, "> ")
 		answer, err := readLine(stdin)
@@ -282,6 +293,33 @@ func menuChoice(stdin io.Reader, stdout io.Writer, prompt string, options []stri
 			return number - 1, nil
 		}
 		fmt.Fprintf(stdout, "Choose a number from 1 to %d.\n", len(options))
+	}
+}
+
+// askLifetime asks how long a machine may run until it is accepted. A bare
+// number is hours; an empty answer means no limit, which is confirmed later.
+func askLifetime(stdin io.Reader, stdout io.Writer) (string, error) {
+	for {
+		fmt.Fprint(stdout, "Stop automatically after how many hours? (e.g. 1, 1.5, 30m; empty for no limit): ")
+		answer, err := readLine(stdin)
+		answer = strings.TrimSpace(answer)
+		if answer == "" {
+			if err != nil && !errors.Is(err, io.EOF) {
+				return "", err
+			}
+			if err != nil {
+				return "", errMenuBack
+			}
+			return "none", nil
+		}
+		if _, parseErr := parseLifetime(answer); parseErr != nil {
+			fmt.Fprintln(stdout, parseErr.Error())
+			if err != nil {
+				return "", errMenuBack
+			}
+			continue
+		}
+		return answer, nil
 	}
 }
 

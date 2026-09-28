@@ -38,7 +38,8 @@ In scripts, where there is no terminal to ask in, `hi` stops with
 
 ## Every machine stops by itself
 
-Every run and instance has a maximum lifetime set with `--max`:
+Every run and instance has a maximum lifetime set with `--max`. Give it in
+hours (`2`, `1.5`) or with a unit (`30m`, `1h30m`, `2d`):
 
 | Kind      | Default | Upper limit        |
 |-----------|---------|--------------------|
@@ -58,6 +59,16 @@ How the limit is enforced differs by provider:
   runtime is released when the run ends.
 
 Choose the shortest `--max` that fits the work. You can always start another.
+
+### No time limit
+
+`--max none` (or an empty answer to the menu's lifetime question) starts a
+machine without a limit. It keeps running, and costing money, until you stop
+it, so `hi` shows a warning and asks you to confirm; in scripts, add `--yes`.
+
+- On Hugging Face, the job gets a one-year timeout.
+- On Colab, no watcher runs, and Colab still ends the session after 24 hours.
+- `hi compute ls` shows `no limit` in the STOPS IN column.
 
 ## Check what is running
 

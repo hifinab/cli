@@ -465,3 +465,21 @@ func TestHFBillingCommandListsAndSavesTheChoice(t *testing.T) {
 		t.Fatalf("--clear left %q saved", config.HFNamespace)
 	}
 }
+
+func TestHFNoLimitSendsAOneYearTimeout(t *testing.T) {
+	fake := newFakeHF(t)
+	fake.finalStage = "RUNNING"
+	code, stdout, stderr := runComputeTest("up", "--on", "hf", "--name", "forever", "--max", "none", "--yes")
+	if code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	if spec := fake.lastSpec(); spec["timeoutSeconds"] != float64(365*24*3600) {
+		t.Fatalf("timeoutSeconds = %v, want a year", spec["timeoutSeconds"])
+	}
+	if !strings.Contains(stdout, "no time limit") {
+		t.Fatalf("no warning:\n%s", stdout)
+	}
+	if _, stdout, _ = runComputeTest("ls"); !strings.Contains(stdout, "no limit") {
+		t.Fatalf("ls:\n%s", stdout)
+	}
+}

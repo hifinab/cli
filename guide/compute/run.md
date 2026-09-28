@@ -120,7 +120,7 @@ uploading a model to the Hub.
 | Option              | Meaning                                                    |
 |---------------------|------------------------------------------------------------|
 | `--gpu <hardware>`  | Hardware from `hi compute hardware`; default is the cheapest CPU |
-| `--max <duration>`  | Stop after this long; default `1h`                          |
+| `--max <duration>`  | Stop after this long: hours (`2`), `30m`, `2d`, or `none`; default `1h` |
 | `--name <name>`     | Name for `logs`, `wait`, and `stop`                         |
 | `--env KEY=VALUE`   | Environment variable; repeatable                            |
 | `--secret KEY`      | Encrypted secret from your shell (Hugging Face); repeatable |

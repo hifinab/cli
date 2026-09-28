@@ -344,6 +344,17 @@ func hfLabels(name string) map[string]string {
 	return map[string]string{"name": name, "managed-by": "hi"}
 }
 
+// hfNoLimit is the timeout sent for "no limit": Jobs default to 30 minutes
+// without one, and accept a year.
+const hfNoLimit = 365 * 24 * time.Hour
+
+func hfTimeout(lifetime time.Duration) int {
+	if lifetime == noLimit {
+		return int(hfNoLimit.Seconds())
+	}
+	return int(lifetime.Seconds())
+}
+
 func environmentMap(entries []string) map[string]string {
 	env := map[string]string{}
 	for _, entry := range entries {
@@ -362,7 +373,7 @@ func (p *hfProvider) jobSpec(image string, command []string, env map[string]stri
 		"arguments":      []string{},
 		"environment":    env,
 		"flavor":         flavor,
-		"timeoutSeconds": int(lifetime.Seconds()),
+		"timeoutSeconds": hfTimeout(lifetime),
 	}
 	if name != "" {
 		spec["labels"] = hfLabels(name)
@@ -588,7 +599,7 @@ func hfInstance(job hfJob) computeInstance {
 	}
 	if created, err := time.Parse(time.RFC3339, job.CreatedAt); err == nil {
 		instance.created = created
-		if job.Timeout > 0 && hfJobActive(job.Status.Stage) {
+		if job.Timeout > 0 && job.Timeout < int(hfNoLimit.Seconds()) && hfJobActive(job.Status.Stage) {
 			instance.deadline = created.Add(time.Duration(job.Timeout) * time.Second)
 		}
 	}

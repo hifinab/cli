@@ -132,8 +132,9 @@ Run a Python script to completion on a fresh machine:
 hi compute run --gpu T4 --max 2h train.py -- --epochs 3
 ```
 
-Every machine has a maximum lifetime (`--max`, default 4 hours for instances
-and 1 hour for runs, at most 24 hours on Colab). Hugging Face enforces it
+Every machine has a maximum lifetime (`--max`, in hours such as `2` or with a
+unit such as `30m`; default 4 hours for instances and 1 hour for runs, at most
+24 hours on Colab). `--max none` removes the limit after a warning. Hugging Face enforces it
 itself; for Colab, `hi` runs a detached background watcher and checks again on
 every `hi compute ls`. Paid hardware asks for confirmation; pass `--yes` in
 scripts. `--dry-run` shows the provider command or API request without

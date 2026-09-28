@@ -22,8 +22,10 @@ on Colab). Follow these rules every time:
    terminal for hi's own confirmation prompt. Never add `--yes` on your own
    judgement.
 2. **Always set `--max`.** Choose the shortest lifetime that fits the task
-   (for example `--max 30m` for a quick test). Every machine stops itself at
-   `--max`; the defaults are 4h for instances and 1h for runs.
+   (for example `--max 30m` for a quick test; a bare number is hours). Every
+   machine stops itself at `--max`; the defaults are 4h for instances and 1h
+   for runs. Never use `--max none` (no limit) unless the user asks for it
+   explicitly.
 3. **Clean up.** When you are done with a machine you started, stop it with
    `hi compute stop <name>`, then check `hi compute ls` shows nothing left
    running that you started. Never stop machines you did not start without

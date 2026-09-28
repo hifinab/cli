@@ -75,8 +75,10 @@ hi compute logs hf/6ab97cba6b030d633f69a5ea
 
 ## Limits and confirmation
 
-Every run and instance has a maximum lifetime, `--max`. Instances default to
-4 hours and runs to 1 hour; Colab allows at most 24 hours. Paid hardware asks
+Every run and instance has a maximum lifetime, `--max`, in hours (`2`) or with
+a unit (`30m`, `2d`). Instances default to 4 hours and runs to 1 hour; Colab
+allows at most 24 hours. `--max none` means no limit, after a warning you must
+confirm. Paid hardware asks
 you to confirm before it starts. [Costs, limits, and billing](/guide/compute/billing/)
 explains how each provider enforces the limit.
 
