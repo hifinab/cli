@@ -143,6 +143,16 @@ Dependency: shared tools no longer update themselves, so they rely on
 rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
+### v0.13.0 — Guided installer
+
+- [ ] Replace the fixed `hi install` run with a guided menu of checkboxes
+  that selects which tools to install. Unchecking an installed tool
+  uninstalls it, so the same menu serves as both installer and uninstaller.
+  Spec not yet written.
+
+Dependency: needs uninstall steps for every tool `hi install` manages, and
+must respect the per-user or all-users choice from v0.12.0.
+
 ### Deferred — Modal compute
 
 - [ ] Add a Modal driver through Modal's official Go SDK.
