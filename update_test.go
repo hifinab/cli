@@ -227,3 +227,27 @@ func TestUpdateFallsBackToTheAPI(t *testing.T) {
 		t.Fatalf("API calls = %d, want the fallback to be used once", calls)
 	}
 }
+
+func TestUpdateNeverGoesBackwardsWithoutVersion(t *testing.T) {
+	requireLinux(t)
+	fakeReleases(t, "v0.7.2", false)
+	path := installedBinary(t, "v0.7.3")
+	code, stdout, _ := runUpdateTest()
+	if code != 0 || !strings.Contains(stdout, "hi v0.7.3 is up to date.") {
+		t.Fatalf("exit code = %d, stdout = %s", code, stdout)
+	}
+	if got := readTestFile(t, path); got != fakeBinary("v0.7.3") {
+		t.Fatal("a bare update downgraded the binary")
+	}
+	for _, test := range []struct {
+		a, b  string
+		older bool
+	}{
+		{"v0.7.2", "v0.7.3", true}, {"v0.7.10", "v0.7.9", false}, {"v0.9.0", "v0.10.0", true},
+		{"v1.0.0", "v0.99.99", false}, {"v0.7.3", "v0.7.3", false}, {"v0.7.3", "dev", false},
+	} {
+		if got := olderRelease(test.a, test.b); got != test.older {
+			t.Errorf("olderRelease(%s, %s) = %v, want %v", test.a, test.b, got, test.older)
+		}
+	}
+}

@@ -107,6 +107,11 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
 - [x] Find the latest release from GitHub's `/releases/latest` redirect, so
   `hi update` works when the API's hourly limit for the network is used up.
 
+### v0.7.4 — Never downgrade
+
+- [x] A bare `hi update` only installs a newer release, even while GitHub's
+  latest-release redirect still points at the previous one.
+
 ## Planned
 
 ### v0.8.0 — RunPod compute

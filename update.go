@@ -61,7 +61,9 @@ func update(requested string, check bool, stdout io.Writer) error {
 		}
 		target = latest
 	}
-	if target == version {
+	if target == version || (requested == "" && olderRelease(target, version)) {
+		// The latest-release redirect can lag behind a new release for a few
+		// minutes; a bare update never goes backwards.
 		fmt.Fprintf(stdout, "hi %s is up to date.\n", version)
 		return nil
 	}
@@ -214,6 +216,23 @@ func replaceBinary(path, tag string) error {
 		return err
 	}
 	return os.Rename(temporary.Name(), path)
+}
+
+// olderRelease reports whether release tag a is older than b. Versions that
+// are not release tags, such as development builds, are never newer.
+func olderRelease(a, b string) bool {
+	if !releaseTagPattern.MatchString(a) || !releaseTagPattern.MatchString(b) {
+		return false
+	}
+	var left, right [3]int
+	fmt.Sscanf(a, "v%d.%d.%d", &left[0], &left[1], &left[2])
+	fmt.Sscanf(b, "v%d.%d.%d", &right[0], &right[1], &right[2])
+	for i := range left {
+		if left[i] != right[i] {
+			return left[i] < right[i]
+		}
+	}
+	return false
 }
 
 func checksumFor(sums []byte, asset string) string {
