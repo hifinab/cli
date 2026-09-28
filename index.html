@@ -102,15 +102,19 @@
   .term-bar { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
   .dots { display: flex; gap: 7px; margin-right: 8px; }
   .dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.14); }
-  .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
-  .tabs button {
-    font: 500 13px var(--mono); color: var(--dim); background: none; border: 0;
-    padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: color .2s, background .2s;
+  .term-title { font: 500 13px var(--mono); color: var(--dim); }
+  .term-body { padding: 4px 20px; font: 15px/1.7 var(--mono); }
+  .option { padding: 18px 0; }
+  .option + .option { border-top: 1px solid var(--line); }
+  .option-label {
+    margin: 0 0 8px; display: flex; align-items: center; gap: 10px;
+    font: 600 12.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
   }
-  .tabs button:hover { color: var(--text); }
-  .tabs button[aria-selected="true"] { color: var(--text); background: rgba(255,255,255,0.07); }
-  .term-body { padding: 22px 20px 24px; font: 15px/1.7 var(--mono); }
-  .cmdline { display: flex; align-items: flex-start; gap: 12px; }
+  .pill-tag {
+    font: 500 11px var(--mono); letter-spacing: 0; text-transform: none; color: var(--mint);
+    border: 1px solid rgba(79, 209, 165, 0.35); border-radius: 999px; padding: 1px 8px;
+  }
+  .cmdline { display: flex; align-items: center; gap: 12px; }
   .cmdline code { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
   .cmdline .ps { color: var(--dim); user-select: none; }
   .cmdline .arg { color: var(--accent); }
@@ -119,7 +123,7 @@
     border: 0; border-radius: 7px; padding: 7px 12px; cursor: pointer; transition: filter .2s;
   }
   .copy:hover { filter: brightness(1.12); }
-  .note { color: var(--dim); margin: 14px 0 0; font-size: 13.5px; }
+  .note { color: var(--dim); margin: 8px 0 0; font-size: 13.5px; }
   .guide-link { margin: 22px 0 0; color: var(--muted); font-size: 15.5px; }
   .guide-link a { color: var(--accent); text-decoration: none; }
   .guide-link a:hover { text-decoration: underline; }
@@ -199,8 +203,9 @@
     .hero { padding-top: 40px; }
     .cmd { grid-template-columns: 1fr; gap: 4px; }
     .strix { grid-template-columns: 1fr; padding: 24px; }
-    .term-body { font-size: 13.5px; padding: 18px 16px 20px; }
-    .cmdline { flex-direction: column; }
+    .term-body { font-size: 13.5px; padding: 4px 16px; }
+    .cmdline { flex-wrap: wrap; align-items: flex-start; }
+    .cmdline code { flex-basis: calc(100% - 30px); }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before { transition: none !important; }
@@ -234,22 +239,39 @@
       binary with no runtime to install.
     </p>
 
-    <div class="term" role="region" aria-label="Install command">
+    <div class="term" role="region" aria-label="Install commands">
       <div class="term-bar">
         <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
-        <div class="tabs" role="tablist">
-          <button role="tab" aria-selected="true" data-tab="strix">Strix Halo</button>
-          <button role="tab" aria-selected="false" data-tab="ws">Workstation</button>
-          <button role="tab" aria-selected="false" data-tab="cli">CLI only</button>
-        </div>
+        <span class="term-title">install</span>
       </div>
       <div class="term-body">
-        <div class="cmdline">
-          <span class="ps">$</span>
-          <code id="cmd"></code>
-          <button class="copy" id="copy" type="button">copy</button>
+        <div class="option">
+          <p class="option-label">CLI only <span class="pill-tag">most people</span></p>
+          <div class="cmdline">
+            <span class="ps">$</span>
+            <code>curl -fsSL https://hifin.sh/install.sh | sh</code>
+            <button class="copy" type="button" data-copy="curl -fsSL https://hifin.sh/install.sh | sh">copy</button>
+          </div>
+          <p class="note">Just the <code>hi</code> binary, checksum-verified, in <code>~/.local/bin</code>. Update it later with <code>hi update</code>.</p>
         </div>
-        <p class="note" id="note"></p>
+        <div class="option">
+          <p class="option-label">Workstation</p>
+          <div class="cmdline">
+            <span class="ps">$</span>
+            <code>curl -fsSL https://hifin.sh/install.sh | sh<span class="arg"> -s -- install</span></code>
+            <button class="copy" type="button" data-copy="curl -fsSL https://hifin.sh/install.sh | sh -s -- install">copy</button>
+          </div>
+          <p class="note">Installs <code>hi</code>, then the Hifin workstation software on Ubuntu 26.04. No GPU setup, no reboot.</p>
+        </div>
+        <div class="option">
+          <p class="option-label">Strix Halo</p>
+          <div class="cmdline">
+            <span class="ps">$</span>
+            <code>curl -fsSL https://hifin.sh/install.sh | sh<span class="arg"> -s -- install strix</span></code>
+            <button class="copy" type="button" data-copy="curl -fsSL https://hifin.sh/install.sh | sh -s -- install strix">copy</button>
+          </div>
+          <p class="note">Everything above plus AMD ROCm for Strix Halo. <b>Reboot once</b> when it finishes.</p>
+        </div>
       </div>
     </div>
     <p class="guide-link">New here? <a href="/guide/quickstart/">Rent your first GPU in five minutes</a> or <a href="/guide/">read the guide</a>.</p>
@@ -368,47 +390,17 @@
 </footer>
 
 <script>
-  const base = "curl -fsSL https://hifin.sh/install.sh | sh";
-  const tabs = {
-    strix: {
-      args: " -s -- install strix",
-      note: "Installs <code>hi</code>, then runs <code>hi install strix</code> in the same terminal. <b>Reboot once</b> when it finishes."
-    },
-    ws: {
-      args: " -s -- install",
-      note: "Installs <code>hi</code> and the general workstation software. No GPU setup, no reboot."
-    },
-    cli: {
-      args: "",
-      note: "Just the <code>hi</code> binary, checksum-verified, in <code>~/.local/bin</code>. It prints the full path to run straight away."
-    }
-  };
-  const cmd = document.getElementById("cmd");
-  const note = document.getElementById("note");
-  const copy = document.getElementById("copy");
-  let current = "strix";
-
-  function show(name) {
-    current = name;
-    const t = tabs[name];
-    cmd.innerHTML = base +
-      (t.args ? '<span class="arg">' + t.args + "</span>" : "");
-    note.innerHTML = t.note;
-    document.querySelectorAll(".tabs button").forEach(b =>
-      b.setAttribute("aria-selected", String(b.dataset.tab === name)));
-  }
-  document.querySelectorAll(".tabs button").forEach(b =>
-    b.addEventListener("click", () => show(b.dataset.tab)));
-  copy.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(base + tabs[current].args);
-      copy.textContent = "copied ✓";
-    } catch {
-      copy.textContent = "select + copy";
-    }
-    setTimeout(() => (copy.textContent = "copy"), 1600);
+  document.querySelectorAll(".copy[data-copy]").forEach(button => {
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+        button.textContent = "copied ✓";
+      } catch {
+        button.textContent = "select + copy";
+      }
+      setTimeout(() => (button.textContent = "copy"), 1600);
+    });
   });
-  show(current);
 
   const io = new IntersectionObserver(entries => entries.forEach(e => {
     if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
