@@ -44,10 +44,12 @@ type runpodProvider struct {
 // runpodOption is a hardware choice: a short hi name for a RunPod GPU or CPU
 // type, which RunPod names like "NVIDIA GeForce RTX 4090".
 type runpodOption struct {
-	hardware computeHardware
-	hourly   float64
-	gpuID    string
-	cpuID    string
+	hardware  computeHardware
+	hourly    float64
+	gpuID     string
+	cpuID     string
+	memoryGB  float64
+	available bool
 }
 
 type runpodPod struct {
@@ -129,7 +131,7 @@ func (p *runpodProvider) signIn(key string) (string, error) {
 	if strings.ContainsAny(key, "\"\n\r ") {
 		return "", errors.New("that does not look like a RunPod API key")
 	}
-	if err := runpodRequest(key, http.MethodGet, "/catalog/gpus", nil, nil); err != nil {
+	if err := runpodRequest(key, http.MethodGet, "/catalog/cpus", nil, nil); err != nil {
 		if strings.Contains(err.Error(), "rejected the API key") {
 			return "", errors.New("RunPod rejected this key; check you copied all of it")
 		}
@@ -293,16 +295,18 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 
 	var gpus struct {
 		GPUs []struct {
-			ID     string  `json:"id"`
-			Name   string  `json:"name"`
-			Memory float64 `json:"memory"`
-			Secure bool    `json:"secure"`
-			Price  struct {
+			ID           string  `json:"id"`
+			Name         string  `json:"name"`
+			Memory       float64 `json:"memory"`
+			Secure       bool    `json:"secure"`
+			Availability string  `json:"availability"`
+			Price        struct {
 				Secure float64 `json:"secure"`
 			} `json:"price"`
 		} `json:"gpus"`
 	}
-	if err := p.request(http.MethodGet, "/catalog/gpus", nil, &gpus); err != nil {
+	// Availability changes by the minute; it is a hint, not a promise.
+	if err := p.request(http.MethodGet, "/catalog/gpus?include=AVAILABILITY&product=POD&cloud=SECURE", nil, &gpus); err != nil {
 		return nil, err
 	}
 	var cpus struct {
@@ -327,7 +331,7 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 		}
 		options = append(options, runpodOption{
 			hardware: computeHardware{
-				name:   "cpu-" + runpodSlug(cpu.ID),
+				name:   runpodSlug(cpu.ID),
 				kind:   "CPU",
 				memory: fmt.Sprintf("%d vCPU, %g GB RAM", runpodCPUVcpus, cpu.RAMGbPerVcpu*runpodCPUVcpus),
 				rate:   fmt.Sprintf("$%.2f/h", hourly),
@@ -354,7 +358,7 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 			slug = fmt.Sprintf("%s-%dgb", slug, int(gpu.Memory))
 		}
 		seen[slug] = true
-		gpuOptions = append(gpuOptions, runpodOption{
+		option := runpodOption{
 			hardware: computeHardware{
 				name:   slug,
 				kind:   "GPU",
@@ -362,11 +366,26 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 				rate:   fmt.Sprintf("$%.2f/h", gpu.Price.Secure),
 				paid:   true,
 			},
-			hourly: gpu.Price.Secure,
-			gpuID:  gpu.ID,
-		})
+			hourly:    gpu.Price.Secure,
+			gpuID:     gpu.ID,
+			memoryGB:  gpu.Memory,
+			available: gpu.Availability != "NONE",
+		}
+		switch gpu.Availability {
+		case "NONE":
+			option.hardware.note = "none free"
+		case "LOW":
+			option.hardware.note = "few free"
+		}
+		gpuOptions = append(gpuOptions, option)
 	}
-	sort.Slice(gpuOptions, func(i, j int) bool { return gpuOptions[i].hardware.name < gpuOptions[j].hardware.name })
+	// Free GPUs first, each group by price.
+	sort.SliceStable(gpuOptions, func(i, j int) bool {
+		if gpuOptions[i].available != gpuOptions[j].available {
+			return gpuOptions[i].available
+		}
+		return gpuOptions[i].hourly < gpuOptions[j].hourly
+	})
 	options = append(options, gpuOptions...)
 
 	p.mu.Lock()
@@ -385,6 +404,29 @@ func (p *runpodProvider) hardware() ([]computeHardware, error) {
 		hardware[i] = option.hardware
 	}
 	return hardware, nil
+}
+
+// freeAlternatives names up to three cheapest GPUs that RunPod reports as
+// free, with at least the memory of the one that was not.
+func (p *runpodProvider) freeAlternatives(name string) string {
+	p.mu.Lock()
+	p.options = nil // availability is stale by now
+	p.mu.Unlock()
+	wanted, err := p.option(name)
+	if err != nil || wanted.gpuID == "" {
+		return ""
+	}
+	options, _ := p.hardwareOptions()
+	var names []string
+	for _, option := range options {
+		if option.gpuID != "" && option.available && option.memoryGB >= wanted.memoryGB && option.hardware.name != name {
+			names = append(names, fmt.Sprintf("%s (%s)", option.hardware.name, option.hardware.rate))
+			if len(names) == 3 {
+				break
+			}
+		}
+	}
+	return strings.Join(names, ", ")
 }
 
 func (p *runpodProvider) option(name string) (runpodOption, error) {
@@ -453,8 +495,11 @@ func (p *runpodProvider) upCommand(request upRequest) []string {
 	if env, ok := spec["env"].(map[string]string); ok && env["PUBLIC_KEY"] != "" {
 		env["PUBLIC_KEY"] = "<your ~/.ssh public key>"
 	}
-	data, _ := json.Marshal(spec)
-	return []string{"POST", runpodAPIBase + "/pods", string(data)}
+	var data bytes.Buffer
+	encoder := json.NewEncoder(&data)
+	encoder.SetEscapeHTML(false)
+	_ = encoder.Encode(spec)
+	return []string{"POST", runpodAPIBase + "/pods", strings.TrimSpace(data.String())}
 }
 
 // create starts a pod, waits until it can be reached over SSH, and installs
@@ -469,6 +514,11 @@ func (p *runpodProvider) create(request upRequest, stdout, stderr io.Writer) err
 	}
 	var pod runpodPod
 	if err := p.request(http.MethodPost, "/pods", spec, &pod); err != nil {
+		if strings.Contains(err.Error(), "none of that hardware is free") {
+			if alternatives := p.freeAlternatives(request.hardware.name); alternatives != "" {
+				err = fmt.Errorf("%w\nFree right now with at least as much memory: %s", err, alternatives)
+			}
+		}
 		return err
 	}
 	fmt.Fprintf(stdout, "Created pod %s; waiting for it to start (this can take a few minutes)...\n", pod.ID)
@@ -528,7 +578,7 @@ func (p *runpodProvider) installWatchdog(name string, lifetime time.Duration) er
 	}
 	script := fmt.Sprintf(`export $(tr '\0' '\n' < /proc/1/environ | grep '^RUNPOD_' | xargs)
 sleep %d
-runpodctl pod delete "$RUNPOD_POD_ID" || runpodctl remove pod "$RUNPOD_POD_ID" ||
+runpodctl remove pod "$RUNPOD_POD_ID" || runpodctl pod delete "$RUNPOD_POD_ID" ||
   curl -fsS -X DELETE -H "Authorization: Bearer $RUNPOD_API_KEY" "https://api.runpod.io/v2/pods/$RUNPOD_POD_ID"`,
 		int(lifetime.Seconds()))
 	command := "mkdir -p ~/.hi && cat > ~/.hi/watchdog.sh && (setsid nohup bash ~/.hi/watchdog.sh > ~/.hi/watchdog.log 2>&1 < /dev/null &)"
@@ -574,7 +624,7 @@ func (p *runpodProvider) hardwareName(pod runpodPod) string {
 	case pod.GPU != nil:
 		return runpodSlug(pod.GPU.ID)
 	case pod.CPU != nil:
-		return "cpu-" + runpodSlug(pod.CPU.ID)
+		return runpodSlug(pod.CPU.ID)
 	}
 	return "?"
 }

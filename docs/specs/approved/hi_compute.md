@@ -2,8 +2,7 @@
 
 Status: Approved for runs, instances, SSH, tunnels, logs, and serving on
 Colab, Hugging Face, and RunPod, in that order. Colab (v0.6.0) and Hugging
-Face (v0.7.0) are released; RunPod (v0.8.0) is implemented and awaits a live
-test.
+Face (v0.7.0) are released, and so is RunPod (v0.8.0).
 Everything marked **(draft)** is not yet approved: the full TUI, compute files,
 templates, file copy, SSH config integration, idle limits, and further
 providers.
@@ -206,9 +205,17 @@ CPU pods use 2 vCPUs. `up` waits until SSH is reachable, then installs a
 watchdog that terminates the pod at `--max` through the pod-scoped
 `RUNPOD_API_KEY`; the local watcher also runs, because the pod key's
 permissions are undocumented. `run` and `wait` are not supported yet. Errors
-map 402 to balance, 400 to no capacity, and 403 to key permissions.
+map 402 to balance, 400 to no capacity (with up to three free alternatives
+of at least the same memory), and 403 to key permissions. The catalog is read
+with `include=AVAILABILITY&product=POD&cloud=SECURE`; GPUs with free units are
+listed first.
 
-Not yet verified against a live account.
+Verified live on 2026-09-28: `up` on an RTX PRO 4000 (about 30 seconds to
+SSH), `ssh`, `tunnel`, `ls`, and the watchdog: the pod-scoped key can
+terminate its own pod with the bundled (older) `runpodctl remove pod`, and a
+CPU pod with `--max 3m` and no local watcher terminated itself on time. The
+bundled runpodctl lacks `pod delete`, so the watchdog tries `remove pod`
+first. Most cheap secure-cloud GPUs had no capacity during the test.
 
 ### Hugging Face Jobs API
 

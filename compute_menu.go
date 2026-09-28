@@ -370,8 +370,9 @@ func menuHardware(ui menuUI, provider computeProvider) (computeHardware, error) 
 	}
 	labels := make([]string, len(options))
 	for i, hardware := range options {
-		labels[i] = fmt.Sprintf("%-*s  %-4s %-*s  %s",
-			nameWidth, hardware.name, hardware.kind, memoryWidth, hardware.memory, hardware.rate)
+		labels[i] = fmt.Sprintf("%-*s  %-4s %-*s  %-9s %s",
+			nameWidth, hardware.name, hardware.kind, memoryWidth, hardware.memory, hardware.rate, hardware.note)
+		labels[i] = strings.TrimRight(labels[i], " ")
 	}
 	choice, err := ui.choose("Hardware", labels, len(options) > 10)
 	if err != nil {

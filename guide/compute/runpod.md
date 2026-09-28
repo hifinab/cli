@@ -7,9 +7,10 @@ description: Set up RunPod for hi compute - an API key, your SSH key, and how hi
 directly to start pods on its secure cloud, with SSH access and prices from
 RunPod's catalog.
 
-> RunPod support is new. It is tested against a simulated RunPod API; the first
-> runs against a real account may still need adjustments.
-{: .note}
+> RunPod's secure cloud often has no free units of its cheapest GPUs. The
+> `NOW` column shows what is free; if a start fails, `hi` suggests free GPUs
+> with at least as much memory.
+{: .tip}
 
 ## Set it up
 
@@ -59,8 +60,20 @@ hi compute hardware --on runpod
 
 RunPod's GPU names are shortened: `NVIDIA GeForce RTX 4090` becomes
 `rtx-4090`, `A100 PCIe` becomes `a100-pcie`. `hi compute hardware --on runpod`
-lists every GPU available in RunPod's secure cloud with its current price per
-hour, plus CPU pods with 2 vCPUs.
+lists CPU pods with 2 vCPUs (`cpu3c`, `cpu5g`, …), then every GPU in RunPod's
+secure cloud with its price per hour. GPUs with free units come first, marked
+`few free`; those with none are listed last as `none free`:
+
+```text
+PROVIDER  HARDWARE      KIND  MEMORY             RATE     NOW
+runpod    cpu3c         CPU   2 vCPU, 4 GB RAM   $0.06/h
+runpod    rtx-4000-ada  GPU   20 GB VRAM         $0.28/h  few free
+runpod    a40           GPU   48 GB VRAM         $0.49/h  few free
+...
+runpod    rtx-a4000     GPU   16 GB VRAM         $0.25/h  none free
+```
+
+Availability changes by the minute, so treat it as a hint.
 
 ```sh
 hi compute up --gpu rtx-4090 --name box --max 2
@@ -83,7 +96,8 @@ few minutes while RunPod pulls the image.
 RunPod pods have no built-in time limit, so `hi` enforces `--max` twice:
 
 - A small watchdog on the pod terminates it at the limit, using the pod's own
-  RunPod key. This works even when your laptop is off.
+  RunPod key and the `runpodctl` that RunPod puts in every pod. This works even
+  when your laptop is off.
 - The same local watcher as for Colab stops it from your laptop, and every
   `hi compute ls` checks too.
 

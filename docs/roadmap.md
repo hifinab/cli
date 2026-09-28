@@ -112,8 +112,6 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
 - [x] A bare `hi update` only installs a newer release, even while GitHub's
   latest-release redirect still points at the previous one.
 
-## Planned
-
 ### v0.8.0 — RunPod compute
 
 - [x] Add a RunPod driver through its REST API v2 (v1 retires on
@@ -121,11 +119,18 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
   `logs`, and `stop` (which terminates).
 - [x] Enforce `--max` with a watchdog on the pod as well as the local watcher.
 - [x] Add `hi login runpod`.
-- [ ] Verify against a live RunPod account. Needs an API key.
+- [x] Ask for the API key in `hi login runpod` and in the menu, and save it
+  in runpodctl's `~/.runpod/config.toml`.
+- [x] Show which GPUs are free and suggest free alternatives when a start
+  fails.
+- [x] Verify against a live RunPod account: SSH, tunnel, and a pod that
+  terminated itself at `--max` with no local watcher.
 - [ ] Runs to completion on RunPod.
   Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
 Dependency: extends the v0.6.0 and v0.7.0 driver interface.
+
+## Planned
 
 ### v0.9.0 — Authentication
 

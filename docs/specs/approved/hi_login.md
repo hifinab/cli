@@ -24,7 +24,7 @@ hi login colab
 
 `hi login runpod` has no native tool to delegate to, since runpodctl only
 stores a key it is given. It reads an API key without echo, checks it with
-`GET /v2/catalog/gpus`, and saves it as `apiKey` in runpodctl's
+`GET /v2/catalog/cpus`, and saves it as `apiKey` in runpodctl's
 `~/.runpod/config.toml` with mode 0600, keeping the file's other settings. The
 guided menu offers the same prompt when RunPod is chosen while signed out.
 

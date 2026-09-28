@@ -65,6 +65,8 @@ type computeHardware struct {
 	memory string
 	rate   string
 	paid   bool
+	// note is extra information such as "none free right now".
+	note string
 }
 
 type computeInstance struct {
@@ -314,15 +316,27 @@ func computeHardwareCommand(args []string, stdout, stderr io.Writer) error {
 	}
 	for _, provider := range providers {
 		table := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(table, "PROVIDER\tHARDWARE\tKIND\tMEMORY\tRATE")
 		options, err := provider.hardware()
 		if err != nil {
 			fmt.Fprintf(stderr, "hi: %s hardware: %v\n", provider.name(), err)
 			continue
 		}
+		notes := false
 		for _, hardware := range options {
-			fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n",
+			notes = notes || hardware.note != ""
+		}
+		header := "PROVIDER\tHARDWARE\tKIND\tMEMORY\tRATE"
+		if notes {
+			header += "\tNOW"
+		}
+		fmt.Fprintln(table, header)
+		for _, hardware := range options {
+			row := fmt.Sprintf("%s\t%s\t%s\t%s\t%s",
 				provider.name(), hardware.name, hardware.kind, hardware.memory, hardware.rate)
+			if notes {
+				row += "\t" + hardware.note
+			}
+			fmt.Fprintln(table, row)
 		}
 		table.Flush()
 		if account, err := provider.account(); err == nil && account != "" {

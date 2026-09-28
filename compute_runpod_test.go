@@ -62,9 +62,14 @@ func (f *fakeRunpod) serve(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/v2")
 	switch {
 	case path == "/catalog/gpus":
+		if r.URL.Query().Get("include") != "AVAILABILITY" {
+			writeJSON(400, map[string]any{"title": "the test expects availability to be requested"})
+			return
+		}
 		writeJSON(200, map[string]any{"gpus": []map[string]any{
-			{"id": "NVIDIA GeForce RTX 4090", "name": "RTX 4090", "memory": 24, "secure": true, "price": map[string]any{"secure": 0.69}},
-			{"id": "NVIDIA A100 80GB PCIe", "name": "A100 PCIe", "memory": 80, "secure": true, "price": map[string]any{"secure": 1.64}},
+			{"id": "NVIDIA GeForce RTX 4090", "name": "RTX 4090", "memory": 24, "secure": true, "availability": "HIGH", "price": map[string]any{"secure": 0.69}},
+			{"id": "NVIDIA A100 80GB PCIe", "name": "A100 PCIe", "memory": 80, "secure": true, "availability": "LOW", "price": map[string]any{"secure": 1.64}},
+			{"id": "NVIDIA RTX A4000", "name": "RTX A4000", "memory": 16, "secure": true, "availability": "NONE", "price": map[string]any{"secure": 0.25}},
 			{"id": "NVIDIA RTX A2000", "name": "RTX A2000", "memory": 6, "secure": false, "price": map[string]any{"secure": 0}},
 		}})
 	case path == "/catalog/cpus":
@@ -132,16 +137,24 @@ func TestRunpodHardwareHasShortNamesAndPrices(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
 	}
-	for _, want := range []string{"cpu-cpu3c", "2 vCPU, 4 GB RAM", "$0.06/h", "rtx-4090", "24 GB VRAM", "$0.69/h", "a100-pcie", "$1.64/h"} {
+	for _, want := range []string{"cpu3c", "2 vCPU, 4 GB RAM", "$0.06/h", "rtx-4090", "24 GB VRAM", "$0.69/h", "a100-pcie", "$1.64/h"} {
 		if !strings.Contains(stdout, want) {
 			t.Fatalf("hardware output missing %q:\n%s", want, stdout)
 		}
 	}
-	if strings.Contains(stdout, "a2000") {
+	if strings.Contains(stdout, "rtx-a2000") {
 		t.Fatalf("a GPU without secure-cloud capacity was listed:\n%s", stdout)
 	}
-	if strings.Index(stdout, "cpu-cpu3c") > strings.Index(stdout, "rtx-4090") {
+	if strings.Index(stdout, "cpu3c") > strings.Index(stdout, "rtx-4090") {
 		t.Fatal("CPU options should come first")
+	}
+	// Free GPUs come first by price; a GPU with none free comes last and says so.
+	if !(strings.Index(stdout, "rtx-4090") < strings.Index(stdout, "a100-pcie") &&
+		strings.Index(stdout, "a100-pcie") < strings.Index(stdout, "rtx-a4000")) {
+		t.Fatalf("GPUs are not ordered by availability, then price:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "NOW") || !strings.Contains(stdout, "few free") || !strings.Contains(stdout, "none free") {
+		t.Fatalf("availability is not shown:\n%s", stdout)
 	}
 }
 
@@ -212,9 +225,12 @@ func TestRunpodErrorsExplainBalanceAndCapacity(t *testing.T) {
 		t.Fatalf("402: exit code = %d, stderr = %s", code, stderr)
 	}
 	fake.failure = http.StatusBadRequest
-	code, _, stderr = runComputeTest("up", "--gpu", "rtx-4090", "--name", "busy", "--yes")
+	code, _, stderr = runComputeTest("up", "--gpu", "rtx-a4000", "--name", "busy", "--yes")
 	if code != 1 || !strings.Contains(stderr, "no capacity") || !strings.Contains(stderr, "try another --gpu") {
 		t.Fatalf("400: exit code = %d, stderr = %s", code, stderr)
+	}
+	if !strings.Contains(stderr, "Free right now with at least as much memory: rtx-4090 ($0.69/h), a100-pcie ($1.64/h)") {
+		t.Fatalf("no free alternatives were suggested:\n%s", stderr)
 	}
 }
 
