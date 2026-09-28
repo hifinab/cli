@@ -213,19 +213,12 @@ func providerBadge(provider string) string {
 }
 
 func (u *styledUI) choose(title string, options []string, filter bool) (int, error) {
-	choice := 0
-	huhOptions := make([]huh.Option[int], len(options))
-	for i, option := range options {
-		huhOptions[i] = huh.NewOption(option, i)
-	}
-	// Filtering is always available with "/"; Filtering(true) would start
-	// in filter mode instead.
-	field := huh.NewSelect[int]().Title(title).Options(huhOptions...).Value(&choice).
-		Height(min(len(options)+2, 16))
+	description := ""
 	if filter {
-		field = field.Description("Press / and type to filter, for example /a10")
+		description = "Press / and type to filter, for example /a10"
 	}
-	if err := u.run(field); err != nil {
+	choice, err := runListSelect(u.in, u.out, title, description, options)
+	if err != nil {
 		return 0, err
 	}
 	if !strings.HasSuffix(title, "?") {
