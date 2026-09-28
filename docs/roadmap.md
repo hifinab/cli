@@ -96,6 +96,12 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
 - [x] Accept bare hours for `--max`, and `--max none` for no limit after a
   confirmed warning.
 
+### v0.7.2 — Styled compute menu
+
+- [x] Give `hi compute`'s guided menu a styled terminal UI: arrow-key menus,
+  filtering, validated inputs, a record of each answer, and a cost summary
+  that defaults to No before anything starts.
+
 ## Planned
 
 ### v0.8.0 — RunPod compute
