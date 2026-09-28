@@ -325,6 +325,8 @@ func providerLabel(name string) string {
 		return "colab  Google Colab, prepaid compute units"
 	case "hf":
 		return "hf     Hugging Face Jobs, billed per minute"
+	case "runpod":
+		return "runpod RunPod pods, pay as you go"
 	}
 	return name
 }

@@ -6,8 +6,8 @@ description: Use the hi CLI to run work on rented remote machines (Google Colab,
 # hi
 
 `hi` is the Hifin command-line tool. Its `hi compute` commands rent remote
-machines from Colab or Hugging Face with the same commands on both, and give
-them back. Run `hi compute help` for the full reference; the user-facing guide
+machines from Colab, Hugging Face, or RunPod with the same commands on all of
+them, and give them back. Run `hi compute help` for the full reference; the user-facing guide
 is at https://hifin.sh/guide/ if the user needs step-by-step instructions.
 
 ## Rules
@@ -46,9 +46,12 @@ hi compute hardware --on hf
 
 Hardware names are the provider's own: Colab uses `cpu`, `T4`, `L4`, `G4`
 (96 GB), `A100`, `H100`; Hugging Face uses flavors such as `cpu-basic`,
-`t4-small`, `a10g-small`, `l40sx1`, `a100-large`, `rtx-pro-6000` (96 GB).
+`t4-small`, `a10g-small`, `l40sx1`, `a100-large`, `rtx-pro-6000` (96 GB);
+RunPod uses short GPU names such as `rtx-4090` and `a100-pcie` (see
+`hi compute hardware --on runpod`). RunPod supports `up`, `ssh`, `tunnel`,
+and `stop`, but not `run`.
 When both providers are signed in, the hardware name picks the provider;
-otherwise pass `--on colab` or `--on hf`.
+otherwise pass `--on colab`, `--on hf`, or `--on runpod`.
 
 `hi compute billing` shows which Hugging Face account pays (the user's own if
 it can pay, otherwise their only organization that can) and the Colab

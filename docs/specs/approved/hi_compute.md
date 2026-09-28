@@ -1,8 +1,9 @@
 # `hi compute` specification
 
 Status: Approved for runs, instances, SSH, tunnels, logs, and serving on
-Colab, Hugging Face, and RunPod, in that order. Colab is implemented and
-released (v0.6.0), and so is Hugging Face (v0.7.0).
+Colab, Hugging Face, and RunPod, in that order. Colab (v0.6.0) and Hugging
+Face (v0.7.0) are released; RunPod (v0.8.0) is implemented and awaits a live
+test.
 Everything marked **(draft)** is not yet approved: the full TUI, compute files,
 templates, file copy, SSH config integration, idle limits, and further
 providers.
@@ -185,6 +186,29 @@ Colab-specific rules:
 - SSH needs Colab Pro or Pro+ and a local `~/.ssh/id_ed25519` or
   `id_ecdsa`; `hi compute providers` says which is missing.
 - Colab's terms forbid public web services; tunnels bind to localhost only.
+
+### RunPod REST API v2
+
+RunPod is called through `https://api.runpod.io/v2` with a Bearer API key;
+REST v1 and GraphQL are deprecated (v1 retires on 2026-11-15). The key comes
+from `RUNPOD_API_KEY`, then `apiKey` in runpodctl's `~/.runpod/config.toml`.
+
+| `hi compute` | RunPod API v2                                                         |
+|--------------|-----------------------------------------------------------------------|
+| `hardware`   | `GET /catalog/gpus` (secure-cloud price per hour) and `/catalog/cpus` |
+| `up`         | `POST /pods` with `gpu` or `cpu`, `ports: ["22/tcp"]`, `startSsh`, and `env.PUBLIC_KEY` set to the user's key |
+| `ls`         | `GET /pods`, skipping `TERMINATED`; `env.HI_MANAGED=1` marks hi's pods |
+| `ssh`        | `ssh.direct` host and port once the pod is `RUNNING`                  |
+| `stop`       | `DELETE /pods/{id}` (terminate); a stopped pod would still bill disk  |
+
+Hardware names are short slugs of RunPod's names (`rtx-4090`, `a100-pcie`);
+CPU pods use 2 vCPUs. `up` waits until SSH is reachable, then installs a
+watchdog that terminates the pod at `--max` through the pod-scoped
+`RUNPOD_API_KEY`; the local watcher also runs, because the pod key's
+permissions are undocumented. `run` and `wait` are not supported yet. Errors
+map 402 to balance, 400 to no capacity, and 403 to key permissions.
+
+Not yet verified against a live account.
 
 ### Hugging Face Jobs API
 

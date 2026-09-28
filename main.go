@@ -78,7 +78,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runSkill(args[1:], stdout, stderr)
 	case "login":
 		if len(args) != 2 {
-			fmt.Fprintln(stderr, "usage: hi login <hf|colab>")
+			fmt.Fprintln(stderr, "usage: hi login <hf|colab|runpod>")
 			return 2
 		}
 		return exitCode(login(args[1], stdin, stdout, stderr), stderr)
@@ -111,8 +111,8 @@ Usage:
   hi net status                 Show NetBird connection status
   hi net down                   Disconnect NetBird
   hi net reconnect              Reconnect an enrolled NetBird peer
-  hi compute                    Start and use remote GPU machines (Colab, Hugging Face)
-  hi login <hf|colab>           Sign in to a compute provider
+  hi compute                    Start and use remote GPU machines (Colab, Hugging Face, RunPod)
+  hi login <hf|colab|runpod>    Sign in to a compute provider
   hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
   hi update [--check]           Update hi to the latest release

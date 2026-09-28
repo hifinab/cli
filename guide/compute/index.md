@@ -26,8 +26,7 @@ instances share `ls`, `status`, `logs`, `stop`, and the same limits.
 |-------------------------------------------------|------------------------------|---------------------------------------------------------------|
 | [Google Colab](/guide/compute/colab/)           | The Colab CLI                | Prepaid compute units on Pro+, 96 GB G4 GPUs, 176 GB RAM      |
 | [Hugging Face Jobs](/guide/compute/hugging-face/) | The Jobs REST API          | Pay per minute, any container image, detached runs, secrets, HTTPS endpoints |
-
-RunPod is next on the [roadmap](https://github.com/hifinab/cli/blob/main/docs/roadmap.md).
+| [RunPod](/guide/compute/runpod/)                | The REST API v2              | A wide range of GPUs, SSH straight into the pod, any container image |
 
 ```sh
 hi compute providers    # which providers are signed in
@@ -38,10 +37,10 @@ hi compute hardware     # every provider's hardware, memory, and price
 
 `hi` picks the provider in this order:
 
-1. `--on colab` or `--on hf` on the command.
+1. `--on colab`, `--on hf`, or `--on runpod` on the command.
 2. The `HI_COMPUTE_PROVIDER` environment variable.
 3. The hardware name: `--gpu G4` only exists on Colab, `--gpu a10g-small`
-   only on Hugging Face.
+   only on Hugging Face, `--gpu rtx-4090` only on RunPod.
 4. The only provider you are signed in to.
 
 If none of these decides, `hi` asks you to add `--on`.

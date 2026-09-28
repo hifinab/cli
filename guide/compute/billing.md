@@ -9,6 +9,7 @@ description: What remote compute costs on each provider, who pays, how hi asks b
 |--------------|-----------------------------------------------|-------------------------------|
 | Colab        | Prepaid compute units from your Colab plan    | `hi compute hardware --on colab`, `hi compute billing` |
 | Hugging Face | US dollars, billed per minute while a job runs | `hi compute hardware --on hf` |
+| RunPod       | US dollars from your account balance, while a pod exists | `hi compute hardware --on runpod` |
 
 Some real numbers from testing `hi`:
 
@@ -57,6 +58,8 @@ How the limit is enforced differs by provider:
   sessions after 24 hours regardless.
 - **Colab runs** pass `--max` to the Colab CLI as the run's timeout, and the
   runtime is released when the run ends.
+- **RunPod** has no built-in limit either. `hi` installs a watchdog on the pod
+  that terminates it at `--max`, and runs the local watcher as well.
 
 Choose the shortest `--max` that fits the work. You can always start another.
 

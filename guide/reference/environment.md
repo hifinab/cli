@@ -7,12 +7,13 @@ description: The environment variables hi reads and the files it writes.
 
 | Variable                | Used for                                                          |
 |-------------------------|-------------------------------------------------------------------|
-| `HI_COMPUTE_PROVIDER`   | Default provider for `hi compute`: `colab` or `hf`                |
+| `HI_COMPUTE_PROVIDER`   | Default provider for `hi compute`: `colab`, `hf`, or `runpod`     |
 | `HI_HF_NAMESPACE`       | Hugging Face account to bill; overrides `hi compute billing`      |
 | `HF_TOKEN`              | Hugging Face token; otherwise read from the token file            |
 | `HF_TOKEN_PATH`         | Where to find the Hugging Face token file                         |
 | `HF_HOME`               | Hugging Face folder; the token is `$HF_HOME/token`                |
 | `HF_ENDPOINT`           | Another Hugging Face API endpoint                                 |
+| `RUNPOD_API_KEY`        | RunPod API key; otherwise read from `~/.runpod/config.toml`       |
 | `HI_NETBIRD_SETUP_KEY`  | Setup key for `hi net` in scripts                                 |
 | `HI_INSTALL_DIR`        | Installer: where to put `hi`                                      |
 | `HI_VERSION`            | Installer: which release to install                               |
@@ -35,6 +36,7 @@ description: The environment variables hi reads and the files it writes.
 |---------------------------------------------|------------------------------------------------------|
 | `~/.cache/huggingface/token`                | The `hf` CLI's sign-in                               |
 | `~/.config/colab-cli/token.json`            | The Colab CLI's sign-in; `hi` only checks it exists  |
+| `~/.runpod/config.toml`                     | runpodctl's `apiKey`                                 |
 | `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa`      | Your SSH key, for shells and tunnels                 |
 
 `hi` never copies, prints, or stores provider tokens.

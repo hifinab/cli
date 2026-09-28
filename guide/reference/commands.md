@@ -8,7 +8,7 @@ description: Every hi command and option in one place.
 | Command                          | Does                                                   |
 |----------------------------------|--------------------------------------------------------|
 | `hi compute …`                   | Rent and use remote machines; see below                |
-| `hi login <hf\|colab>`           | Sign in to a compute provider                          |
+| `hi login <hf\|colab\|runpod>`   | Sign in to a compute provider                          |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install [strix]`             | Install the workstation software                       |
 | `hi verify strix`                | Check a Strix Halo workstation                         |
@@ -42,7 +42,7 @@ description: Every hi command and option in one place.
 
 | Option              | up | run | serve | Meaning                                              |
 |---------------------|----|-----|-------|------------------------------------------------------|
-| `--on <provider>`   | ✓  | ✓   | ✓     | `colab` or `hf`                                      |
+| `--on <provider>`   | ✓  | ✓   | ✓     | `colab`, `hf`, or `runpod`                           |
 | `--gpu <hardware>`  | ✓  | ✓   | ✓     | Hardware name from `hi compute hardware`             |
 | `--name <name>`     | ✓  | ✓   | ✓     | Name for later commands                              |
 | `--max <duration>`  | ✓  | ✓   | ✓     | Maximum lifetime: hours (`2`, `1.5`), `30m`, `2d`, or `none` (asks first) |
@@ -50,7 +50,7 @@ description: Every hi command and option in one place.
 | `--dry-run`         | ✓  | ✓   | ✓     | Show the request; start nothing                      |
 | `--namespace <ns>`  | ✓  | ✓   | ✓     | Hugging Face account to bill this once               |
 | `--high-mem`        | ✓  | ✓   |       | High-RAM machine (Colab)                             |
-| `--image <image>`   | ✓  |     |       | Container image (Hugging Face)                       |
+| `--image <image>`   | ✓  |     |       | Container image (Hugging Face, RunPod)               |
 | `--env KEY=VALUE`   |    | ✓   |       | Environment variable; repeatable                     |
 | `--secret KEY`      |    | ✓   |       | Encrypted secret from your shell (Hugging Face)      |
 | `--detach`          |    | ✓   |       | Return after starting (Hugging Face)                 |
@@ -69,6 +69,7 @@ after names for `logs`, `serve`, `stop`, and `billing`.
 ```sh
 hi login hf       # hf auth login, then hf auth whoami
 hi login colab    # the Colab CLI's browser sign-in, then the balance
+hi login runpod   # runpodctl doctor, or how to set RUNPOD_API_KEY
 ```
 
 ## hi skill

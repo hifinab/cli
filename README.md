@@ -38,8 +38,8 @@ hi net             Securely enroll this machine with NetBird
 hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
-hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face)
-hi login <hf|colab>  Sign in to a compute provider
+hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod)
+hi login <hf|colab|runpod>  Sign in to a compute provider
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
 hi update          Update hi to the latest release (--check, --version)
@@ -99,7 +99,7 @@ required.
 
 `hi compute` rents a remote machine, lets you use it as if it were local, and
 gives it back, with the same commands on every provider: Colab (through its
-CLI) and Hugging Face Jobs (through its API). RunPod is next. Run `hi compute`
+CLI), Hugging Face Jobs, and RunPod (through their APIs). Run `hi compute`
 in a terminal for a guided menu that prints the equivalent command for every
 step.
 
@@ -163,6 +163,20 @@ value from your environment as an encrypted job secret. `ssh` and `tunnel`
 need an SSH key registered at https://huggingface.co/settings/keys. A served
 model is reachable at `https://<job>--8000.hf.jobs/v1` with your Hugging Face
 token as the API key.
+
+### RunPod
+
+```sh
+hi login runpod                                  # API key from console.runpod.io
+hi compute hardware --on runpod                  # GPUs such as rtx-4090, with prices
+hi compute up --gpu rtx-4090 --name box --max 2  # SSH-able pod
+hi compute ssh box
+hi compute stop box                              # terminates the pod
+```
+
+RunPod pods have no built-in time limit, so `hi` installs a watchdog on the
+pod that terminates it at `--max`, besides its local watcher. `run` is not
+supported on RunPod yet.
 
 ### Colab
 

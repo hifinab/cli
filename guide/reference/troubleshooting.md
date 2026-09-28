@@ -40,6 +40,15 @@ what to do next.
 | `… is larger than 96 KB`                                    | Put the code in an image, or in a repository the script clones. |
 | `401` from an `…hf.jobs` URL                                | Send `Authorization: Bearer <your Hugging Face token>`.      |
 
+## RunPod
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `RunPod needs more account balance`                         | Add funds at console.runpod.io/user/billing.                 |
+| `none of that hardware is free right now`                   | Choose another `--gpu`.                                      |
+| `RunPod refused … read-only`                                | Create an API key with read and write access.                |
+| `runpod has no run-to-completion jobs yet`                  | Use `hi compute up --on runpod` and `hi compute ssh`.        |
+
 ## Shells and tunnels
 
 | Message                                                     | What to do                                                   |

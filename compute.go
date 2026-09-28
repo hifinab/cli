@@ -141,7 +141,7 @@ type computeRecord struct {
 }
 
 var (
-	computeProviders = []computeProvider{colabProvider{}, newHFProvider()}
+	computeProviders = []computeProvider{colabProvider{}, newHFProvider(), newRunpodProvider()}
 	computeNow       = time.Now
 	// startComputeWatcher is replaced in tests so no background process starts.
 	startComputeWatcher = spawnComputeWatcher
@@ -250,7 +250,7 @@ Usage:
   hi compute billing [ACCOUNT]        Show or choose who pays (Hugging Face)
 
 Options for up and run:
-  --on <provider>    colab or hf (default: inferred from --gpu, or
+  --on <provider>    colab, hf, or runpod (default: inferred from --gpu, or
                      $HI_COMPUTE_PROVIDER, or the only signed-in provider)
   --gpu <hardware>   Hardware name from hi compute hardware (default: CPU)
   --name <name>      Instance name (default: generated)
@@ -259,7 +259,7 @@ Options for up and run:
   --env KEY=VALUE    Environment variable for run; repeatable
   --secret KEY       Pass $KEY as an encrypted secret (Hugging Face)
   --detach           run: return after starting (Hugging Face)
-  --image <image>    Container image (Hugging Face)
+  --image <image>    Container image (Hugging Face, RunPod)
   --namespace <ns>   Account to bill this once (Hugging Face; see billing)
   --yes              Skip the cost confirmation
   --dry-run          Show what would happen without starting anything
@@ -270,7 +270,7 @@ Options for serve (plus --on, --gpu, --name, --max, --yes, --dry-run):
   --port <port>      Local port for the API (default 8080)
   --args "<args>"    Extra llama-server arguments
 
-Providers: colab, hf
+Providers: colab, hf, runpod
 Recipes:   qwen3.8-flash-next (Colab G4, Hugging Face rtx-pro-6000)`)
 }
 
@@ -453,8 +453,13 @@ func startInstance(
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 ) error {
-	if provider.name() == "colab" && (request.image != "" || request.namespace != "") {
+	switch {
+	case provider.name() == "colab" && (request.image != "" || request.namespace != ""):
 		return usageError{"--image and --namespace do not apply to Colab"}
+	case provider.name() != "colab" && request.highMem:
+		return usageError{"--high-mem applies to Colab only; choose larger --gpu hardware instead"}
+	case provider.name() != "hf" && request.namespace != "":
+		return usageError{"--namespace applies to Hugging Face only"}
 	}
 	records, err := loadComputeRecords()
 	if err != nil {

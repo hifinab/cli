@@ -65,7 +65,8 @@ func newFakeColab(t *testing.T) *fakeColab {
 	t.Setenv("HF_HOME", filepath.Join(directory, "hf"))
 	t.Setenv("HI_COMPUTE_PROVIDER", "")
 	previousProviders := computeProviders
-	computeProviders = []computeProvider{colabProvider{}, newHFProvider()}
+	computeProviders = []computeProvider{colabProvider{}, newHFProvider(), newRunpodProvider()}
+	t.Setenv("RUNPOD_API_KEY", "")
 	t.Cleanup(func() { computeProviders = previousProviders })
 
 	previous := startComputeWatcher

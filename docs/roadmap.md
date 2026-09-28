@@ -116,8 +116,13 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
 
 ### v0.8.0 — RunPod compute
 
-- [ ] Add a RunPod driver through its REST API, with the on-instance watchdog
-  RunPod needs for lifetime limits.
+- [x] Add a RunPod driver through its REST API v2 (v1 retires on
+  2026-11-15): hardware with prices, `up`, `ls`, `status`, `ssh`, `tunnel`,
+  `logs`, and `stop` (which terminates).
+- [x] Enforce `--max` with a watchdog on the pod as well as the local watcher.
+- [x] Add `hi login runpod`.
+- [ ] Verify against a live RunPod account. Needs an API key.
+- [ ] Runs to completion on RunPod.
   Approved spec: [hi_compute.md](specs/approved/hi_compute.md).
 
 Dependency: extends the v0.6.0 and v0.7.0 driver interface.
