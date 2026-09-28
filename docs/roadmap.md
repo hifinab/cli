@@ -102,6 +102,11 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
   filtering, validated inputs, a record of each answer, and a cost summary
   that defaults to No before anything starts.
 
+### v0.7.3 — Update without the GitHub API
+
+- [x] Find the latest release from GitHub's `/releases/latest` redirect, so
+  `hi update` works when the API's hourly limit for the network is used up.
+
 ## Planned
 
 ### v0.8.0 — RunPod compute

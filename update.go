@@ -93,7 +93,14 @@ func update(requested string, check bool, stdout io.Writer) error {
 	return nil
 }
 
+// latestRelease finds the newest release. GitHub redirects
+// /releases/latest to the release's tag page, which is not rate-limited like
+// the API (60 unauthenticated calls an hour per address); the API is the
+// fallback.
 func latestRelease() (string, error) {
+	if tag, err := latestReleaseFromRedirect(); err == nil {
+		return tag, nil
+	}
 	var release struct {
 		TagName string `json:"tag_name"`
 	}
@@ -106,6 +113,31 @@ func latestRelease() (string, error) {
 		return "", fmt.Errorf("find the latest release: unexpected answer from GitHub")
 	}
 	return release.TagName, nil
+}
+
+func latestReleaseFromRedirect() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	url := fmt.Sprintf("%s/%s/releases/latest", updateDownloadBase, updateRepository)
+	request, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)
+	if err != nil {
+		return "", err
+	}
+	request.Header.Set("User-Agent", "hi/"+version)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	response, err := client.Do(request)
+	if err != nil {
+		return "", err
+	}
+	response.Body.Close()
+	location := response.Header.Get("Location")
+	tag := location[strings.LastIndex(location, "/")+1:]
+	if response.StatusCode/100 != 3 || !strings.Contains(location, "/releases/tag/") || !releaseTagPattern.MatchString(tag) {
+		return "", fmt.Errorf("no release redirect (HTTP %d)", response.StatusCode)
+	}
+	return tag, nil
 }
 
 // updatablePath is the running binary, if hi may replace it: a regular file

@@ -17,12 +17,23 @@ import (
 // fakeReleases serves GitHub's latest-release API and release assets. Each
 // release's binary is a script that prints its version.
 func fakeReleases(t *testing.T, latest string, tamper bool) string {
+	return fakeReleasesWith(t, latest, tamper, true, nil)
+}
+
+// fakeReleasesWith can turn off the /releases/latest redirect and count API
+// calls, to test which way the latest release is found.
+func fakeReleasesWith(t *testing.T, latest string, tamper, redirect bool, apiCalls *int) string {
 	t.Helper()
 	asset := "hi-linux-" + runtime.GOARCH
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/repos/hifinab/cli/releases/latest":
+			if apiCalls != nil {
+				*apiCalls++
+			}
 			fmt.Fprintf(w, `{"tag_name": %q}`, latest)
+		case r.URL.Path == "/hifinab/cli/releases/latest" && redirect:
+			http.Redirect(w, r, "/hifinab/cli/releases/tag/"+latest, http.StatusFound)
 		case strings.HasPrefix(r.URL.Path, "/hifinab/cli/releases/download/"):
 			parts := strings.Split(r.URL.Path, "/")
 			tag, file := parts[5], parts[6]
@@ -188,5 +199,31 @@ func TestUpdateRefusesAnUnwritableDirectory(t *testing.T) {
 	}
 	if got := readTestFile(t, path); got != fakeBinary("v0.7.0") {
 		t.Fatal("the binary changed")
+	}
+}
+
+func TestUpdateFindsTheLatestReleaseWithoutTheAPI(t *testing.T) {
+	requireLinux(t)
+	calls := 0
+	fakeReleasesWith(t, "v0.9.0", false, true, &calls)
+	installedBinary(t, "v0.7.0")
+	if code, stdout, stderr := runUpdateTest("--check"); code != 0 || !strings.Contains(stdout, "v0.9.0 is available") {
+		t.Fatalf("exit code = %d, stdout = %s, stderr = %s", code, stdout, stderr)
+	}
+	if calls != 0 {
+		t.Fatalf("the rate-limited API was called %d times", calls)
+	}
+}
+
+func TestUpdateFallsBackToTheAPI(t *testing.T) {
+	requireLinux(t)
+	calls := 0
+	fakeReleasesWith(t, "v0.9.0", false, false, &calls)
+	installedBinary(t, "v0.7.0")
+	if code, stdout, stderr := runUpdateTest("--check"); code != 0 || !strings.Contains(stdout, "v0.9.0 is available") {
+		t.Fatalf("exit code = %d, stdout = %s, stderr = %s", code, stdout, stderr)
+	}
+	if calls != 1 {
+		t.Fatalf("API calls = %d, want the fallback to be used once", calls)
 	}
 }
