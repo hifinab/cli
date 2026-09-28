@@ -114,7 +114,7 @@ hi compute up --gpu T4 --name play        # start a machine (stops after 4h)
 hi compute ssh play                       # shell on it
 hi compute tunnel play 8000               # its port 8000 on 127.0.0.1:8000
 hi compute ls                             # what is running and when it stops
-hi compute stop play
+hi compute stop play                      # or just `hi compute stop` to pick from a list
 ```
 
 Serve a model with llama.cpp and get an OpenAI-compatible API on

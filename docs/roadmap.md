@@ -130,6 +130,11 @@ token-read exception in [hi_login.md](specs/approved/hi_login.md).
 
 Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 
+### v0.8.1 — Pick what to stop
+
+- [x] A bare `hi compute stop` lists what is running and stops the chosen
+  instance, or all of them, after confirming.
+
 ## Planned
 
 ### v0.9.0 — Authentication
