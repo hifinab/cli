@@ -92,8 +92,10 @@ Run `hi compute` with no arguments in a terminal for a guided menu:
   left; `no time limit` is highlighted.
 - Every provider is listed; choosing one you are not signed in to signs you
   in first (for RunPod, by asking for the API key).
-- Choose with the arrow keys and Enter. In long lists such as Hugging Face's
-  hardware, press `/` and type to filter, for example `/a10`.
+- Choose with the arrow keys and Enter; the list stays put and only the
+  marker moves. Long lists such as Hugging Face's hardware scroll only at the
+  edge. Press `/` and type to filter, for example `/a10`, and use number keys
+  to jump in short lists.
 - Text answers are checked as you type them, so a lifetime like `soon` is
   flagged before anything happens.
 - Each answer stays on screen as a `✔` line, so you can see the choices you

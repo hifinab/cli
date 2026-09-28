@@ -135,6 +135,11 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] A bare `hi compute stop` lists what is running and stops the chosen
   instance, or all of them, after confirming.
 
+### v0.8.2 — Steady menus
+
+- [x] Menu lists stay still while the cursor moves; long lists scroll only
+  at the edge.
+
 ## Planned
 
 ### v0.9.0 — Authentication
