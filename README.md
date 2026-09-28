@@ -147,8 +147,11 @@ hi compute up --gpu a10g-small --name box                # SSH-able GPU box
 hi compute serve qwen3.8-flash-next --on hf              # RTX PRO 6000, HTTPS URL
 ```
 
-Jobs need pre-paid credits on the account or organization that pays; bill an
-organization with `--namespace ORG` or `HI_HF_NAMESPACE`. `--secret` sends a
+Jobs need pre-paid credits on the account that pays. `hi` bills your own
+account if it can pay, otherwise your only organization that can, and names
+the payer before every paid start. `hi compute billing` lists your accounts
+and which can pay; `hi compute billing ORG` saves a choice, `--namespace ORG`
+overrides it for one command. `--secret` sends a
 value from your environment as an encrypted job secret. `ssh` and `tunnel`
 need an SSH key registered at https://huggingface.co/settings/keys. A served
 model is reachable at `https://<job>--8000.hf.jobs/v1` with your Hugging Face
@@ -175,13 +178,15 @@ about 9 compute units per hour.
 tokens.
 
 ```sh
-cd my-project && hi skill    # .agents/skills/hi/SKILL.md and .claude/skills/hi/SKILL.md
+cd my-project && hi skill    # .agents/skills/hi/SKILL.md, linked from .claude/skills/hi
 hi skill --global            # the same under ~, for every project
 hi skill --print             # just show it
 ```
 
-Commit the project copy so the whole team's agents get it, and rerun
-`hi skill` after updating `hi` to refresh it.
+The skill is written once in the Agent Skills folder that Codex and others
+read. Claude Code reads only `.claude/skills`, so `hi skill` makes that a
+relative symlink to the same folder. Commit both so the whole team's agents
+get it, and rerun `hi skill` after updating `hi` to refresh it.
 
 ## Workstation setup
 

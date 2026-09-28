@@ -187,6 +187,8 @@ func runCompute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(computeServeCommand(rest, stdin, stdout, stderr), stderr)
 	case "logs":
 		return exitCode(computeLogsCommand(rest, stdin, stdout, stderr), stderr)
+	case "billing":
+		return exitCode(computeBillingCommand(rest, stdout, stderr), stderr)
 	case "wait":
 		code, err := computeWaitCommand(rest, stdout, stderr)
 		if err != nil {
@@ -245,6 +247,7 @@ Usage:
   hi compute run [options] <image> -- <command...>
                                       Run to completion, streaming logs
   hi compute wait <name>...           Wait for detached runs to finish
+  hi compute billing [ACCOUNT]        Show or choose who pays (Hugging Face)
 
 Options for up and run:
   --on <provider>    colab or hf (default: inferred from --gpu, or
@@ -257,7 +260,7 @@ Options for up and run:
   --secret KEY       Pass $KEY as an encrypted secret (Hugging Face)
   --detach           run: return after starting (Hugging Face)
   --image <image>    Container image (Hugging Face)
-  --namespace <ns>   Account or organization to bill (Hugging Face)
+  --namespace <ns>   Account to bill this once (Hugging Face; see billing)
   --yes              Skip the cost confirmation
   --dry-run          Show what would happen without starting anything
 
@@ -461,9 +464,9 @@ func startInstance(
 	}
 
 	deadline := computeNow().Add(request.max)
-	fmt.Fprintf(stdout, "Start %s/%s on %s (%s), stopping after %s at %s.\n",
+	fmt.Fprintf(stdout, "Start %s/%s on %s (%s%s), stopping after %s at %s.\n",
 		provider.name(), request.name, request.hardware.name, request.hardware.rate,
-		formatDuration(request.max), deadline.Format("15:04"))
+		billedSuffix(provider, request.namespace), formatDuration(request.max), deadline.Format("15:04"))
 
 	if dryRun {
 		fmt.Fprintf(stdout, "Would run: %s\n", strings.Join(provider.upCommand(request), " "))
@@ -854,7 +857,7 @@ func computeTunnelCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 	// Catch Ctrl+C here so ssh ends but hi can still offer to stop the instance.
 	interrupts := make(chan os.Signal, 1)
 	signal.Notify(interrupts, os.Interrupt)
-	tunnelErr := runSSH(sshArgs, stdin, stdout, stderr)
+	tunnelErr := runTunnel(provider, name, sshArgs, stdin, stdout, stderr)
 	signal.Stop(interrupts)
 	fmt.Fprintln(stdout)
 
@@ -933,6 +936,42 @@ func computeProxyCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 		}
 	}
 	return fmt.Errorf("%s instances are reached directly; no proxy is needed", provider.name())
+}
+
+// tunnelCheckEvery is shortened in tests.
+var tunnelCheckEvery = 30 * time.Second
+
+// runTunnel runs ssh and ends it when the instance stops. Some gateways,
+// such as Hugging Face's, keep answering keep-alives after the job is gone,
+// so ssh alone would never notice.
+func runTunnel(provider computeProvider, name string, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	ssh, err := exec.LookPath("ssh")
+	if err != nil {
+		return errors.New("ssh is not installed; install openssh-client")
+	}
+	command := exec.Command(ssh, args...)
+	command.Stdin = stdin
+	command.Stdout = stdout
+	command.Stderr = stderr
+	if err := command.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	ticker := time.NewTicker(tunnelCheckEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-ticker.C:
+			if running, err := instanceRunning(provider, name); err == nil && !running {
+				_ = command.Process.Signal(syscall.SIGTERM)
+				<-done
+				return nil
+			}
+		}
+	}
 }
 
 func runSSH(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -1089,8 +1128,9 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	if what == "" {
 		what = request.image
 	}
-	fmt.Fprintf(stdout, "Run %s on %s %s (%s), stopping after %s.\n",
-		what, provider.name(), request.hardware.name, request.hardware.rate, formatDuration(request.max))
+	fmt.Fprintf(stdout, "Run %s on %s %s (%s%s), stopping after %s.\n",
+		what, provider.name(), request.hardware.name, request.hardware.rate,
+		billedSuffix(provider, request.namespace), formatDuration(request.max))
 	if *dryRun {
 		fmt.Fprintf(stdout, "Would run: %s\n", strings.Join(provider.runCommand(request), " "))
 		return 0, nil
@@ -1104,6 +1144,59 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		}
 	}
 	return provider.runJob(request, stdin, stdout, stderr)
+}
+
+// billedSuffix names the paying account for providers that bill one.
+func billedSuffix(provider computeProvider, namespace string) string {
+	biller, ok := provider.(interface{ billedTo(string) string })
+	if !ok {
+		return ""
+	}
+	if account := biller.billedTo(namespace); account != "" {
+		return ", billed to " + account
+	}
+	return ""
+}
+
+func computeBillingCommand(args []string, stdout, stderr io.Writer) error {
+	flags := newComputeFlags("billing", stderr)
+	clear := flags.Bool("clear", false, "choose the account automatically again")
+	positional, err := parseInterspersedFlags(flags, args)
+	if err != nil {
+		return err
+	}
+	if len(positional) > 1 || (*clear && len(positional) == 1) {
+		return usageError{"usage: hi compute billing [ACCOUNT | --clear]"}
+	}
+	choice := ""
+	if len(positional) == 1 {
+		choice = positional[0]
+	}
+	for _, provider := range computeProviders {
+		if status := provider.check(); !status.installed || !status.signedIn {
+			continue
+		}
+		if hf, ok := provider.(*hfProvider); ok {
+			fmt.Fprintln(stdout, "Hugging Face:")
+			if err := hf.billing(choice, *clear, stdout); err != nil {
+				return err
+			}
+			if choice != "" || *clear {
+				return nil
+			}
+			fmt.Fprintln(stdout)
+			continue
+		}
+		if choice == "" && !*clear {
+			if account, err := provider.account(); err == nil && account != "" {
+				fmt.Fprintf(stdout, "%s\n\n", account)
+			}
+		}
+	}
+	if choice != "" || *clear {
+		return errors.New("choosing an account applies to Hugging Face; sign in with `hi login hf`")
+	}
+	return nil
 }
 
 func computeWaitCommand(args []string, stdout, stderr io.Writer) (int, error) {

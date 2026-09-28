@@ -23,28 +23,48 @@ func runSkillIn(t *testing.T, directory string, args ...string) (int, string, st
 	return code, stdout.String(), stderr.String()
 }
 
-func TestSkillWritesForCodexAndClaudeInTheCurrentFolder(t *testing.T) {
+func TestSkillWritesOnceAndLinksItForClaudeCode(t *testing.T) {
 	project := t.TempDir()
 	code, stdout, stderr := runSkillIn(t, project)
 	if code != 0 {
 		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
 	}
-	for _, directory := range []string{".agents/skills/hi", ".claude/skills/hi"} {
-		path := filepath.Join(project, directory, "SKILL.md")
-		content := readTestFile(t, path)
-		if !strings.HasPrefix(content, "---\nname: hi\ndescription: ") {
-			t.Fatalf("%s does not start with skill frontmatter:\n%s", path, content[:80])
-		}
-		if !strings.Contains(content, skillMarker+" "+version) || !strings.Contains(content, "Ask before spending") {
-			t.Fatalf("%s lacks the version marker or the rules", path)
-		}
-		if !strings.Contains(stdout, path) {
-			t.Fatalf("output does not name %s:\n%s", path, stdout)
-		}
+	path := filepath.Join(project, ".agents", "skills", "hi", "SKILL.md")
+	content := readTestFile(t, path)
+	if !strings.HasPrefix(content, "---\nname: hi\ndescription: ") {
+		t.Fatalf("%s does not start with skill frontmatter", path)
 	}
-	// Rerunning updates the files hi wrote.
+	if !strings.Contains(content, skillMarker+" "+version) || !strings.Contains(content, "Ask before spending") {
+		t.Fatalf("%s lacks the version marker or the rules", path)
+	}
+	link := filepath.Join(project, ".claude", "skills", "hi")
+	if target, err := os.Readlink(link); err != nil || target != "../../.agents/skills/hi" {
+		t.Fatalf("%s is not a relative link to the skill: %q, %v", link, target, err)
+	}
+	if readTestFile(t, filepath.Join(link, "SKILL.md")) != content {
+		t.Fatal("Claude Code's path does not resolve to the same skill")
+	}
+	if !strings.Contains(stdout, path) || !strings.Contains(stdout, link) {
+		t.Fatalf("output does not name both paths:\n%s", stdout)
+	}
+	// Rerunning updates the file and keeps the link.
 	if code, _, stderr := runSkillIn(t, project); code != 0 {
 		t.Fatalf("rerun failed: %s", stderr)
+	}
+}
+
+func TestSkillReplacesAFolderFromAnEarlierHiSkillWithTheLink(t *testing.T) {
+	project := t.TempDir()
+	old := filepath.Join(project, ".claude", "skills", "hi", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(old), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, old, "---\nname: hi\n---\n"+skillMarker+" v0.7.0 -->\n", 0o644)
+	if code, _, stderr := runSkillIn(t, project); code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	if info, err := os.Lstat(filepath.Join(project, ".claude", "skills", "hi")); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("the old folder was not replaced by a link")
 	}
 }
 
@@ -75,7 +95,7 @@ func TestSkillGlobalAndPrint(t *testing.T) {
 	}
 	for _, directory := range []string{".agents/skills/hi", ".claude/skills/hi"} {
 		if _, err := os.Stat(filepath.Join(home, directory, "SKILL.md")); err != nil {
-			t.Fatalf("--global did not write %s: %v", directory, err)
+			t.Fatalf("--global did not provide %s: %v", directory, err)
 		}
 	}
 	project := t.TempDir()

@@ -45,8 +45,14 @@ Hardware names are the provider's own: Colab uses `cpu`, `T4`, `L4`, `G4`
 (96 GB), `A100`, `H100`; Hugging Face uses flavors such as `cpu-basic`,
 `t4-small`, `a10g-small`, `l40sx1`, `a100-large`, `rtx-pro-6000` (96 GB).
 When both providers are signed in, the hardware name picks the provider;
-otherwise pass `--on colab` or `--on hf`. Hugging Face bills the namespace in
-`--namespace` or `$HI_HF_NAMESPACE`, else the user's own account.
+otherwise pass `--on colab` or `--on hf`.
+
+`hi compute billing` shows which Hugging Face account pays (the user's own if
+it can pay, otherwise their only organization that can) and the Colab
+compute-unit balance. The start line of every paid command names the payer,
+as in `($1.00/h, billed to hifinab)`; include it when you ask the user.
+Changing the saved payer with `hi compute billing ACCOUNT` is the user's
+decision.
 
 If a provider is not ready, tell the user the fix rather than working around
 it: `hi login hf`, `hi login colab`, or `hi install`.
@@ -125,7 +131,7 @@ hi compute stop <name>
 | Message                                       | Meaning and fix                                                    |
 |-----------------------------------------------|--------------------------------------------------------------------|
 | `confirmation needed; rerun with --yes`       | Paid hardware: get the user's yes, then add `--yes`.               |
-| `Hugging Face Jobs need pre-paid credits`     | Add credits, or bill an organization with `--namespace ORG`.        |
+| `Hugging Face Jobs need pre-paid credits`     | Tell the user; `hi compute billing` shows which account can pay.   |
 | `several providers are ready`                 | Add `--on colab` or `--on hf`, or a provider-specific `--gpu`.     |
 | `Permission denied (publickey)` on Hugging Face | The SSH key is not registered on the Hub account.                |
 | `unknown ... hardware`                        | Use a name from `hi compute hardware`.                             |

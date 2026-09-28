@@ -79,11 +79,16 @@ which SSH requires.
 Dependencies: the v0.6.0 driver interface, state, and SSH layer; the
 token-read exception in [hi_login.md](specs/approved/hi_login.md).
 
-### v0.7.1 — Agent skill
+### v0.7.1 — Agent skill and billing
 
 - [x] Write a `hi` agent skill for Claude Code and Codex with `hi skill`,
-  into the current folder or, with `--global`, the home folder.
+  into the current folder or, with `--global`, the home folder; one copy in
+  `.agents/skills`, linked from `.claude/skills`.
   Approved spec: [hi_skill.md](specs/approved/hi_skill.md).
+- [x] Choose who pays for Hugging Face Jobs automatically, and show or save
+  it with `hi compute billing`.
+- [x] Close tunnels whose instance was stopped even when the SSH gateway
+  stays up; verify Hugging Face SSH and tunnels live.
 
 ## Planned
 

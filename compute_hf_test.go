@@ -27,6 +27,9 @@ type fakeHF struct {
 	finalStage string
 	logLines   []string
 	nextID     int
+	// userCanPay and orgs shape the whoami answer; alice pays by default.
+	userCanPay bool
+	orgs       []map[string]any
 }
 
 func newFakeHF(t *testing.T) *fakeHF {
@@ -36,6 +39,7 @@ func newFakeHF(t *testing.T) *fakeHF {
 		jobs:       map[string]map[string]any{},
 		namespaces: map[string]string{},
 		finalStage: "COMPLETED",
+		userCanPay: true,
 		logLines:   []string{"===== Job started =====", "hello from the job"},
 	}
 	server := httptest.NewServer(http.HandlerFunc(fake.serve))
@@ -50,6 +54,7 @@ func newFakeHF(t *testing.T) *fakeHF {
 	t.Setenv("HF_ENDPOINT", server.URL)
 	t.Setenv("HF_TOKEN", fakeHFToken)
 	t.Setenv("HI_HF_NAMESPACE", "")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(t.TempDir(), "config"))
 	previous := hfPollEvery
 	hfPollEvery = time.Millisecond
 	t.Cleanup(func() { hfPollEvery = previous })
@@ -70,7 +75,11 @@ func (f *fakeHF) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case r.URL.Path == "/api/whoami-v2":
-		writeJSON(map[string]string{"name": "alice"})
+		orgs := f.orgs
+		if orgs == nil {
+			orgs = []map[string]any{}
+		}
+		writeJSON(map[string]any{"name": "alice", "canPay": f.userCanPay, "orgs": orgs})
 	case r.URL.Path == "/api/jobs/hardware":
 		writeJSON([]map[string]any{
 			{"name": "cpu-basic", "ram": "16 GB", "unitCostUSD": 0.000167, "unitLabel": "minute"},
@@ -260,7 +269,7 @@ func TestHFRunDetachAndWait(t *testing.T) {
 func TestHFPaymentRequiredExplainsCreditsAndNamespace(t *testing.T) {
 	newFakeHF(t)
 	code, stdout, stderr := runComputeTest("run", "--on", "hf", "--namespace", "broke", "python:3.12", "--", "true")
-	if code != 1 || !strings.Contains(stderr, "pre-paid credits") || !strings.Contains(stderr, "--namespace ORG") {
+	if code != 1 || !strings.Contains(stderr, "pre-paid credits") || !strings.Contains(stderr, "hi compute billing ORG") {
 		t.Fatalf("exit code = %d, stderr = %s", code, stderr)
 	}
 	requireNoToken(t, stdout, stderr)
@@ -397,5 +406,62 @@ func TestHFTokenIsReadFromHFHome(t *testing.T) {
 	t.Setenv("HF_TOKEN", "hf_from_env")
 	if got := hfToken(); got != "hf_from_env" {
 		t.Fatalf("HF_TOKEN did not take precedence: %q", got)
+	}
+}
+
+func TestHFBillsTheOnlyOrganizationThatCanPay(t *testing.T) {
+	fake := newFakeHF(t)
+	fake.userCanPay = false
+	fake.orgs = []map[string]any{
+		{"name": "hobby", "canPay": false, "plan": ""},
+		{"name": "team", "canPay": true, "plan": "team"},
+	}
+	code, stdout, stderr := runComputeTest("run", "--on", "hf", "python:3.12", "--", "true")
+	if code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "billed to team") || !strings.Contains(stdout, "/jobs/team/") {
+		t.Fatalf("the paying organization was not billed:\n%s", stdout)
+	}
+}
+
+func TestHFBillingCommandListsAndSavesTheChoice(t *testing.T) {
+	fake := newFakeHF(t)
+	fake.orgs = []map[string]any{{"name": "team", "canPay": true, "plan": "team"}}
+
+	code, stdout, stderr := runComputeTest("billing")
+	if code != 0 {
+		t.Fatalf("exit code = %d; stderr: %s", code, stderr)
+	}
+	for _, want := range []string{"alice", "team", "yes", "<- hi bills this", "automatic"} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("billing output missing %q:\n%s", want, stdout)
+		}
+	}
+
+	if code, _, stderr := runComputeTest("billing", "nobody"); code != 1 || !strings.Contains(stderr, "not your account") {
+		t.Fatalf("unknown account: exit code = %d, stderr = %s", code, stderr)
+	}
+	if code, stdout, _ := runComputeTest("billing", "team"); code != 0 || !strings.Contains(stdout, "now bill team") {
+		t.Fatalf("saving the choice failed:\n%s", stdout)
+	}
+	code, stdout, _ = runComputeTest("run", "--on", "hf", "python:3.12", "--", "true")
+	if code != 0 || !strings.Contains(stdout, "billed to team") {
+		t.Fatalf("the saved choice was not used:\n%s", stdout)
+	}
+	// An explicit namespace still wins for one job, and the env var beats the saved choice.
+	if _, stdout, _ = runComputeTest("run", "--on", "hf", "--namespace", "alice", "--dry-run", "python:3.12", "--", "true"); !strings.Contains(stdout, "billed to alice") {
+		t.Fatalf("--namespace did not win:\n%s", stdout)
+	}
+	t.Setenv("HI_HF_NAMESPACE", "alice")
+	if _, stdout, _ = runComputeTest("run", "--on", "hf", "--dry-run", "python:3.12", "--", "true"); !strings.Contains(stdout, "billed to alice") {
+		t.Fatalf("HI_HF_NAMESPACE did not win over the saved choice:\n%s", stdout)
+	}
+	t.Setenv("HI_HF_NAMESPACE", "")
+	if code, stdout, _ := runComputeTest("billing", "--clear"); code != 0 || !strings.Contains(stdout, "automatic again") {
+		t.Fatalf("--clear failed:\n%s", stdout)
+	}
+	if config, _ := loadComputeConfig(); config.HFNamespace != "" {
+		t.Fatalf("--clear left %q saved", config.HFNamespace)
 	}
 }

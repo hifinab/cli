@@ -18,12 +18,17 @@ hi skill --print    Print it without writing anything
 hi skill --force    Replace a hi skill that hi did not write
 ```
 
-`hi skill` writes the same `SKILL.md` to both places agents look:
+`hi skill` writes `SKILL.md` once and links it where Claude Code looks:
 
-| Path                           | Read by                                   |
-|--------------------------------|-------------------------------------------|
-| `.agents/skills/hi/SKILL.md`   | Codex and other Agent Skills readers      |
-| `.claude/skills/hi/SKILL.md`   | Claude Code                               |
+| Path                           | What                        | Read by                               |
+|--------------------------------|-----------------------------|---------------------------------------|
+| `.agents/skills/hi/SKILL.md`   | The skill                   | Codex and other Agent Skills readers  |
+| `.claude/skills/hi`            | Symlink to `../../.agents/skills/hi` | Claude Code                  |
+
+Claude Code follows the Agent Skills file format but, as of 2.1.283, only
+discovers skills in `.claude/skills`; a folder holding only
+`.agents/skills/hi` was not found, and the symlink was. A `.claude/skills/hi`
+folder from an earlier `hi skill` is replaced by the link.
 
 `--global` uses the same paths under `$HOME`. A project copy can be committed
 so the whole team's agents get it.

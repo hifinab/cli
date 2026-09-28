@@ -17,12 +17,14 @@ var hiSkill []byte
 
 const skillMarker = "<!-- Written by hi"
 
-// skillDirectories are where agents look for skills, relative to a project
-// or home directory: Codex and the Agent Skills standard, then Claude Code.
-var skillDirectories = []string{
-	filepath.Join(".agents", "skills", "hi"),
-	filepath.Join(".claude", "skills", "hi"),
-}
+// The skill is written once in the Agent Skills location that Codex and
+// others read. Claude Code (2.1.283) only reads .claude/skills, so that
+// location is a relative symlink to the same folder.
+var (
+	skillDirectory    = filepath.Join(".agents", "skills", "hi")
+	claudeSkillLink   = filepath.Join(".claude", "skills", "hi")
+	claudeSkillTarget = filepath.Join("..", "..", ".agents", "skills", "hi")
+)
 
 func runSkill(args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("hi skill", flag.ContinueOnError)
@@ -75,24 +77,53 @@ func skillContent() []byte {
 }
 
 func writeSkill(base string, force bool) ([]string, error) {
-	content := skillContent()
 	var written []string
-	for _, directory := range skillDirectories {
-		path := filepath.Join(base, directory, "SKILL.md")
-		existing, err := os.ReadFile(path)
-		if err == nil && !force && !strings.Contains(string(existing), skillMarker) {
-			return written, fmt.Errorf("%s exists and was not written by hi; rerun with --force to replace it", path)
-		}
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return written, err
-		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return written, err
-		}
-		if err := os.WriteFile(path, content, 0o644); err != nil {
-			return written, err
-		}
-		written = append(written, path)
+	path := filepath.Join(base, skillDirectory, "SKILL.md")
+	if err := checkSkillOwner(path, force); err != nil {
+		return written, err
 	}
-	return written, nil
+	link := filepath.Join(base, claudeSkillLink)
+	if info, err := os.Lstat(link); err == nil && info.Mode()&os.ModeSymlink == 0 {
+		// A folder, from an earlier hi skill or written by hand.
+		if err := checkSkillOwner(filepath.Join(link, "SKILL.md"), force); err != nil {
+			return written, err
+		}
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return written, err
+	}
+	if err := os.WriteFile(path, skillContent(), 0o644); err != nil {
+		return written, err
+	}
+	written = append(written, path)
+
+	if target, err := os.Readlink(link); err == nil && target == claudeSkillTarget {
+		return append(written, link+" -> "+claudeSkillTarget), nil
+	}
+	if err := os.RemoveAll(link); err != nil {
+		return written, err
+	}
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		return written, err
+	}
+	if err := os.Symlink(claudeSkillTarget, link); err != nil {
+		return written, err
+	}
+	return append(written, link+" -> "+claudeSkillTarget), nil
+}
+
+// checkSkillOwner refuses to replace a skill file hi did not write.
+func checkSkillOwner(path string, force bool) error {
+	existing, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) || force {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(string(existing), skillMarker) {
+		return fmt.Errorf("%s exists and was not written by hi; rerun with --force to replace it", path)
+	}
+	return nil
 }

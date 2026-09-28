@@ -511,3 +511,26 @@ func TestComputeTunnelReportsDroppedConnectionToRunningInstance(t *testing.T) {
 		t.Fatalf("exit code = %d, stderr = %s; want the ssh failure", code, stderr)
 	}
 }
+
+func TestComputeTunnelClosesWhenTheInstanceStopsButSSHStaysUp(t *testing.T) {
+	fake := newFakeColab(t)
+	fake.setSessions("[qwen] ep1 | Hardware: G4 | Shape: Standard | Variant: GPU")
+	// This ssh never exits on its own, like a gateway that outlives the job.
+	writeTestFile(t, filepath.Join(fake.directory, "bin", "ssh"), "#!/bin/sh\nexec sleep 30\n", 0o755)
+	previous := tunnelCheckEvery
+	tunnelCheckEvery = 20 * time.Millisecond
+	t.Cleanup(func() { tunnelCheckEvery = previous })
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		fake.setSessions("[colab] No active sessions found on server.")
+	}()
+
+	start := time.Now()
+	code, stdout, stderr := runComputeTest("tunnel", "qwen", "8000")
+	if code != 0 || !strings.Contains(stdout, "Tunnel closed: qwen is no longer running.") {
+		t.Fatalf("exit code = %d, stdout = %s, stderr = %s", code, stdout, stderr)
+	}
+	if elapsed := time.Since(start); elapsed > 10*time.Second {
+		t.Fatalf("the tunnel took %s to close", elapsed)
+	}
+}

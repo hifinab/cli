@@ -212,9 +212,15 @@ Rules:
   limit itself and no local watcher runs. Jobs are labelled
   `name=<hi name>` and `managed-by=hi`; `ls`, `stop`, and `logs` find jobs by
   that label or by job ID (`hf/<id>`).
-- The namespace is `--namespace`, then `HI_HF_NAMESPACE`, then the signed-in
-  user. `ls` covers the user, `HI_HF_NAMESPACE`, and every namespace `hi`
-  started an instance in.
+- The account that pays is `--namespace`, then `HI_HF_NAMESPACE`, then the
+  account saved with `hi compute billing ACCOUNT` (in
+  `~/.config/hi/compute.json`), then the user if `whoami` reports `canPay`,
+  then the user's only organization that can pay, else the user. The API
+  reports `canPay` per account but not the credit balance. Every paid start
+  line names the payer. `hi compute billing` lists the accounts, which can
+  pay, and why one was chosen; `--clear` returns to automatic.
+- `ls` covers the user, the billed account, `HI_HF_NAMESPACE`, and every
+  namespace `hi` started an instance in.
 - Scripts are shipped base64-encoded in the job's environment and decoded by
   the job's command, instead of uploading them to a bucket as the `hf` CLI
   does. Scripts are limited to 96 KB.
@@ -254,8 +260,12 @@ image's entrypoint, `llama-server -hf` downloads inside the image, and the
 exposed endpoint answers 401 without a token. The whole test cost under
 $0.05.
 
-Not yet verified: `ssh` and `tunnel` through the Jobs SSH gateway, because the
-test key was not registered on the account.
+On 2026-09-28, with the user's key registered: `ssh` through the Jobs SSH
+gateway and a `tunnel` to a web server on the job both work. The gateway keeps
+answering keep-alives after a job is cancelled, so `tunnel` also checks every
+30 seconds that the instance still runs and closes itself (26 seconds after
+`stop` in the live test). Automatic billing chose `hifinab`, the only account
+that can pay.
 
 ### Phasing
 

@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 )
 
@@ -40,10 +41,23 @@ var hfPollEvery = 5 * time.Second
 // hfProvider runs Hugging Face Jobs through the documented Jobs REST API
 // (https://huggingface.co/api/jobs); the hf CLI is only used to sign in.
 type hfProvider struct {
-	mu        sync.Mutex
-	user      string
-	flavors   []hfFlavor
-	namespace string
+	mu       sync.Mutex
+	signedIn *hfAccount
+	flavors  []hfFlavor
+}
+
+// hfAccount is the signed-in user and the organizations they belong to.
+// canPay says whether an account can be billed for Jobs; the API does not
+// report the credit balance itself.
+type hfAccount struct {
+	Name   string `json:"name"`
+	CanPay bool   `json:"canPay"`
+	Orgs   []struct {
+		Name      string `json:"name"`
+		CanPay    bool   `json:"canPay"`
+		Plan      string `json:"plan"`
+		RoleInOrg string `json:"roleInOrg"`
+	} `json:"orgs"`
 }
 
 type hfFlavor struct {
@@ -194,30 +208,39 @@ func (p *hfProvider) apiError(status int, data []byte) error {
 		return errors.New("Hugging Face rejected the token; run `hi login hf` again")
 	case http.StatusPaymentRequired:
 		return fmt.Errorf("Hugging Face Jobs need pre-paid credits: %s\n"+
-			"Add credits at https://huggingface.co/settings/billing, or bill an organization with --namespace ORG", message)
+			"Add credits at https://huggingface.co/settings/billing, or bill an organization that can pay:\n"+
+			"see `hi compute billing`, then `hi compute billing ORG`", message)
 	case http.StatusForbidden:
 		return fmt.Errorf("Hugging Face refused: %s (check --namespace and the token's permissions)", message)
 	}
 	return fmt.Errorf("Hugging Face API returned %d: %s", status, message)
 }
 
-func (p *hfProvider) whoami() (string, error) {
+func (p *hfProvider) whoamiAccount() (*hfAccount, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.user != "" {
-		return p.user, nil
+	if p.signedIn != nil {
+		return p.signedIn, nil
 	}
-	var result struct {
-		Name string `json:"name"`
+	var account hfAccount
+	if err := p.request(http.MethodGet, "/api/whoami-v2", nil, &account); err != nil {
+		return nil, err
 	}
-	if err := p.request(http.MethodGet, "/api/whoami-v2", nil, &result); err != nil {
-		return "", err
-	}
-	p.user = result.Name
-	return p.user, nil
+	p.signedIn = &account
+	return p.signedIn, nil
 }
 
-// defaultNamespace is --namespace, then HI_HF_NAMESPACE, then the user.
+func (p *hfProvider) whoami() (string, error) {
+	account, err := p.whoamiAccount()
+	if err != nil {
+		return "", err
+	}
+	return account.Name, nil
+}
+
+// defaultNamespace picks who pays: --namespace, then HI_HF_NAMESPACE, then
+// the account saved with `hi compute billing`, then the user if they can pay,
+// then their only organization that can pay, else the user.
 func (p *hfProvider) defaultNamespace(requested string) (string, error) {
 	if requested != "" {
 		return requested, nil
@@ -225,7 +248,35 @@ func (p *hfProvider) defaultNamespace(requested string) (string, error) {
 	if configured := os.Getenv("HI_HF_NAMESPACE"); configured != "" {
 		return configured, nil
 	}
-	return p.whoami()
+	if config, err := loadComputeConfig(); err == nil && config.HFNamespace != "" {
+		return config.HFNamespace, nil
+	}
+	account, err := p.whoamiAccount()
+	if err != nil {
+		return "", err
+	}
+	if account.CanPay {
+		return account.Name, nil
+	}
+	var paying []string
+	for _, org := range account.Orgs {
+		if org.CanPay {
+			paying = append(paying, org.Name)
+		}
+	}
+	if len(paying) == 1 {
+		return paying[0], nil
+	}
+	return account.Name, nil
+}
+
+// billedTo names the account a new job would bill, for confirmations.
+func (p *hfProvider) billedTo(requested string) string {
+	namespace, err := p.defaultNamespace(requested)
+	if err != nil {
+		return ""
+	}
+	return namespace
 }
 
 func (p *hfProvider) hardware() ([]computeHardware, error) {
@@ -462,6 +513,9 @@ func (p *hfProvider) namespaces() ([]string, error) {
 		}
 	}
 	add(os.Getenv("HI_HF_NAMESPACE"))
+	if billed, err := p.defaultNamespace(""); err == nil {
+		add(billed)
+	}
 	if records, err := loadComputeRecords(); err == nil {
 		for _, record := range records {
 			if record.Provider == "hf" {
@@ -864,4 +918,72 @@ func (p *hfProvider) serverURL(name string) (string, error) {
 		return "", fmt.Errorf("%s exposes no port", name)
 	}
 	return strings.TrimRight(job.Status.ExposeURLs[0], "/"), nil
+}
+
+// billing prints the user's accounts, or saves which one to bill.
+func (p *hfProvider) billing(choice string, clear bool, stdout io.Writer) error {
+	account, err := p.whoamiAccount()
+	if err != nil {
+		return err
+	}
+	if clear {
+		if err := saveHFNamespace(""); err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, "Hugging Face billing is automatic again.")
+		choice = ""
+	} else if choice != "" {
+		known, canPay := choice == account.Name, account.CanPay
+		for _, org := range account.Orgs {
+			if org.Name == choice {
+				known, canPay = true, org.CanPay
+			}
+		}
+		if !known {
+			return fmt.Errorf("%s is not your account or one of your organizations; see `hi compute billing`", choice)
+		}
+		if err := saveHFNamespace(choice); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Hugging Face jobs now bill %s.\n", choice)
+		if !canPay {
+			fmt.Fprintf(stdout, "Note: %s cannot pay for Jobs yet; add credits at https://huggingface.co/settings/billing\n", choice)
+		}
+		return nil
+	}
+
+	billed, err := p.defaultNamespace("")
+	if err != nil {
+		return err
+	}
+	table := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(table, "ACCOUNT\tTYPE\tCAN PAY\tPLAN\tBILLED")
+	row := func(name, kind string, canPay bool, plan string) {
+		pays, mark := "no", ""
+		if canPay {
+			pays = "yes"
+		}
+		if name == billed {
+			mark = "<- hi bills this"
+		}
+		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n", name, kind, pays, plan, mark)
+	}
+	row(account.Name, "user", account.CanPay, "")
+	for _, org := range account.Orgs {
+		row(org.Name, "org", org.CanPay, org.Plan)
+	}
+	table.Flush()
+	fmt.Fprintf(stdout, "\nChosen by: %s\n", p.billingReason())
+	fmt.Fprintln(stdout, "Change with `hi compute billing ACCOUNT`; `--clear` makes it automatic again.")
+	return nil
+}
+
+func (p *hfProvider) billingReason() string {
+	if os.Getenv("HI_HF_NAMESPACE") != "" {
+		return "HI_HF_NAMESPACE in your environment"
+	}
+	if config, err := loadComputeConfig(); err == nil && config.HFNamespace != "" {
+		return "`hi compute billing` (saved in " + computeConfigPath() + ")"
+	}
+	return "automatic: your own account if it can pay, else your only organization that can"
 }
