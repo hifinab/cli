@@ -357,9 +357,14 @@ func (p *managedProvider) list() ([]computeInstance, error) {
 	if err := p.call(http.MethodGet, "/v1/instances", nil, &leases); err != nil {
 		return nil, err
 	}
-	instances := make([]computeInstance, len(leases))
-	for i, lease := range leases {
-		instances[i] = computeInstance{
+	// The server returns every managed instance of the user; keep this
+	// provider's.
+	var instances []computeInstance
+	for _, lease := range leases {
+		if lease.Provider != p.provider {
+			continue
+		}
+		instances = append(instances, computeInstance{
 			name:     lease.Name,
 			hardware: lease.Hardware,
 			detail:   fmt.Sprintf("started through %s (%s), %s", p.url, lease.Request, lease.Rate),
@@ -367,7 +372,7 @@ func (p *managedProvider) list() ([]computeInstance, error) {
 			managed:  true,
 			created:  lease.Started,
 			deadline: lease.Deadline,
-		}
+		})
 	}
 	return instances, nil
 }

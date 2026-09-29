@@ -273,6 +273,13 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Verify live: an A4000 on Hyperstack in Oslo, booted in 3.5 minutes,
   SSH as `shadeform`.
 
+### v0.12.1 — One row per managed instance
+
+- [x] With two managed providers, `hi compute ls` listed each managed
+  instance under both; each provider now lists only its own.
+- [x] Verify managed Shadeform live: a staff start approved by policy on
+  aiw12, SSH to the machine, and a stop.
+
 ## Planned
 
 ### v0.13.0 — Managed compute: live dashboard

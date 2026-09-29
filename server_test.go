@@ -684,3 +684,25 @@ func TestCheapSoldOutHardwareCanJumpToAMuchPricierReplacement(t *testing.T) {
 		t.Fatalf("code %d\n%s%s", code, stdout, stderr)
 	}
 }
+
+func TestManagedListsKeepEachProvidersOwnInstances(t *testing.T) {
+	ts := newTestServer(t)
+	other := newFakeManaged()
+	ts.server.providers["shadeform"] = &namedFake{fakeManaged: other, label: "shadeform"}
+	ts.connectAs(t, "alice", "staff")
+	now := time.Now()
+	ts.server.state.Leases["only-sf"] = &serverLease{Name: "only-sf", Provider: "shadeform", User: "alice",
+		Hardware: "a4000", Started: now, Deadline: now.Add(time.Hour)}
+	code, stdout, _ := runHi("compute", "ls")
+	if code != 0 || strings.Count(stdout, "only-sf") != 1 || !strings.Contains(stdout, "only-sf  shadeform") {
+		t.Fatalf("ls:\n%s", stdout)
+	}
+}
+
+// namedFake is a fake managed provider under another name.
+type namedFake struct {
+	*fakeManaged
+	label string
+}
+
+func (n *namedFake) name() string { return n.label }
