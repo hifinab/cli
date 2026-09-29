@@ -163,6 +163,13 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   tunnel, stop, and a pod stopped by the server at `--max`.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
 
+### v0.9.1 — Visible key entry
+
+- [x] Key and token prompts (`hi server provider add`, `hi login runpod`,
+  `hi net`) show a `*` per character, so a paste is visibly received.
+- [x] `hi server provider add` works before the server is started, and checks
+  the provider name before asking for the key.
+
 ## Planned
 
 ### v0.10.0 — Managed compute: Slack

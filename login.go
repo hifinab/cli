@@ -46,8 +46,8 @@ func login(provider string, stdin io.Reader, stdout, stderr io.Writer) error {
 			return fmt.Errorf("`hi login runpod` asks for the key in a terminal; in scripts, set RUNPOD_API_KEY instead")
 		}
 		fmt.Fprintf(stdout, "Create an API key with read and write access at %s\n", runpodKeysURL)
-		fmt.Fprint(stdout, "RunPod API key (hidden): ")
-		key, err := term.ReadPassword(int(terminal.Fd()))
+		fmt.Fprint(stdout, "RunPod API key (paste it; it shows as *): ")
+		key, err := readSecret(terminal, stdout)
 		fmt.Fprintln(stdout)
 		if err != nil {
 			return fmt.Errorf("read the API key: %w", err)

@@ -17,8 +17,6 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
-
-	"golang.org/x/term"
 )
 
 // hi connect joins this device to a hi server. Until it does, hi compute
@@ -353,10 +351,6 @@ func (f *flagSet) parse(args []string) ([]string, error) {
 
 func newTable(w io.Writer) *tabwriter.Writer {
 	return tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-}
-
-func readPassword(file *os.File) ([]byte, error) {
-	return term.ReadPassword(int(file.Fd()))
 }
 
 // Exit statuses for requests that wait on a person: pending and denied.

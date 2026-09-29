@@ -1558,15 +1558,46 @@ func serverProviderCommand(args []string, stdin io.Reader, stdout, stderr io.Wri
 		}
 		return nil
 	case len(positional) == 2 && positional[0] == "add":
-		key, err := readProviderKey(positional[1], stdin, stdout)
+		name := positional[1]
+		if _, ok := serverProviderFactories[name]; !ok {
+			return usageError{fmt.Sprintf("%q can't be managed yet; managed providers: %s",
+				name, strings.Join(managedProviderNames(), ", "))}
+		}
+		dir, err := serverDirectory(*dirFlag)
 		if err != nil {
 			return err
 		}
-		body := map[string]string{"as": *as, "name": positional[1], "key": key}
-		if err := adminCall(*dirFlag, http.MethodPost, "/admin/providers", body, nil); err != nil {
+		if _, err := os.Stat(filepath.Join(dir, "config.json")); err != nil {
+			return fmt.Errorf("no server in %s; run `hi server init` first", dir)
+		}
+		key, err := readProviderKey(name, stdin, stdout)
+		if err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "Connected devices can now use %s through this server.\n", positional[1])
+		if _, err := os.Stat(filepath.Join(dir, "admin.sock")); err == nil {
+			body := map[string]string{"as": *as, "name": name, "key": key}
+			if err := adminCall(*dirFlag, http.MethodPost, "/admin/providers", body, nil); err != nil {
+				return err
+			}
+			fmt.Fprintf(stdout, "Connected devices can now use %s through this server.\n", name)
+			return nil
+		}
+		// The server isn't running: check the key and store it for its next start.
+		if check := serverKeyCheck[name]; check != nil {
+			if err := check(key); err != nil {
+				return err
+			}
+		}
+		server, err := openServer(dir, io.Discard)
+		if err != nil {
+			return err
+		}
+		server.keys[name] = key
+		if err := server.saveKeysLocked(); err != nil {
+			return err
+		}
+		server.audit(*as, "set provider key", name, "")
+		fmt.Fprintf(stdout, "Saved the %s key. Start the server with `hi server run`.\n", name)
 		return nil
 	case len(positional) == 2 && positional[0] == "remove":
 		path := "/admin/providers/" + positional[1] + "?as=" + *as
@@ -1583,10 +1614,17 @@ func serverProviderCommand(args []string, stdin io.Reader, stdout, stderr io.Wri
 // scripts. It never appears in arguments or output.
 func readProviderKey(provider string, stdin io.Reader, stdout io.Writer) (string, error) {
 	if file, ok := stdin.(*os.File); ok && isTerminal(stdin) {
-		fmt.Fprintf(stdout, "%s API key (hidden): ", provider)
-		key, err := readPassword(file)
+		fmt.Fprintf(stdout, "%s API key (paste it; it shows as *): ", provider)
+		key, err := readSecret(file, stdout)
 		fmt.Fprintln(stdout)
-		return strings.TrimSpace(string(key)), err
+		if err != nil {
+			return "", err
+		}
+		if len(strings.TrimSpace(string(key))) == 0 {
+			return "", errors.New("no key was entered")
+		}
+		fmt.Fprintf(stdout, "Got %d characters; checking the key with %s...\n", len(strings.TrimSpace(string(key))), provider)
+		return strings.TrimSpace(string(key)), nil
 	}
 	line, err := readLine(stdin)
 	if err != nil && !errors.Is(err, io.EOF) {

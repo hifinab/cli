@@ -532,3 +532,51 @@ func TestAStartInterruptedByARestartFails(t *testing.T) {
 		t.Fatalf("after a restart: %+v", request)
 	}
 }
+
+func TestMaskedInputEchoesStarsAndHandlesEditing(t *testing.T) {
+	var echo bytes.Buffer
+	// Typed "abc", Backspace, an arrow key, a bracketed paste of "de", Enter.
+	got, err := readMasked(strings.NewReader("abc\x7f\x1b[D\x1b[200~de\x1b[201~\rignored"), &echo)
+	if err != nil || string(got) != "abde" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if echo.String() != "***\b \b**" {
+		t.Fatalf("echo %q", echo.String())
+	}
+	if _, err := readMasked(strings.NewReader("ab\x03"), &echo); err == nil {
+		t.Fatal("Ctrl-C did not cancel")
+	}
+}
+
+func TestProviderAddWorksBeforeTheServerRuns(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "server")
+	previous := serverKeyCheck
+	serverKeyCheck = map[string]func(string) error{"runpod": func(key string) error { return nil }}
+	defer func() { serverKeyCheck = previous }()
+	t.Setenv("RUNPOD_API_KEY", "")
+
+	if code, _, stderr := runHi("server", "init", "--listen", "127.0.0.1:7474", "--dir", dir); code != 0 {
+		t.Fatalf("init: %s", stderr)
+	}
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"server", "provider", "add", "runpod", "--dir", dir}, strings.NewReader("rpa_secret\n"), &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "Saved the runpod key") || strings.Contains(stdout.String(), "rpa_secret") {
+		t.Fatalf("provider add: %d\n%s%s", code, stdout.String(), stderr.String())
+	}
+	server, err := openServer(dir, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if server.keys["runpod"] != "rpa_secret" || server.providers["runpod"] == nil {
+		t.Fatalf("the key was not stored: %v", server.keys)
+	}
+	info, _ := os.Stat(filepath.Join(dir, "keys.json"))
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("keys.json mode %v", info.Mode().Perm())
+	}
+	code = run([]string{"server", "provider", "add", "runpd", "--dir", dir}, strings.NewReader("x\n"), &stdout, &stderr)
+	if code != 2 {
+		t.Fatalf("a misspelled provider was accepted: %d", code)
+	}
+}

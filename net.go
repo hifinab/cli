@@ -87,7 +87,7 @@ func readNetBirdSetupKey(path string, stdin io.Reader, stdout io.Writer) ([]byte
 		return nil, fmt.Errorf("setup key requires a terminal; set %s or use `hi net --setup-key-file <path>`", netBirdSetupKeyEnv)
 	}
 	fmt.Fprint(stdout, "NetBird setup key: ")
-	key, err := term.ReadPassword(int(terminal.Fd()))
+	key, err := readSecret(terminal, stdout)
 	fmt.Fprintln(stdout)
 	if err != nil {
 		return nil, fmt.Errorf("read NetBird setup key: %w", err)
