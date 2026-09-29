@@ -35,6 +35,11 @@ on Colab). Follow these rules every time:
    commands, files, or logs.
 5. **Ask before system changes.** `hi install`, `hi adduser`, and `hi net` need
    sudo and change the machine. Only run them when the user asks.
+6. **Managed compute waits for a person.** When `hi compute providers` says a
+   provider is `managed by` a hi server, starting there sends a request that
+   someone else approves. Rules 1 and 2 still apply. Never run
+   `hi server approve` or `hi server deny`, and never retry a denied request
+   with other hardware or another name to get around the decision.
 
 ## Choosing a provider and hardware
 
@@ -122,6 +127,30 @@ hi compute logs <name> --follow                                  # build, downlo
 Use any OpenAI-compatible client with the printed base URL and model name.
 Stop the machine when finished.
 
+## Managed compute (a team's hi server)
+
+If the user's machine has joined a hi server (`hi connect status` says so),
+the providers it manages need an approval, a reason, and a time limit. Colab
+and other providers still use the user's own sign-in.
+
+```sh
+hi compute up --on runpod --gpu rtx-4090 --max 1h --reason "eval of the new tokenizer" --yes --no-wait
+# prints the request ID, such as r-9b41e0, and exits with status 3 (pending)
+hi compute requests r-9b41e0 --wait --timeout 10m
+```
+
+1. Write `--reason` as one line the approvers will understand.
+2. Use `--no-wait`, tell the user the request ID and that it waits for
+   approval, then wait with `hi compute requests <id> --wait --timeout 10m`.
+3. Exit status 0 means it is running; carry on as with any instance. Status 3
+   means it is still pending: tell the user and check again later. Status 4
+   means it was denied: tell the user the approver's reason and stop there.
+4. `--json` on `hi compute requests` gives the request in a form you can
+   read.
+
+Stopping never needs approval, and you can stop only the user's own
+machines.
+
 ## Check and clean up
 
 ```sh
@@ -143,6 +172,10 @@ which needs a terminal. `ls` also stops instances past their limit. Names can be
 | `Permission denied (publickey)` on Hugging Face | The SSH key is not registered on the Hub account.                |
 | `unknown ... hardware`                        | Use a name from `hi compute hardware`.                             |
 | A `serve` step failed                         | `hi compute logs <name>` shows the build, download, and server logs. |
+| `approvers need a reason`                     | Managed provider: add `--reason "..."`.                            |
+| `... is waiting for approval` (exit 3)        | Tell the user; check with `hi compute requests <id> --wait`.       |
+| `... was denied by ...` (exit 4)              | Tell the user the reason; do not retry around it.                  |
+| `can't reach the hi server`                   | Managed providers are unavailable; tell the user. Do not use another key. |
 
 ## Workstation and network
 

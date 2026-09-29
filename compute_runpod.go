@@ -394,6 +394,14 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 	return options, nil
 }
 
+// forgetHardware drops the cached list, so a long-running hi server sees
+// current prices and availability.
+func (p *runpodProvider) forgetHardware() {
+	p.mu.Lock()
+	p.options = nil
+	p.mu.Unlock()
+}
+
 func (p *runpodProvider) hardware() ([]computeHardware, error) {
 	options, err := p.hardwareOptions()
 	if err != nil {
@@ -466,7 +474,11 @@ func (p *runpodProvider) podSpec(request upRequest) (map[string]any, error) {
 		image = runpodImage
 	}
 	env := map[string]string{"HI_MANAGED": "1"}
-	if key := runpodPublicKey(); key != "" {
+	key := request.publicKey
+	if key == "" {
+		key = runpodPublicKey()
+	}
+	if key != "" {
 		env["PUBLIC_KEY"] = key
 	}
 	spec := map[string]any{
@@ -505,7 +517,7 @@ func (p *runpodProvider) upCommand(request upRequest) []string {
 // create starts a pod, waits until it can be reached over SSH, and installs
 // the lifetime watchdog on it.
 func (p *runpodProvider) create(request upRequest, stdout, stderr io.Writer) error {
-	if runpodPublicKey() == "" {
+	if request.publicKey == "" && runpodPublicKey() == "" {
 		return errors.New("no SSH public key found; run `ssh-keygen -t ed25519` first")
 	}
 	spec, err := p.podSpec(request)
@@ -529,7 +541,9 @@ func (p *runpodProvider) create(request upRequest, stdout, stderr io.Writer) err
 		fmt.Fprintf(stderr, "hi: the pod still bills; stop it with `hi compute stop %s`\n", request.name)
 		return err
 	}
-	if request.max != noLimit {
+	// A hi server has no SSH access to pods it starts for a device; its own
+	// reconciler stops them at --max instead.
+	if request.max != noLimit && !request.brokered {
 		if err := p.installWatchdog(request.name, request.max); err != nil {
 			fmt.Fprintf(stderr, "hi: warning: could not install the watchdog on the pod (%v); "+
 				"the local watcher still stops it at --max while this machine is on\n", err)

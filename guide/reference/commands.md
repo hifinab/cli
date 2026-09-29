@@ -9,6 +9,9 @@ description: Every hi command and option in one place.
 |----------------------------------|--------------------------------------------------------|
 | `hi compute …`                   | Rent and use remote machines; see below                |
 | `hi login <hf\|colab\|runpod>`   | Sign in to a compute provider                          |
+| `hi connect <server>`            | Join a hi server; `status`, `key`                      |
+| `hi disconnect`                  | Leave it; use your own keys again                      |
+| `hi server …`                    | Run the server that brokers compute; see below         |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install [strix]`             | Install the workstation software                       |
 | `hi verify strix`                | Check a Strix Halo workstation                         |
@@ -37,6 +40,7 @@ description: Every hi command and option in one place.
 | `hi compute wait <name>…`                            | Wait for runs to end; exits with their status          |
 | `hi compute stop [<name> \| --all] [--yes]`          | Stop and release; without a name, pick from a list    |
 | `hi compute proxy <name>`                            | The SSH transport, for `ProxyCommand` (Colab)          |
+| `hi compute requests [<id> [--wait] [--timeout <d>]] [--json]` | Your requests to the hi server; exit 3 pending, 4 denied |
 
 ### Options for up, run, and serve
 
@@ -48,6 +52,8 @@ description: Every hi command and option in one place.
 | `--max <duration>`  | ✓  | ✓   | ✓     | Maximum lifetime: hours (`2`, `1.5`), `30m`, `2d`, or `none` (asks first) |
 | `--yes`             | ✓  | ✓   | ✓     | Skip the cost confirmation                           |
 | `--dry-run`         | ✓  | ✓   | ✓     | Show the request; start nothing                      |
+| `--reason <text>`   | ✓  |     | ✓     | Why you need it; approvers see it (managed providers) |
+| `--no-wait`         | ✓  |     |       | Return while approval is pending; exit 3 (managed providers) |
 | `--namespace <ns>`  | ✓  | ✓   | ✓     | Hugging Face account to bill this once               |
 | `--high-mem`        | ✓  | ✓   |       | High-RAM machine (Colab)                             |
 | `--image <image>`   | ✓  |     |       | Container image (Hugging Face, RunPod)               |
@@ -63,6 +69,28 @@ description: Every hi command and option in one place.
 Defaults: `--gpu` is the provider's cheapest CPU; `--max` is `4h` for `up` and
 `serve` and `1h` for `run`, at most `24h` on Colab. Flags may come before or
 after names for `logs`, `serve`, `stop`, and `billing`.
+
+## hi connect and hi server
+
+See [Managed compute for a team](/guide/compute/managed/).
+
+| Command                                             | Does                                                 |
+|-----------------------------------------------------|------------------------------------------------------|
+| `hi connect <server> [--user <name>] [--no-wait]`   | Enroll this device and wait for approval             |
+| `hi connect status`                                 | Server, user, group, and managed providers           |
+| `hi connect key`                                    | This device's public key, for an admin to pre-approve |
+| `hi disconnect`                                     | Forget the server and delete the device key          |
+| `hi server init [--listen <addr>]`                  | Create the server's state                            |
+| `hi server run`                                     | Serve clients                                        |
+| `hi server provider add\|remove\|list [<provider>]` | Provider keys (RunPod)                              |
+| `hi server user add <u> --group <g> [--key <k>]`    | Add a user; `--key` pre-approves a device            |
+| `hi server user remove <u>`, `user list`            | Remove a user and their devices; list users          |
+| `hi server requests [--all]`                        | What is waiting for a decision                       |
+| `hi server approve <id> [--group <g>]`              | Approve an enrollment or compute request             |
+| `hi server deny <id> [--reason <r>]`                | Deny a request                                       |
+| `hi server ls`                                      | Everything running, for every user                   |
+| `hi server stop <name> \| --user <u> \| --all`      | Stop instances                                       |
+| `hi server audit [--since <d>]`                     | The audit log                                        |
 
 ## hi login
 

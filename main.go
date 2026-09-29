@@ -84,6 +84,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(login(args[1], stdin, stdout, stderr), stderr)
 	case "compute":
 		return runCompute(args[1:], stdin, stdout, stderr)
+	case "connect":
+		return runConnect(args[1:], stdin, stdout, stderr)
+	case "disconnect":
+		return runDisconnect(args[1:], stdout, stderr)
+	case "server":
+		return runServer(args[1:], stdin, stdout, stderr)
 	case "verify":
 		if len(args) != 2 || args[1] != "strix" {
 			fmt.Fprintln(stderr, "usage: hi verify strix")
@@ -113,6 +119,9 @@ Usage:
   hi net reconnect              Reconnect an enrolled NetBird peer
   hi compute                    Start and use remote GPU machines (Colab, Hugging Face, RunPod)
   hi login <hf|colab|runpod>    Sign in to a compute provider
+  hi connect <server>           Join a hi server that approves and pays for compute
+  hi disconnect                 Leave it; hi compute uses your own keys again
+  hi server                     Run the server that brokers compute for a team
   hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
   hi update [--check]           Update hi to the latest release

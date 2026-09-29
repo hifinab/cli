@@ -19,6 +19,8 @@
       url: /guide/compute/serve/
     - title: Costs, limits, and billing
       url: /guide/compute/billing/
+    - title: Managed compute for a team
+      url: /guide/compute/managed/
 - section: Providers
   pages:
     - title: Google Colab

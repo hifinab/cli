@@ -40,6 +40,9 @@ hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
 hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod)
 hi login <hf|colab|runpod>  Sign in to a compute provider
+hi connect <server>         Join a team's hi server, which approves and pays for compute
+hi disconnect               Leave it; hi compute uses your own keys again
+hi server          Run the server that brokers compute for a team (hi server help)
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
 hi update          Update hi to the latest release (--check, --version)

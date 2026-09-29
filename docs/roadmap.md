@@ -142,14 +142,73 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 
 ## Planned
 
-### v0.9.0 — Authentication
+### v0.9.0 — Managed compute: server and brokered RunPod
+
+- [x] Add `hi server` on a dedicated box in the VPN. It holds the provider
+  keys, makes every provider call for connected devices, and keeps state in
+  a JSON file with an audit log.
+- [x] Add `hi connect` and `hi disconnect`, with an ed25519 device key that
+  signs every request and is pre-approved by an admin.
+- [x] Add a managed driver, so that connected devices start, list, reach,
+  and stop RunPod through the server with the same `hi compute` commands.
+- [x] Record a lease for every start. A reconciler stops instances at their
+  `--max` and reports instances that have no lease.
+- [x] Approve, deny, and stop from the server box with `hi server approve`,
+  `deny`, and `stop`.
+- [x] Make the request flow work for agents: `--reason`, `--no-wait`,
+  `hi compute requests --wait`, exit statuses for pending and denied, and
+  nobody approves their own request.
+- [x] Keep a never-connected `hi` exactly as it is today. Colab is never
+  managed.
+- [x] Document it in the guide and teach it to agents in `hi skill`.
+- [ ] Verify with a live RunPod account over NetBird: enroll, approve, SSH,
+  tunnel, stop, and a pod stopped by the server at `--max`.
+  Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.10.0 — Managed compute: Slack
+
+- [ ] Add a Slack app over Socket Mode, with a manifest printed by
+  `hi server slack setup`. It posts enrollment and compute approval buttons,
+  stop buttons, message states, and threaded alerts, and answers
+  `/hi status` and `/hi stop`.
+  Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.11.0 — Managed compute: policy, budgets, and reports
+
+- [ ] Add groups, auto-approve rules, monthly budgets, and
+  `hi compute extend`.
+- [ ] Answer `/hi spend`, `/hi users`, `/hi budget`, and `/hi audit`, and
+  post daily, weekly, and monthly reports.
+- [ ] Label agents in requests, and add `hi connect --agent` for agents that
+  run on their own.
+  Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.12.0 — Managed compute: live dashboard
+
+- [ ] Add `hi server live` for approvers and `--wall` for shared screens.
+- [ ] Run the wall in a tmux session that screens attach to read-only over
+  SSH, set up by `hi server wall`.
+- [ ] Add `hi compute live` for users, client activity events, and provider
+  GPU metrics where the provider has them.
+  Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.13.0 — Managed compute: Slack App Home
+
+- [ ] Add an App Home dashboard with Now, Waiting, This month, and Devices,
+  plus a per-user view and direct messages for linked users.
+  Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+Managed Hugging Face Jobs and the providers under "More compute providers"
+follow provider by provider.
+
+### v0.14.0 — Authentication
 
 - [ ] Delegate GitHub and OMP authentication to their native tools.
   Approved spec: [hi_login.md](specs/approved/hi_login.md).
 
 Dependency: login requires the corresponding installed CLI.
 
-### v0.10.0 — Project bootstrap
+### v0.15.0 — Project bootstrap
 
 - [ ] Add the interactive `hi init` helper and deterministic Python template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
@@ -157,17 +216,17 @@ Dependency: login requires the corresponding installed CLI.
 Dependency: the Python template requires `uv` and establishes the metadata and
 safe-generation contract used by later templates.
 
-### v0.11.0 — Specialized project templates
+### v0.16.0 — Specialized project templates
 
 - [ ] Add the quantitative-research template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 - [ ] Add the deterministic web-application template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
-Dependency: both templates extend the v0.10.0 planner, conflict detection,
+Dependency: both templates extend the v0.15.0 planner, conflict detection,
 metadata, agent instructions, and documentation structure.
 
-### v0.12.0 — Focused machine operations
+### v0.17.0 — Focused machine operations
 
 - [ ] Read and change the machine hostname independently of installation.
   Approved spec: [hi_hostname.md](specs/approved/hi_hostname.md).
@@ -181,7 +240,7 @@ Dependency: shared tools no longer update themselves, so they rely on
 rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
-### v0.13.0 — Guided installer
+### v0.18.0 — Guided installer
 
 - [ ] Replace the fixed `hi install` run with a guided menu of checkboxes
   that selects which tools to install. Unchecking an installed tool
@@ -189,7 +248,7 @@ rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
   Spec not yet written.
 
 Dependency: needs uninstall steps for every tool `hi install` manages, and
-must respect the per-user or all-users choice from v0.12.0.
+must respect the per-user or all-users choice from v0.17.0.
 
 ### Deferred — More compute providers
 

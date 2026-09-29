@@ -79,6 +79,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	yes := flags.Bool("yes", false, "skip confirmation")
 	dryRun := flags.Bool("dry-run", false, "show without starting")
 	namespace := flags.String("namespace", "", "account or organization to bill")
+	reason := flags.String("reason", "", "why you need it (managed providers)")
 	positional, err := parseInterspersedFlags(flags, args)
 	if err != nil {
 		return err
@@ -152,7 +153,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 		}
 		fmt.Fprintf(stdout, "Reusing %s/%s.\n", provider.name(), instance)
 	} else {
-		request := upRequest{name: instance, hardware: hardware, max: maxLifetime.value, namespace: *namespace}
+		request := upRequest{name: instance, hardware: hardware, max: maxLifetime.value, namespace: *namespace, reason: *reason}
 		if apiServed {
 			request.serve = &recipe
 		}

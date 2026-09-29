@@ -97,6 +97,15 @@ type upRequest struct {
 	namespace string
 	// serve, when set, makes the instance run this model server itself.
 	serve *serveRecipe
+	// reason, noWait, and publicKey are for managed providers: the reason
+	// approvers see, returning while approval is pending, and the SSH key
+	// the instance should accept.
+	reason    string
+	noWait    bool
+	publicKey string
+	// brokered means a hi server starts this for a connected device; the
+	// server has no SSH access to the instance.
+	brokered bool
 }
 
 // runRequest is either a Python script (script, args) or a container image
@@ -150,6 +159,11 @@ var (
 )
 
 func runCompute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	restore, err := withManagedProviders()
+	if err != nil {
+		return exitCode(err, stderr)
+	}
+	defer restore()
 	if len(args) == 0 {
 		if !isTerminal(stdin) {
 			printComputeUsage(stdout)
@@ -191,6 +205,8 @@ func runCompute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(computeLogsCommand(rest, stdin, stdout, stderr), stderr)
 	case "billing":
 		return exitCode(computeBillingCommand(rest, stdout, stderr), stderr)
+	case "requests":
+		return exitCode(computeRequestsCommand(rest, stdout, stderr), stderr)
 	case "wait":
 		code, err := computeWaitCommand(rest, stdout, stderr)
 		if err != nil {
@@ -224,6 +240,10 @@ func exitCode(err error, stderr io.Writer) int {
 	if errors.As(err, &usage) {
 		return 2
 	}
+	var status exitStatusError
+	if errors.As(err, &status) {
+		return status.code
+	}
 	return 1
 }
 
@@ -250,6 +270,7 @@ Usage:
                                       Run to completion, streaming logs
   hi compute wait <name>...           Wait for detached runs to finish
   hi compute billing [ACCOUNT]        Show or choose who pays (Hugging Face)
+  hi compute requests [<id> [--wait]] Your requests to the hi server (when connected)
 
 Options for up and run:
   --on <provider>    colab, hf, or runpod (default: inferred from --gpu, or
@@ -265,6 +286,12 @@ Options for up and run:
   --namespace <ns>   Account to bill this once (Hugging Face; see billing)
   --yes              Skip the cost confirmation
   --dry-run          Show what would happen without starting anything
+  --reason <text>    Why you need it; approvers see it (managed providers)
+  --no-wait          up: return while approval is pending, exit status 3
+
+Connected to a hi server (hi connect), the providers it manages go through
+it and need an approval; a denied request exits with status 4. Colab and
+providers it doesn't manage use your own keys as before.
 
 Options for serve (plus --on, --gpu, --name, --max, --yes, --dry-run):
   --quant <quant>    GGUF quant, e.g. Q4_K_M (recipes have a default)
@@ -288,6 +315,11 @@ func computeProvidersCommand(stdout io.Writer) error {
 			state = "not installed"
 		case !status.signedIn:
 			state = "not signed in"
+		}
+		if isManaged(provider) && state == "ready" {
+			state = "managed by " + provider.(*managedProvider).url
+		} else if isManaged(provider) {
+			state = "managed, but " + state
 		}
 		fmt.Fprintf(stdout, "%-8s %s\n", provider.name(), state)
 		for _, hint := range status.hints {
@@ -436,18 +468,24 @@ func computeUpCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	dryRun := flags.Bool("dry-run", false, "show without starting")
 	image := flags.String("image", "", "container image")
 	namespace := flags.String("namespace", "", "account or organization to bill")
+	reason := flags.String("reason", "", "why you need it (managed providers)")
+	noWait := flags.Bool("no-wait", false, "return while approval is pending (managed providers)")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
-		return usageError{"usage: hi compute up [--on P] [--gpu HW] [--name N] [--max D] [--image I] [--namespace NS] [--high-mem] [--yes] [--dry-run]"}
+		return usageError{"usage: hi compute up [--on P] [--gpu HW] [--name N] [--max D] [--image I] [--namespace NS] [--high-mem] [--reason R] [--no-wait] [--yes] [--dry-run]"}
 	}
 
 	provider, err := resolveProvider(*on, *gpu)
 	if err != nil {
 		return err
 	}
-	request := upRequest{highMem: *highMem, max: maxLifetime.value, image: *image, namespace: *namespace}
+	if *noWait && !isManaged(provider) {
+		return usageError{"--no-wait applies only to providers managed by a hi server"}
+	}
+	request := upRequest{highMem: *highMem, max: maxLifetime.value, image: *image, namespace: *namespace,
+		reason: *reason, noWait: *noWait}
 	if request.hardware, err = resolveHardware(provider, *gpu); err != nil {
 		return err
 	}
@@ -498,6 +536,11 @@ func startInstance(
 	if err := requireStatus(provider); err != nil {
 		return err
 	}
+	if isManaged(provider) {
+		if err := prepareManagedStart(&request, stdin, stdout); err != nil {
+			return err
+		}
+	}
 	if request.max == noLimit {
 		if err := confirmNoLimit(provider, request.name, stdin, stdout, yes); err != nil {
 			return err
@@ -510,6 +553,11 @@ func startInstance(
 
 	if err := provider.create(request, stdout, stderr); err != nil {
 		return err
+	}
+	if isManaged(provider) {
+		// The server keeps the record and enforces the limit.
+		printNextSteps(request.name, stdout)
+		return nil
 	}
 
 	record := computeRecord{
@@ -535,11 +583,15 @@ func startInstance(
 		}
 	}
 
-	fmt.Fprintf(stdout, "\n%s is up. Next:\n", request.name)
-	fmt.Fprintf(stdout, "  hi compute ssh %s\n", request.name)
-	fmt.Fprintf(stdout, "  hi compute tunnel %s 8000\n", request.name)
-	fmt.Fprintf(stdout, "  hi compute stop %s\n", request.name)
+	printNextSteps(request.name, stdout)
 	return nil
+}
+
+func printNextSteps(name string, stdout io.Writer) {
+	fmt.Fprintf(stdout, "\n%s is up. Next:\n", name)
+	fmt.Fprintf(stdout, "  hi compute ssh %s\n", name)
+	fmt.Fprintf(stdout, "  hi compute tunnel %s 8000\n", name)
+	fmt.Fprintf(stdout, "  hi compute stop %s\n", name)
 }
 
 // noLimit is the lifetime that means "run until stopped".
