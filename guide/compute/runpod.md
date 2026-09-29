@@ -79,6 +79,42 @@ Availability changes by the minute, so treat it as a hint.
 hi compute up --gpu rtx-4090 --name box --max 2
 ```
 
+## Community Cloud
+
+> **Never put API tokens, passwords, SSH private keys, cloud credentials, or
+> sensitive data on a Community Cloud machine**: not in files, environment
+> variables, notebooks, or git remotes. It runs on a third-party host that
+> RunPod does not own. Use it for public code and data only.
+{: .warning}
+
+By default `hi` uses RunPod's Secure Cloud, in RunPod's own datacenters.
+Community Cloud rents the same GPUs from third-party hosts, 25–54% cheaper,
+and is still on-demand: nobody can take the machine back. Choose it by
+adding `@community` to the hardware name:
+
+```sh
+hi compute hardware --on runpod --community
+hi compute up --on runpod --gpu rtx-4090@community --max 2h
+```
+
+| GPU            | Secure | Community |
+|----------------|--------|-----------|
+| RTX 4090       | $0.74  | $0.34     |
+| L40S           | $1.09  | $0.79     |
+| A100 PCIe 80GB | $1.59  | $1.19     |
+| H100 SXM       | $3.49  | $2.69     |
+
+`hi` shows the warning above before every Community start, even with
+`--yes`, and again on every `hi compute ssh`, `tunnel`, `logs`, and
+`serve` to the machine. Hosts vary: a host going offline ends the machine,
+so keep your work checkpointed.
+
+Through a [hi server](/guide/compute/managed/), the Slack request carries
+the same warning. An approved Secure start is never moved to Community
+Cloud when its hardware is sold out, and a Community start is only replaced
+on Community Cloud. A group's `hardware` list in the policy must name
+`@community` hardware explicitly for the group to use it.
+
 ## What hi starts
 
 | Setting   | Value                                                        |

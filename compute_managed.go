@@ -390,7 +390,7 @@ func (p *managedProvider) ssh(name string) (sshTarget, error) {
 	if err := p.call(http.MethodGet, "/v1/instances/"+url.PathEscape(name)+"/ssh", nil, &target); err != nil {
 		return sshTarget{}, err
 	}
-	return sshTarget{options: target.Options, destination: target.Destination, hint: target.Hint}, nil
+	return sshTarget{options: target.Options, destination: target.Destination, hint: target.Hint, warning: target.Warning}, nil
 }
 
 func (p *managedProvider) logs(name string, follow bool, lines int, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -574,4 +574,33 @@ func computeExtendCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	_, err = managed.waitForDecision(created.ID, 0, stdout)
 	return err
+}
+
+// fetchHardware asks the server for hardware: one name, Community Cloud, or
+// the usual list.
+func (p *managedProvider) fetchHardware(query string) ([]computeHardware, error) {
+	var options []apiHardware
+	if err := p.call(http.MethodGet, "/v1/hardware?provider="+url.QueryEscape(p.provider)+query, nil, &options); err != nil {
+		return nil, err
+	}
+	hardware := make([]computeHardware, len(options))
+	for i, option := range options {
+		hardware[i] = computeHardware{name: option.Name, kind: option.Kind, memory: option.Memory,
+			rate: option.Rate, paid: option.Paid, note: option.Note}
+	}
+	return hardware, nil
+}
+
+// lookupHardware resolves names outside the usual list, such as
+// "rtx-4090@community" or "h100@lambdalabs", on the server.
+func (p *managedProvider) lookupHardware(name string) (computeHardware, error) {
+	options, err := p.fetchHardware("&name=" + url.QueryEscape(name))
+	if err != nil || len(options) == 0 {
+		return computeHardware{}, fmt.Errorf("unknown %s hardware %q", p.provider, name)
+	}
+	return options[0], nil
+}
+
+func (p *managedProvider) communityHardware() ([]computeHardware, error) {
+	return p.fetchHardware("&community=1")
 }

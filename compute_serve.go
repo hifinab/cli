@@ -184,7 +184,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 		return nil
 	}
 
-	target, err := provider.ssh(instance)
+	target, err := reach(provider, instance, stderr)
 	if err != nil {
 		return err
 	}
@@ -354,7 +354,7 @@ func computeLogsCommand(args []string, stdin io.Reader, stdout, stderr io.Writer
 
 // sshLogs prints the remote state contract's logs over SSH.
 func sshLogs(provider computeProvider, name string, follow bool, lines int, stdin io.Reader, stdout, stderr io.Writer) error {
-	target, err := provider.ssh(name)
+	target, err := reach(provider, name, stderr)
 	if err != nil {
 		return err
 	}

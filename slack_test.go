@@ -425,3 +425,13 @@ func TestRunningMessageShowsClockTimes(t *testing.T) {
 		t.Fatalf("running message: %s", text)
 	}
 }
+
+func TestSlackFlagsCommunityCloudRequests(t *testing.T) {
+	request := serverRequest{ID: "r-1", Kind: "compute", State: "pending", User: "sam", Name: "x", Provider: "runpod",
+		Hardware: "rtx-4090@community", Rate: "$0.34/h", MaxSeconds: 3600}
+	_, blocks := renderSlackRequest(request, nil, "students", true, time.Now())
+	data, _ := json.Marshal(blocks)
+	if !strings.Contains(string(data), "Community Cloud") || !strings.Contains(string(data), "No API tokens, passwords") {
+		t.Fatalf("no Community Cloud warning: %s", data)
+	}
+}

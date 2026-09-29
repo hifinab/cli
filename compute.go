@@ -131,6 +131,18 @@ type sshTarget struct {
 	// hint explains the most likely cause when ssh fails, such as a key
 	// that is not registered with the provider.
 	hint string
+	// warning is shown before every connection, such as the Community
+	// Cloud warning about secrets.
+	warning string
+}
+
+// reach finds how to SSH to an instance and shows its warning, if any.
+func reach(provider computeProvider, name string, stderr io.Writer) (sshTarget, error) {
+	target, err := provider.ssh(name)
+	if err == nil && target.warning != "" {
+		fmt.Fprintf(stderr, "%s\n\n", target.warning)
+	}
+	return target, err
 }
 
 func withSSHHint(target sshTarget, err error) error {
@@ -341,11 +353,15 @@ func computeProvidersCommand(stdout io.Writer) error {
 func computeHardwareCommand(args []string, stdout, stderr io.Writer) error {
 	flags := newComputeFlags("hardware", stderr)
 	on := flags.String("on", "", "provider")
+	community := flags.Bool("community", false, "RunPod Community Cloud")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
-		return usageError{"usage: hi compute hardware [--on <provider>]"}
+		return usageError{"usage: hi compute hardware [--on <provider>] [--community]"}
+	}
+	if *community {
+		return communityHardwareCommand(*on, stdout)
 	}
 	providers := computeProviders
 	if *on != "" {
@@ -385,6 +401,35 @@ func computeHardwareCommand(args []string, stdout, stderr io.Writer) error {
 		}
 	}
 	return nil
+}
+
+// communityHardwareCommand lists RunPod Community Cloud GPUs, with the
+// warning about secrets.
+func communityHardwareCommand(on string, stdout io.Writer) error {
+	if on != "" && on != "runpod" {
+		return usageError{"--community applies to RunPod only"}
+	}
+	provider, err := providerByName("runpod")
+	if err != nil {
+		return err
+	}
+	lister, ok := provider.(interface {
+		communityHardware() ([]computeHardware, error)
+	})
+	if !ok {
+		return usageError{"--community is not available for the managed RunPod yet"}
+	}
+	options, err := lister.communityHardware()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "%s\n\n", communityWarning)
+	table := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(table, "PROVIDER\tHARDWARE\tKIND\tMEMORY\tRATE\tNOW")
+	for _, hardware := range options {
+		fmt.Fprintf(table, "runpod\t%s\t%s\t%s\t%s\t%s\n", hardware.name, hardware.kind, hardware.memory, hardware.rate, hardware.note)
+	}
+	return table.Flush()
 }
 
 func providerByName(name string) (computeProvider, error) {
@@ -551,6 +596,9 @@ func startInstance(
 	}
 	if err := requireStatus(provider); err != nil {
 		return err
+	}
+	if isCommunityHardware(request.hardware.name) {
+		fmt.Fprintf(stdout, "\n%s\n\n", communityWarning)
 	}
 	if isManaged(provider) {
 		if err := prepareManagedStart(&request, stdin, stdout); err != nil {
@@ -987,7 +1035,7 @@ func computeSSHCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	if err != nil {
 		return err
 	}
-	target, err := provider.ssh(name)
+	target, err := reach(provider, name, stderr)
 	if err != nil {
 		return err
 	}
@@ -1015,7 +1063,7 @@ func computeTunnelCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 	if reason, reserved := provider.reservedPorts()[remotePort]; reserved {
 		return fmt.Errorf("port %d on %s is %s; serve on another port such as 8000", remotePort, provider.name(), reason)
 	}
-	target, err := provider.ssh(name)
+	target, err := reach(provider, name, stderr)
 	if err != nil {
 		return err
 	}

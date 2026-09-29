@@ -280,6 +280,18 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Verify managed Shadeform live: a staff start approved by policy on
   aiw12, SSH to the machine, and a stop.
 
+### v0.12.2 — RunPod Community Cloud
+
+- [x] Add RunPod Community Cloud as an opt-in: `--gpu rtx-4090@community`
+  (25–54% cheaper than Secure Cloud, still on-demand), listed with
+  `hi compute hardware --on runpod --community`.
+- [x] Warn that no API tokens, passwords, SSH private keys, or sensitive data
+  may ever be put on a Community machine: before every start (even with
+  `--yes`), on every `ssh`, `tunnel`, `logs`, and `serve`, on the Slack
+  request, and in the agent skill.
+- [x] Never move an approved Secure Cloud start onto Community Cloud when
+  hardware is sold out; Community starts are replaced only on Community.
+
 ## Planned
 
 ### v0.13.0 — Managed compute: live dashboard
@@ -349,6 +361,12 @@ rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 Dependency: needs uninstall steps for every tool `hi install` manages, and
 must respect the per-user or all-users choice from v0.18.0.
 
+## Deferred until everything else is done
+
+More providers come last, after every planned release above, and only if
+they are needed. RunPod, Shadeform, Hugging Face Jobs, and Colab already
+cover most needs.
+
 ### Deferred — More compute providers
 
 On-demand providers to add to `hi compute`, in priority order. Ranked
@@ -357,9 +375,6 @@ and coverage across many countries. Prices are USD per GPU-hour for a single
 GPU, checked 2026-09-28. Spot pricing played no part in the ranking. Specs
 not yet written.
 
-- [ ] RunPod Community Cloud as an opt-in on the existing driver: H100 SXM
-  $2.69 against Secure's $3.49, and RTX 4090 $0.34 against $0.74. It is still
-  on-demand, but it runs on third-party hosts, so Secure stays the default.
 - [ ] Vast.ai. The cheapest option (H100 $1.87–2.66, A100 $0.74, RTX 4090
   $0.48) and the widest coverage, with hosts in 64 countries on six
   continents. REST with an API key, and search needs no account. Restrict it

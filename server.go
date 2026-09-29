@@ -452,6 +452,7 @@ type apiSSH struct {
 	Options     []string `json:"options"`
 	Destination string   `json:"destination"`
 	Hint        string   `json:"hint,omitempty"`
+	Warning     string   `json:"warning,omitempty"`
 }
 
 type apiEnroll struct {
@@ -653,7 +654,25 @@ func (s *hiServer) handleHardware(w http.ResponseWriter, r *http.Request, _ serv
 		writeAPIError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	options, err := provider.hardware()
+	var options []computeHardware
+	query := r.URL.Query()
+	switch {
+	case query.Get("name") != "":
+		var one computeHardware
+		one, err = resolveHardware(provider, query.Get("name"))
+		options = []computeHardware{one}
+	case query.Get("community") == "1":
+		lister, ok := provider.(interface {
+			communityHardware() ([]computeHardware, error)
+		})
+		if !ok {
+			writeAPIError(w, http.StatusBadRequest, "--community applies to RunPod only")
+			return
+		}
+		options, err = lister.communityHardware()
+	default:
+		options, err = provider.hardware()
+	}
 	if err != nil {
 		writeAPIError(w, http.StatusBadGateway, err.Error())
 		return
@@ -952,8 +971,12 @@ func (s *hiServer) handleSSH(w http.ResponseWriter, r *http.Request, device serv
 		writeAPIError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	warning := target.warning
+	if warning == "" && isCommunityHardware(lease.Hardware) {
+		warning = communityWarning
+	}
 	writeJSON(w, http.StatusOK, apiSSH{Options: target.options, Destination: target.destination,
-		Hint: "hi: the instance accepts the SSH key from ~/.ssh that hi sent with the request"})
+		Hint: "hi: the instance accepts the SSH key from ~/.ssh that hi sent with the request", Warning: warning})
 }
 
 // ---------------------------------------------------------------------------

@@ -66,10 +66,20 @@ func (f *fakeRunpod) serve(w http.ResponseWriter, r *http.Request) {
 			writeJSON(400, map[string]any{"title": "the test expects availability to be requested"})
 			return
 		}
+		community := r.URL.Query().Get("cloud") == "COMMUNITY"
+		available := func(secure, community2 string) string {
+			if community {
+				return community2
+			}
+			return secure
+		}
 		writeJSON(200, map[string]any{"gpus": []map[string]any{
-			{"id": "NVIDIA GeForce RTX 4090", "name": "RTX 4090", "memory": 24, "secure": true, "availability": "HIGH", "price": map[string]any{"secure": 0.69}},
-			{"id": "NVIDIA A100 80GB PCIe", "name": "A100 PCIe", "memory": 80, "secure": true, "availability": "LOW", "price": map[string]any{"secure": 1.64}},
-			{"id": "NVIDIA RTX A4000", "name": "RTX A4000", "memory": 16, "secure": true, "availability": "NONE", "price": map[string]any{"secure": 0.25}},
+			{"id": "NVIDIA GeForce RTX 4090", "name": "RTX 4090", "memory": 24, "secure": true, "community": true,
+				"availability": available("HIGH", "NONE"), "price": map[string]any{"secure": 0.69, "community": 0.34}},
+			{"id": "NVIDIA A100 80GB PCIe", "name": "A100 PCIe", "memory": 80, "secure": true, "community": true,
+				"availability": available("LOW", "HIGH"), "price": map[string]any{"secure": 1.64, "community": 1.19}},
+			{"id": "NVIDIA RTX A4000", "name": "RTX A4000", "memory": 16, "secure": true, "community": true,
+				"availability": available("NONE", "HIGH"), "price": map[string]any{"secure": 0.25, "community": 0.17}},
 			{"id": "NVIDIA RTX A2000", "name": "RTX A2000", "memory": 6, "secure": false, "price": map[string]any{"secure": 0}},
 		}})
 	case path == "/catalog/cpus":
@@ -335,5 +345,52 @@ func TestComputeMenuSignsInToRunpodWhenChosen(t *testing.T) {
 	}
 	if strings.Contains(output, fakeRunpodKey) && !strings.Contains(output, "RunPod API key: ") {
 		t.Fatal("the key was echoed")
+	}
+}
+
+func TestRunpodCommunityCloudWarnsAboutSecretsEverywhere(t *testing.T) {
+	fake := newFakeRunpod(t)
+	code, stdout, stderr := runComputeTest("hardware", "--on", "runpod", "--community")
+	if code != 0 || !strings.Contains(stdout, "COMMUNITY CLOUD") || !strings.Contains(stdout, "rtx-4090@community") ||
+		!strings.Contains(stdout, "$0.34/h") || !strings.Contains(stdout, "Never put API tokens, passwords") {
+		t.Fatalf("hardware --community: %d\n%s%s", code, stdout, stderr)
+	}
+	if code, stdout, _ := runComputeTest("hardware", "--on", "runpod"); code != 0 || strings.Contains(stdout, "@community") {
+		t.Fatalf("the usual list shows Community Cloud:\n%s", stdout)
+	}
+
+	code, stdout, stderr = runComputeTest("up", "--on", "runpod", "--gpu", "rtx-a4000@community", "--name", "cheap", "--max", "1h", "--yes")
+	if code != 0 || !strings.Contains(stdout, "Never put API tokens, passwords, SSH private keys") {
+		t.Fatalf("up on Community Cloud: %d\n%s%s", code, stdout, stderr)
+	}
+	spec := fake.lastSpec()
+	if spec["cloud"] != "COMMUNITY" || spec["env"].(map[string]any)["HI_CLOUD"] != "COMMUNITY" {
+		t.Fatalf("pod spec: %v", spec)
+	}
+	code, stdout, _ = runComputeTest("ls")
+	if code != 0 || !strings.Contains(stdout, "rtx-a4000@community") {
+		t.Fatalf("ls does not mark the pod as Community Cloud:\n%s", stdout)
+	}
+	code, _, stderr = runComputeTest("ssh", "cheap", "--", "true")
+	if code != 0 || !strings.Contains(stderr, "COMMUNITY CLOUD") {
+		t.Fatalf("ssh did not warn: %d %s", code, stderr)
+	}
+
+	// Secure is never replaced by Community Cloud, and Community only by Community.
+	provider := newRunpodProvider()
+	secure, _ := provider.alternatives("rtx-4090", 100)
+	for _, option := range secure {
+		if isCommunityHardware(option.name) {
+			t.Fatalf("a Secure start could move to %s", option.name)
+		}
+	}
+	community, _ := provider.alternatives("rtx-4090@community", 100)
+	if len(community) == 0 {
+		t.Fatal("no Community alternatives")
+	}
+	for _, option := range community {
+		if !isCommunityHardware(option.name) {
+			t.Fatalf("a Community start could move to %s", option.name)
+		}
 	}
 }

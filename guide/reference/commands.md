@@ -26,7 +26,7 @@ description: Every hi command and option in one place.
 |------------------------------------------------------|-------------------------------------------------------|
 | `hi compute`                                         | Guided menu in a terminal; help otherwise             |
 | `hi compute providers`                               | Which providers are signed in, and what is missing     |
-| `hi compute hardware [--on <provider>]`              | Hardware, memory, and prices                           |
+| `hi compute hardware [--on <provider>] [--community]` | Hardware, memory, and prices; `--community` lists RunPod Community Cloud |
 | `hi compute billing [<account> \| --clear]`          | Who pays on Hugging Face, and the Colab balance       |
 | `hi compute up [options]`                            | Start an instance                                      |
 | `hi compute run [options] <script.py> [-- args]`     | Run a Python script to completion                      |

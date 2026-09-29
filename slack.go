@@ -404,6 +404,9 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 		summary += fmt.Sprintf(" (approved %s, which was sold out)", request.Approved)
 	}
 	text := status + "\n" + summary + "\n" + reason
+	if isCommunityHardware(request.Hardware) {
+		text += "\n⚠️ *Community Cloud*: a third-party host. No API tokens, passwords, or sensitive data on it."
+	}
 	if request.Budget != "" && (request.State == "pending" || request.OverBudget) {
 		mark := "💸"
 		if request.OverBudget {

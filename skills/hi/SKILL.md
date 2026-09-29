@@ -32,7 +32,10 @@ on Colab). Follow these rules every time:
    asking.
 4. **Keep secrets secret.** Pass credentials with `--secret NAME` (Hugging Face
    encrypts them), never with `--env`, and never print tokens or put them in
-   commands, files, or logs.
+   commands, files, or logs. **Never put any token, password, key, or
+   sensitive data on a RunPod Community Cloud machine** (hardware ending in
+   `@community`): it is a third-party host. Use Community only for public
+   code and data, and only when the user chose it.
 5. **Ask before system changes.** `hi install`, `hi adduser`, and `hi net` need
    sudo and change the machine. Only run them when the user asks.
 6. **Managed compute waits for a person.** When `hi compute providers` says a

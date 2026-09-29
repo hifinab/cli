@@ -37,8 +37,28 @@ var (
 // time limit, so hi runs its local watcher and also installs a watchdog on
 // the pod that terminates it at --max.
 type runpodProvider struct {
-	mu      sync.Mutex
-	options []runpodOption
+	mu        sync.Mutex
+	options   []runpodOption
+	community []runpodOption
+}
+
+// runpodCommunitySuffix marks Community Cloud hardware, such as
+// "rtx-4090@community": cheaper GPUs on third-party hosts.
+const runpodCommunitySuffix = "@community"
+
+// communityWarning is shown before every Community Cloud start and on every
+// connection to one.
+const communityWarning = `⚠️  COMMUNITY CLOUD: this machine runs on a third-party host that RunPod does not own.
+    Never put API tokens, passwords, SSH private keys, cloud credentials, or sensitive
+    data on it: not in files, environment variables, notebooks, or git remotes.`
+
+func isCommunityHardware(name string) bool { return strings.HasSuffix(name, runpodCommunitySuffix) }
+
+func communityWarningFor(community bool) string {
+	if community {
+		return communityWarning
+	}
+	return ""
 }
 
 // runpodOption is a hardware choice: a short hi name for a RunPod GPU or CPU
@@ -50,6 +70,8 @@ type runpodOption struct {
 	cpuID     string
 	memoryGB  float64
 	available bool
+	// community is Community Cloud: a third-party host.
+	community bool
 }
 
 type runpodPod struct {
@@ -293,20 +315,8 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 		return cached, nil
 	}
 
-	var gpus struct {
-		GPUs []struct {
-			ID           string  `json:"id"`
-			Name         string  `json:"name"`
-			Memory       float64 `json:"memory"`
-			Secure       bool    `json:"secure"`
-			Availability string  `json:"availability"`
-			Price        struct {
-				Secure float64 `json:"secure"`
-			} `json:"price"`
-		} `json:"gpus"`
-	}
-	// Availability changes by the minute; it is a hint, not a promise.
-	if err := p.request(http.MethodGet, "/catalog/gpus?include=AVAILABILITY&product=POD&cloud=SECURE", nil, &gpus); err != nil {
+	gpuOptions, err := p.gpuOptions(false)
+	if err != nil {
 		return nil, err
 	}
 	var cpus struct {
@@ -342,11 +352,47 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 		})
 	}
 	sort.Slice(options, func(i, j int) bool { return options[i].hourly < options[j].hourly })
+	options = append(options, gpuOptions...)
 
-	var gpuOptions []runpodOption
+	p.mu.Lock()
+	p.options = options
+	p.mu.Unlock()
+	return options, nil
+}
+
+// gpuOptions lists GPUs on Secure Cloud, or on Community Cloud with names
+// ending in @community, free ones first, each group by price.
+func (p *runpodProvider) gpuOptions(community bool) ([]runpodOption, error) {
+	var gpus struct {
+		GPUs []struct {
+			ID           string  `json:"id"`
+			Name         string  `json:"name"`
+			Memory       float64 `json:"memory"`
+			Secure       bool    `json:"secure"`
+			Community    bool    `json:"community"`
+			Availability string  `json:"availability"`
+			Price        struct {
+				Secure    float64 `json:"secure"`
+				Community float64 `json:"community"`
+			} `json:"price"`
+		} `json:"gpus"`
+	}
+	cloud := "SECURE"
+	if community {
+		cloud = "COMMUNITY"
+	}
+	// Availability changes by the minute; it is a hint, not a promise.
+	if err := p.request(http.MethodGet, "/catalog/gpus?include=AVAILABILITY&product=POD&cloud="+cloud, nil, &gpus); err != nil {
+		return nil, err
+	}
+	var options []runpodOption
 	seen := map[string]bool{}
 	for _, gpu := range gpus.GPUs {
-		if !gpu.Secure || gpu.Price.Secure <= 0 {
+		offered, hourly := gpu.Secure, gpu.Price.Secure
+		if community {
+			offered, hourly = gpu.Community, gpu.Price.Community
+		}
+		if !offered || hourly <= 0 {
 			continue
 		}
 		label := gpu.Name
@@ -358,18 +404,22 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 			slug = fmt.Sprintf("%s-%dgb", slug, int(gpu.Memory))
 		}
 		seen[slug] = true
+		if community {
+			slug += runpodCommunitySuffix
+		}
 		option := runpodOption{
 			hardware: computeHardware{
 				name:   slug,
 				kind:   "GPU",
 				memory: fmt.Sprintf("%g GB VRAM", gpu.Memory),
-				rate:   fmt.Sprintf("$%.2f/h", gpu.Price.Secure),
+				rate:   fmt.Sprintf("$%.2f/h", hourly),
 				paid:   true,
 			},
-			hourly:    gpu.Price.Secure,
+			hourly:    hourly,
 			gpuID:     gpu.ID,
 			memoryGB:  gpu.Memory,
 			available: gpu.Availability != "NONE",
+			community: community,
 		}
 		switch gpu.Availability {
 		case "NONE":
@@ -377,28 +427,68 @@ func (p *runpodProvider) hardwareOptions() ([]runpodOption, error) {
 		case "LOW":
 			option.hardware.note = "few free"
 		}
-		gpuOptions = append(gpuOptions, option)
+		options = append(options, option)
 	}
-	// Free GPUs first, each group by price.
-	sort.SliceStable(gpuOptions, func(i, j int) bool {
-		if gpuOptions[i].available != gpuOptions[j].available {
-			return gpuOptions[i].available
+	sort.SliceStable(options, func(i, j int) bool {
+		if options[i].available != options[j].available {
+			return options[i].available
 		}
-		return gpuOptions[i].hourly < gpuOptions[j].hourly
+		return options[i].hourly < options[j].hourly
 	})
-	options = append(options, gpuOptions...)
+	return options, nil
+}
 
+// communityOptions lists Community Cloud GPUs.
+func (p *runpodProvider) communityOptions() ([]runpodOption, error) {
 	p.mu.Lock()
-	p.options = options
+	cached := p.community
+	p.mu.Unlock()
+	if cached != nil {
+		return cached, nil
+	}
+	options, err := p.gpuOptions(true)
+	if err != nil {
+		return nil, err
+	}
+	p.mu.Lock()
+	p.community = options
 	p.mu.Unlock()
 	return options, nil
+}
+
+// optionsFor is the list a hardware name belongs to: Secure, or Community
+// for names ending in @community.
+func (p *runpodProvider) optionsFor(name string) ([]runpodOption, error) {
+	if isCommunityHardware(name) {
+		return p.communityOptions()
+	}
+	return p.hardwareOptions()
+}
+
+// communityHardware lists Community Cloud GPUs for `hardware --community`.
+func (p *runpodProvider) communityHardware() ([]computeHardware, error) {
+	options, err := p.communityOptions()
+	if err != nil {
+		return nil, err
+	}
+	hardware := make([]computeHardware, len(options))
+	for i, option := range options {
+		hardware[i] = option.hardware
+	}
+	return hardware, nil
+}
+
+// lookupHardware accepts Community Cloud names, which hardware() leaves out.
+func (p *runpodProvider) lookupHardware(name string) (computeHardware, error) {
+	option, err := p.option(strings.ToLower(name))
+	return option.hardware, err
 }
 
 // forgetHardware drops the cached list, so a long-running hi server sees
 // current prices and availability.
 func (p *runpodProvider) forgetHardware() {
 	p.mu.Lock()
-	p.options = nil
+	p.options, p.community = nil, nil
 	p.mu.Unlock()
 }
 
@@ -417,14 +507,12 @@ func (p *runpodProvider) hardware() ([]computeHardware, error) {
 // freeAlternatives names up to three cheapest GPUs that RunPod reports as
 // free, with at least the memory of the one that was not.
 func (p *runpodProvider) freeAlternatives(name string) string {
-	p.mu.Lock()
-	p.options = nil // availability is stale by now
-	p.mu.Unlock()
+	p.forgetHardware() // availability is stale by now
 	wanted, err := p.option(name)
 	if err != nil || wanted.gpuID == "" {
 		return ""
 	}
-	options, _ := p.hardwareOptions()
+	options, _ := p.optionsFor(name)
 	var names []string
 	for _, option := range options {
 		if option.gpuID != "" && option.available && option.memoryGB >= wanted.memoryGB && option.hardware.name != name {
@@ -439,13 +527,15 @@ func (p *runpodProvider) freeAlternatives(name string) string {
 
 // alternatives lists free hardware of the same kind, with at least the
 // memory of name, costing at most ceiling dollars an hour, cheapest first.
+// Secure hardware is only ever replaced on Secure Cloud, and Community on
+// Community: an approval never moves someone onto a third-party host.
 func (p *runpodProvider) alternatives(name string, ceiling float64) ([]computeHardware, error) {
 	p.forgetHardware() // availability is stale by now
 	wanted, err := p.option(name)
 	if err != nil {
 		return nil, err
 	}
-	options, err := p.hardwareOptions()
+	options, err := p.optionsFor(name)
 	if err != nil {
 		return nil, err
 	}
@@ -469,7 +559,7 @@ func (p *runpodProvider) alternatives(name string, ceiling float64) ([]computeHa
 }
 
 func (p *runpodProvider) option(name string) (runpodOption, error) {
-	options, err := p.hardwareOptions()
+	options, err := p.optionsFor(name)
 	if err != nil {
 		return runpodOption{}, err
 	}
@@ -505,6 +595,11 @@ func (p *runpodProvider) podSpec(request upRequest) (map[string]any, error) {
 		image = runpodImage
 	}
 	env := map[string]string{"HI_MANAGED": "1"}
+	cloud := "SECURE"
+	if option.community {
+		cloud = "COMMUNITY"
+		env["HI_CLOUD"] = "COMMUNITY"
+	}
 	key := request.publicKey
 	if key == "" {
 		key = runpodPublicKey()
@@ -515,7 +610,7 @@ func (p *runpodProvider) podSpec(request upRequest) (map[string]any, error) {
 	spec := map[string]any{
 		"name":     request.name,
 		"image":    image,
-		"cloud":    "SECURE",
+		"cloud":    cloud,
 		"disk":     50,
 		"ports":    []string{"22/tcp"},
 		"startSsh": true,
@@ -659,15 +754,23 @@ func (p *runpodProvider) pods() ([]runpodPod, error) {
 }
 
 func (p *runpodProvider) hardwareName(pod runpodPod) string {
+	community := pod.Env["HI_CLOUD"] == "COMMUNITY"
 	options, _ := p.hardwareOptions()
+	if community {
+		options, _ = p.communityOptions()
+	}
 	for _, option := range options {
 		if (pod.GPU != nil && option.gpuID == pod.GPU.ID) || (pod.CPU != nil && option.cpuID == pod.CPU.ID) {
 			return option.hardware.name
 		}
 	}
+	suffix := ""
+	if community {
+		suffix = runpodCommunitySuffix
+	}
 	switch {
 	case pod.GPU != nil:
-		return runpodSlug(pod.GPU.ID)
+		return runpodSlug(pod.GPU.ID) + suffix
 	case pod.CPU != nil:
 		return runpodSlug(pod.CPU.ID)
 	}
@@ -753,6 +856,7 @@ func (p *runpodProvider) ssh(name string) (sshTarget, error) {
 		},
 		destination: user + "@" + pod.SSH.Direct.Host,
 		hint:        "hi: RunPod pods accept the key in ~/.ssh/id_ed25519.pub that hi passed when starting it",
+		warning:     communityWarningFor(pod.Env["HI_CLOUD"] == "COMMUNITY"),
 	}, nil
 }
 
