@@ -208,6 +208,14 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] `/hi status` says "Nothing is waiting for a decision" instead of "0
   waiting".
 
+### v0.10.3 — Slack shows user text as typed
+
+- [x] Requesters' reasons, hostnames, and provider errors show in Slack
+  exactly as typed: a reason can no longer mention people, ping `@channel`,
+  or fake a link.
+- [x] `/hi status` lists instances that are still starting, and `/hi stop`
+  explains when the one you asked for hasn't finished starting.
+
 ## Planned
 
 ### v0.11.0 — Managed compute: policy, budgets, and reports

@@ -365,3 +365,38 @@ func TestSlashStopUnderstandsMentionsAndReplacesItsPrompt(t *testing.T) {
 		t.Fatal("job is still leased")
 	}
 }
+
+func TestSlackShowsUserTextAsTyped(t *testing.T) {
+	request := serverRequest{ID: "r-1", Kind: "compute", State: "pending", User: "eve", Hostname: "<!channel>",
+		Name: "x", Provider: "runpod", Hardware: "l4", Rate: "$0.49/h", MaxSeconds: 600,
+		Reason: "ping @iman <!here> <https://evil.test|click> & more"}
+	_, blocks := renderSlackRequest(request, nil, "staff", true, time.Now())
+	var buffer strings.Builder
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	encoder.Encode(blocks)
+	out := buffer.String()
+	for _, bad := range []string{"<!here>", "<!channel>", "<https://evil.test"} {
+		if strings.Contains(out, bad) {
+			t.Fatalf("user text reached Slack unescaped (%s): %s", bad, out)
+		}
+	}
+	if !strings.Contains(out, `"verbatim":true`) || !strings.Contains(out, "&lt;!here&gt;") {
+		t.Fatalf("blocks: %s", out)
+	}
+}
+
+func TestSlashCommandKnowsAboutStartingInstances(t *testing.T) {
+	ts := newTestServer(t)
+	withSlack(t, ts)
+	ts.server.state.Requests["r-9"] = &serverRequest{ID: "r-9", Kind: "compute", State: "starting", User: "iman",
+		Name: "warming", Provider: "runpod", Hardware: "a40"}
+	encode := func(v any) string { data, _ := json.Marshal(v); return string(data) }
+	if out := encode(ts.server.slack.slashResponse(slack.SlashCommand{UserID: "UBOB", Text: "status"})); !strings.Contains(out, "1 starting") ||
+		!strings.Contains(out, "warming") {
+		t.Fatalf("/hi status: %s", out)
+	}
+	if out := encode(ts.server.slack.slashResponse(slack.SlashCommand{UserID: "UBOB", Text: "stop @iman"})); !strings.Contains(out, "still starting") {
+		t.Fatalf("/hi stop @iman: %s", out)
+	}
+}

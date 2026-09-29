@@ -172,7 +172,8 @@ func (s *hiServer) notifyThread(id, text string) {
 		if ts == "" {
 			return
 		}
-		if _, _, err := s.slack.api.PostMessage(s.slack.channel(), slack.MsgOptionText(text, false), slack.MsgOptionTS(ts)); err != nil {
+		if _, _, err := s.slack.api.PostMessage(s.slack.channel(), slack.MsgOptionText(slackEscape(text), false),
+			slack.MsgOptionTS(ts)); err != nil {
 			fmt.Fprintf(s.log, "slack: %v\n", err)
 		}
 	})
@@ -184,7 +185,7 @@ func (s *hiServer) notifyChannel(text string) {
 		return
 	}
 	s.slack.enqueue(func() {
-		if _, _, err := s.slack.api.PostMessage(s.slack.channel(), slack.MsgOptionText(text, false)); err != nil {
+		if _, _, err := s.slack.api.PostMessage(s.slack.channel(), slack.MsgOptionText(slackEscape(text), false)); err != nil {
 			fmt.Fprintf(s.log, "slack: %v\n", err)
 		}
 	})
@@ -241,8 +242,16 @@ func (b *slackBridge) syncRequest(id string) {
 // ---------------------------------------------------------------------------
 // rendering
 
+// slackText is formatted text that Slack shows verbatim: it never turns
+// @names, #channels, or URLs into mentions or links.
 func slackText(text string) *slack.TextBlockObject {
-	return slack.NewTextBlockObject(slack.MarkdownType, text, false, false)
+	return slack.NewTextBlockObject(slack.MarkdownType, text, false, true)
+}
+
+// slackEscape makes text from users and providers show as typed, so a
+// reason can't mention @channel or fake a link.
+func slackEscape(text string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(text)
 }
 
 func slackPlain(text string) *slack.TextBlockObject {
@@ -284,6 +293,10 @@ func aboutDollars(amount float64) string {
 
 // renderSlackRequest draws a request's message as it stands now.
 func renderSlackRequest(request serverRequest, lease *serverLease, group string, knownUser bool, now time.Time) (string, []slack.Block) {
+	for _, field := range []*string{&request.Hostname, &request.Reason, &request.DenyReason, &request.Error,
+		&request.Image, &request.Progress, &request.Approved, &request.Name, &request.Hardware} {
+		*field = slackEscape(*field)
+	}
 	who := fmt.Sprintf("*%s*", request.User)
 	if group != "" {
 		who = fmt.Sprintf("*%s* (%s, %s)", request.User, group, request.Hostname)
@@ -580,19 +593,33 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 		leases = append(leases, *lease)
 	}
 	pending := 0
+	var starting []serverRequest
 	for _, request := range s.state.Requests {
-		if request.State == "pending" {
+		switch request.State {
+		case "pending":
 			pending++
+		case "starting":
+			starting = append(starting, *request)
 		}
 	}
 	s.mu.Unlock()
+	sort.Slice(starting, func(i, j int) bool { return starting[i].Name < starting[j].Name })
+	startingText := ""
+	for _, request := range starting {
+		startingText += fmt.Sprintf("\n`%s` · *%s* · %s/%s · starting", slackEscape(request.Name), request.User,
+			request.Provider, slackEscape(request.Hardware))
+	}
 	sort.Slice(leases, func(i, j int) bool { return leases[i].Name < leases[j].Name })
 	now := computeNow()
 
 	switch {
 	case len(fields) == 0 || fields[0] == "status":
 		if len(leases) == 0 {
-			return respond("Nothing is running. " + waitingText(pending))
+			text := "Nothing is running. " + waitingText(pending)
+			if len(starting) > 0 {
+				text = fmt.Sprintf("%d starting. %s%s", len(starting), waitingText(pending), startingText)
+			}
+			return respond(text, slack.NewSectionBlock(slackText(text), nil, nil))
 		}
 		var rate float64
 		blocks := []slack.Block{}
@@ -602,7 +629,7 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 				lease.Hardware, lease.Rate, formatDuration(now.Sub(lease.Started)), lease.Deadline.Local().Format("15:04"))
 			blocks = append(blocks, slack.NewSectionBlock(slackText(line), nil, slack.NewAccessory(stopButton(lease.Name))))
 		}
-		header := fmt.Sprintf("%d running, %s/h now. %s", len(leases), formatDollars(rate), waitingText(pending))
+		header := fmt.Sprintf("%d running, %s/h now. %s%s", len(leases), formatDollars(rate), waitingText(pending), startingText)
 		return respond(header, append([]slack.Block{slack.NewSectionBlock(slackText(header), nil, nil)}, blocks...)...)
 	case fields[0] == "stop" && len(fields) == 2 && fields[1] == "all":
 		if len(leases) == 0 {
@@ -627,8 +654,14 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 				return stopUserResponse(fields[1], leases, respond)
 			}
 		}
+		for _, request := range starting {
+			if request.Name == fields[1] || request.User == fields[1] {
+				return respond(fmt.Sprintf("`%s` is still starting. Stop it once it runs: its message in the channel "+
+					"gets a Stop button, or try `/hi stop %s` again in a minute.", slackEscape(request.Name), slackEscape(fields[1])))
+			}
+		}
 		return respond(fmt.Sprintf("Nothing called %s is running, and no user by that name has anything running. "+
-			"See `/hi status`.", fields[1]))
+			"See `/hi status`.", slackEscape(fields[1])))
 	}
 	return respond("Usage: `/hi status`, `/hi stop <name>`, `/hi stop user <user>`, `/hi stop all`")
 }
