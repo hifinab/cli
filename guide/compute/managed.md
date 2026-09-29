@@ -77,7 +77,8 @@ Two things differ from using your own key:
 
 If the approved hardware is sold out by the time it starts, the approval
 still counts. The server starts the cheapest free hardware with at least as
-much memory, costing at most twice the approved price, and says so:
+much memory, costing at most twice the approved price or the approved price
+plus $1.00/h, whichever is higher, and says so:
 
 ```text
 rtx-4090-1c2d is running on rtx-3090 ($0.50/h); the approved l4 ($0.49/h) was sold out.
@@ -239,9 +240,22 @@ hi server audit --since 24h       # requests, approvals, starts, and stops
 ```
 
 When approved hardware is sold out, the server starts a replacement with
-at least as much memory at up to twice the approved price, and records it in
-the audit log. Change the bound with `"fallback_price_factor"` in the
-server's `config.json` (`1` turns replacements off), then restart the server.
+at least as much memory, and records it in the audit log. A replacement may
+cost up to twice the approved price or the approved price plus $1.00/h,
+whichever is higher, so cheap hardware gets a lot of room and expensive
+hardware stays near 2×:
+
+| Approved | Replacement up to |
+|----------|-------------------|
+| $0.24/h  | $1.24/h           |
+| $0.49/h  | $1.49/h           |
+| $1.00/h  | $2.00/h           |
+| $3.49/h  | $6.98/h           |
+
+Change it with `"fallback_price_factor"` (default `2`) and
+`"fallback_price_extra"` (default `1.0`) in the server's `config.json`, then
+restart the server. A factor of `1` and an extra of `0` turn replacements
+off.
 
 Every 30 seconds the server checks each provider account. It stops machines
 past their `--max`, and it records a machine it didn't start, such as one

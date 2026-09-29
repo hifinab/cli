@@ -139,16 +139,20 @@ func TestSlackApprovesStartsAndStopsFromButtons(t *testing.T) {
 	}
 
 	ts.server.slack.handleInteraction(click("approve", id, "UBOB"))
-	eventually(t, ts, "the running message", func() bool {
-		_, updates, _, _ := fake.snapshot()
-		return strings.Contains(updates[messageTS], "running") && strings.Contains(updates[messageTS], `"action_id":"stop"`)
+	eventually(t, ts, "the running message and its thread note", func() bool {
+		_, updates, threads, _ := fake.snapshot()
+		started := false
+		for _, thread := range threads {
+			started = started || strings.Contains(thread, messageTS+": Started on l4")
+		}
+		return started && strings.Contains(updates[messageTS], "running") && strings.Contains(updates[messageTS], `"action_id":"stop"`)
 	})
 	_, updates, threads, _ := fake.snapshot()
 	if !strings.Contains(updates[messageTS], "approved by bob") {
 		t.Fatalf("running message: %s", updates[messageTS])
 	}
-	if len(threads) == 0 || !strings.Contains(threads[len(threads)-1], messageTS+": Started on l4") {
-		t.Fatalf("no start note in the thread: %v", threads)
+	if len(threads) == 0 || !strings.Contains(threads[0], messageTS+": Approved by bob") {
+		t.Fatalf("no approval note in the thread: %v", threads)
 	}
 
 	ts.server.slack.handleInteraction(click("stop", "slack-job", "UBOB"))
@@ -324,7 +328,7 @@ func TestSlackMessagesKeepTheApproverAndRoundSmallCosts(t *testing.T) {
 func TestSoldOutFailureSaysWhatIsFree(t *testing.T) {
 	ts := newTestServer(t)
 	ts.connectAs(t, "alice", "staff")
-	ts.server.fallbackFactor = 1.01
+	ts.server.fallback = priceBound{factor: 1.01}
 	ts.fake.soldOut["l4"] = true
 	runHi("compute", "up", "--on", "runpod", "--gpu", "l4", "--name", "nope", "--max", "1h", "--reason", "x", "--yes", "--no-wait")
 	id := ts.pending(t, "compute")

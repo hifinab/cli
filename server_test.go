@@ -43,16 +43,10 @@ func fakeHourly(hardware computeHardware) float64 {
 	return hourly
 }
 
-func (f *fakeManaged) alternatives(name string, factor float64) ([]computeHardware, error) {
-	var wanted computeHardware
-	for _, hardware := range fakeHardware {
-		if hardware.name == name {
-			wanted = hardware
-		}
-	}
+func (f *fakeManaged) alternatives(name string, ceiling float64) ([]computeHardware, error) {
 	var result []computeHardware
 	for _, hardware := range fakeHardware {
-		if hardware.name != name && !f.soldOut[hardware.name] && fakeHourly(hardware) <= fakeHourly(wanted)*factor {
+		if hardware.name != name && !f.soldOut[hardware.name] && fakeHourly(hardware) <= ceiling+1e-9 {
 			result = append(result, hardware)
 		}
 	}
@@ -639,7 +633,7 @@ func TestSoldOutHardwareIsReplacedWithinTheApprovedPrice(t *testing.T) {
 func TestSoldOutHardwareFailsWhenNothingFitsThePriceBound(t *testing.T) {
 	ts := newTestServer(t)
 	ts.connectAs(t, "alice", "staff")
-	ts.server.fallbackFactor = 1.01
+	ts.server.fallback = priceBound{factor: 1.01}
 	ts.fake.soldOut["l4"] = true
 	runHi("compute", "up", "--on", "runpod", "--gpu", "l4", "--name", "nope", "--max", "1h", "--reason", "x", "--yes", "--no-wait")
 	id := ts.pending(t, "compute")
@@ -647,7 +641,7 @@ func TestSoldOutHardwareFailsWhenNothingFitsThePriceBound(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, _, stderr := runHi("compute", "requests", id, "--wait", "--timeout", "5s")
-	if code != 1 || !strings.Contains(stderr, "costs at most 1.01x") {
+	if code != 1 || !strings.Contains(stderr, "costs at most $0.49/h") {
 		t.Fatalf("code %d, stderr %s", code, stderr)
 	}
 	if _, ok := ts.fake.started("nope"); ok {
@@ -661,5 +655,32 @@ func TestAuditEntriesStayOnOneLine(t *testing.T) {
 	data, _ := os.ReadFile(filepath.Join(ts.dir, "audit.jsonl"))
 	if !strings.Contains(string(data), `"detail":"first line · second line"`) {
 		t.Fatalf("audit: %s", data)
+	}
+}
+
+func TestPriceBoundGivesCheapHardwareMoreRoom(t *testing.T) {
+	bound := priceBound{factor: 2, extra: 1}
+	for price, want := range map[float64]float64{0.24: 1.24, 0.49: 1.49, 1.00: 2.00, 3.49: 6.98} {
+		if got := bound.ceiling(price); got < want-1e-9 || got > want+1e-9 {
+			t.Fatalf("ceiling(%.2f) = %.2f, want %.2f", price, got, want)
+		}
+	}
+	if (priceBound{factor: 1, extra: 0}).enabled() {
+		t.Fatal("factor 1 and extra 0 should turn replacements off")
+	}
+}
+
+func TestCheapSoldOutHardwareCanJumpToAMuchPricierReplacement(t *testing.T) {
+	ts := newTestServer(t)
+	ts.connectAs(t, "alice", "staff")
+	ts.fake.soldOut["l4"] = true
+	ts.fake.soldOut["rtx-3090"] = true
+	// Only rtx-4090 at $0.74 and a100 at $1.99 are free; the bound for $0.49 is $1.49.
+	runHi("compute", "up", "--on", "runpod", "--gpu", "l4", "--name", "jump", "--max", "1h", "--reason", "x", "--yes", "--no-wait")
+	id := ts.pending(t, "compute")
+	ts.server.decide(id, "bob", true, "", "")
+	if code, stdout, stderr := runHi("compute", "requests", id, "--wait", "--timeout", "5s"); code != 0 ||
+		!strings.Contains(stdout, "running on rtx-4090") {
+		t.Fatalf("code %d\n%s%s", code, stdout, stderr)
 	}
 }

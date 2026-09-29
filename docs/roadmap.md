@@ -227,6 +227,13 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] A running instance's Slack message shows "running since 12:56, stops
   at 13:06" instead of a running time that goes stale.
 
+### v0.10.6 — More room to replace cheap hardware
+
+- [x] A replacement for sold-out hardware may cost up to twice the approved
+  price or the approved price plus $1.00/h, whichever is higher
+  (`fallback_price_factor`, `fallback_price_extra`), so cheap GPUs find a
+  replacement while expensive ones stay near 2×.
+
 ## Planned
 
 ### v0.11.0 — Managed compute: policy, budgets, and reports

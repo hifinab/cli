@@ -29,9 +29,12 @@ import (
 // approval. See docs/specs/approved/hi_server.md.
 
 const (
-	// serverFallbackFactor is how much more per hour a replacement may cost
-	// when the approved hardware is sold out, unless config.json says.
+	// A replacement for sold-out hardware may cost up to this many times the
+	// approved price, or the approved price plus this many dollars an hour,
+	// whichever is higher, unless config.json says otherwise. Cheap hardware
+	// gets a lot of room; expensive hardware stays near 2x.
 	serverFallbackFactor = 2.0
+	serverFallbackExtra  = 1.0
 	serverDefaultPort    = 7373
 	serverClockSkew      = 5 * time.Minute
 	serverRequestExpiry  = 30 * time.Minute
@@ -139,8 +142,8 @@ type hiServer struct {
 	nonces    map[string]time.Time
 	unleased  map[string]bool
 	log       io.Writer
-	// fallbackFactor bounds replacements for sold-out hardware.
-	fallbackFactor float64
+	// fallback bounds replacements for sold-out hardware.
+	fallback priceBound
 	// slack is the Slack bridge, or nil when Slack isn't set up.
 	slack *slackBridge
 }
@@ -165,15 +168,33 @@ func serverDirectory(flagValue string) (string, error) {
 
 type serverConfig struct {
 	Listen string `json:"listen"`
-	// FallbackPriceFactor bounds replacements for sold-out hardware: an
-	// approval covers free hardware with at least as much memory costing up
-	// to this many times the approved price. 1 turns replacements off.
-	FallbackPriceFactor float64 `json:"fallback_price_factor,omitempty"`
+	// FallbackPriceFactor and FallbackPriceExtra bound replacements for
+	// sold-out hardware: an approval covers free hardware with at least as
+	// much memory costing up to factor times the approved price, or the
+	// price plus extra dollars an hour, whichever is higher. A factor of 1
+	// and an extra of 0 turn replacements off.
+	FallbackPriceFactor float64  `json:"fallback_price_factor,omitempty"`
+	FallbackPriceExtra  *float64 `json:"fallback_price_extra,omitempty"`
 }
 
-// fallbackProvider can suggest replacements for sold-out hardware.
+// priceBound is how much a replacement for sold-out hardware may cost.
+type priceBound struct {
+	factor float64
+	extra  float64
+}
+
+// ceiling is the highest hourly price a replacement for price may have.
+func (b priceBound) ceiling(price float64) float64 {
+	return max(price*b.factor, price+b.extra)
+}
+
+func (b priceBound) enabled() bool { return b.factor > 1 || b.extra > 0 }
+
+// fallbackProvider can suggest replacements for sold-out hardware: free
+// hardware of the same kind with at least as much memory, costing at most
+// ceiling dollars an hour, cheapest first.
 type fallbackProvider interface {
-	alternatives(name string, factor float64) ([]computeHardware, error)
+	alternatives(name string, ceiling float64) ([]computeHardware, error)
 }
 
 func openServer(dir string, log io.Writer) (*hiServer, error) {
@@ -185,7 +206,7 @@ func openServer(dir string, log io.Writer) (*hiServer, error) {
 		unleased:  map[string]bool{},
 		log:       log,
 
-		fallbackFactor: serverFallbackFactor,
+		fallback: priceBound{factor: serverFallbackFactor, extra: serverFallbackExtra},
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "state.json"))
 	switch {
@@ -919,14 +940,15 @@ func (s *hiServer) start(request serverRequest) {
 	}
 	err = create(hardware)
 	// Sold out: the approval covers free hardware with at least as much
-	// memory, up to fallbackFactor times the approved price.
+	// memory, up to the price bound.
 	var soldOut noCapacityError
-	if err != nil && errors.As(err, &soldOut) && s.fallbackFactor > 1 {
+	if err != nil && errors.As(err, &soldOut) && s.fallback.enabled() {
 		if fallback, ok := provider.(fallbackProvider); ok {
-			alternatives, listErr := fallback.alternatives(hardware.name, s.fallbackFactor)
+			ceiling := s.fallback.ceiling(hourlyRate(hardware.rate))
+			alternatives, listErr := fallback.alternatives(hardware.name, ceiling)
 			if listErr == nil && len(alternatives) == 0 {
-				err = fmt.Errorf("%s is sold out, and nothing free with as much memory costs at most %gx its %s",
-					hardware.name, s.fallbackFactor, hardware.rate)
+				err = fmt.Errorf("%s is sold out, and nothing free with as much memory costs at most $%.2f/h",
+					hardware.name, ceiling)
 				// Say what is free at any price, so the next request can ask for it.
 				if free, _ := fallback.alternatives(hardware.name, 1e6); len(free) > 0 {
 					var names []string
@@ -944,10 +966,10 @@ func (s *hiServer) start(request serverRequest) {
 					break
 				}
 				fmt.Fprintf(progress, "%s is sold out; starting %s (%s) instead\n", hardware.name, alternative.name, alternative.rate)
-				s.audit("server", "replaced sold-out hardware", request.ID, fmt.Sprintf("%s (%s) with %s (%s), within %gx",
-					hardware.name, hardware.rate, alternative.name, alternative.rate, s.fallbackFactor))
-				s.notifyThread(request.ID, fmt.Sprintf("%s was sold out; starting %s (%s) instead, within %gx the approved price.",
-					hardware.name, alternative.name, alternative.rate, s.fallbackFactor))
+				s.audit("server", "replaced sold-out hardware", request.ID, fmt.Sprintf("%s (%s) with %s (%s), within $%.2f/h",
+					hardware.name, hardware.rate, alternative.name, alternative.rate, ceiling))
+				s.notifyThread(request.ID, fmt.Sprintf("%s was sold out; starting %s (%s) instead, within the approval's "+
+					"bound of $%.2f/h.", hardware.name, alternative.name, alternative.rate, ceiling))
 				if err = create(alternative); err == nil {
 					s.mu.Lock()
 					if current, ok := s.state.Requests[request.ID]; ok {
@@ -1569,7 +1591,10 @@ func serverRunCommand(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	if config.FallbackPriceFactor != 0 {
-		server.fallbackFactor = config.FallbackPriceFactor
+		server.fallback.factor = config.FallbackPriceFactor
+	}
+	if config.FallbackPriceExtra != nil {
+		server.fallback.extra = *config.FallbackPriceExtra
 	}
 	if len(server.providers) == 0 {
 		fmt.Fprintln(stderr, "hi: warning: no provider keys yet; add one with `hi server provider add runpod`")

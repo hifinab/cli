@@ -438,8 +438,8 @@ func (p *runpodProvider) freeAlternatives(name string) string {
 }
 
 // alternatives lists free hardware of the same kind, with at least the
-// memory of name, costing at most factor times its price, cheapest first.
-func (p *runpodProvider) alternatives(name string, factor float64) ([]computeHardware, error) {
+// memory of name, costing at most ceiling dollars an hour, cheapest first.
+func (p *runpodProvider) alternatives(name string, ceiling float64) ([]computeHardware, error) {
 	p.forgetHardware() // availability is stale by now
 	wanted, err := p.option(name)
 	if err != nil {
@@ -455,7 +455,7 @@ func (p *runpodProvider) alternatives(name string, factor float64) ([]computeHar
 		case option.hardware.name == name,
 			(option.gpuID != "") != (wanted.gpuID != ""),
 			option.gpuID != "" && (!option.available || option.memoryGB < wanted.memoryGB),
-			option.hourly > wanted.hourly*factor:
+			option.hourly > ceiling+1e-9:
 			continue
 		}
 		result = append(result, option)

@@ -436,7 +436,9 @@ the request goes:
 6. If the approved hardware is sold out when the server starts it, the
    approval still counts: the server starts the cheapest free hardware with
    at least as much memory, costing at most `fallback_price_factor` (default
-   2) times the approved price, and tells the user and the audit log.
+   2) times the approved price or the approved price plus
+   `fallback_price_extra` (default $1.00/h), whichever is higher, and tells
+   the user and the audit log.
 
 `hi compute run` follows the same flow.
 
