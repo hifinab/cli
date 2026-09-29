@@ -147,6 +147,11 @@ hi compute requests r-9b41e0 --wait --timeout 10m
    means it was denied: tell the user the approver's reason and stop there.
 4. `--json` on `hi compute requests` gives the request in a form you can
    read.
+5. If a machine needs longer, ask with
+   `hi compute extend <name> 1h --reason "..." --no-wait`; it needs approval
+   like a start. Never start a second machine to get around a limit.
+6. A `Warning: This month: … Over … budget` line means the user is over
+   budget. Tell the user; the request still goes to a person.
 
 Stopping never needs approval, and you can stop only the user's own
 machines.

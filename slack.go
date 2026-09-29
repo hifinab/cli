@@ -29,7 +29,7 @@ const slackManifest = `{
   "features": {
     "bot_user": { "display_name": "hi compute", "always_online": true },
     "slash_commands": [
-      { "command": "/hi", "description": "GPU compute: status and stop", "usage_hint": "status | stop <name> | stop user <user> | stop all", "should_escape": false }
+      { "command": "/hi", "description": "GPU compute: status, stop, spend, budgets", "usage_hint": "status | stop <name|@user|all> | spend | users | audit | budget <group> <usd>", "should_escape": false }
     ]
   },
   "oauth_config": { "scopes": { "bot": ["chat:write", "commands", "users:read", "im:write"] } },
@@ -209,6 +209,9 @@ func (b *slackBridge) syncRequest(id string) {
 	group := ""
 	if known {
 		group = user.Group
+		if user.Kind == "agent" {
+			copy.Owner = user.Owner
+		}
 	}
 	s.mu.Unlock()
 
@@ -294,11 +297,17 @@ func aboutDollars(amount float64) string {
 // renderSlackRequest draws a request's message as it stands now.
 func renderSlackRequest(request serverRequest, lease *serverLease, group string, knownUser bool, now time.Time) (string, []slack.Block) {
 	for _, field := range []*string{&request.Hostname, &request.Reason, &request.DenyReason, &request.Error,
-		&request.Image, &request.Progress, &request.Approved, &request.Name, &request.Hardware} {
+		&request.Image, &request.Progress, &request.Approved, &request.Name, &request.Hardware, &request.Agent,
+		&request.Budget} {
 		*field = slackEscape(*field)
 	}
 	who := fmt.Sprintf("*%s*", request.User)
-	if group != "" {
+	switch {
+	case request.Owner != "":
+		who = fmt.Sprintf("🤖 *%s* (%s, owner %s, %s)", request.User, group, request.Owner, request.Hostname)
+	case group != "" && request.Agent != "":
+		who = fmt.Sprintf("*%s* via %s (%s, %s)", request.User, request.Agent, group, request.Hostname)
+	case group != "":
 		who = fmt.Sprintf("*%s* (%s, %s)", request.User, group, request.Hostname)
 	}
 	if request.Kind == "enroll" {
@@ -306,6 +315,13 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 		case "pending":
 			text := fmt.Sprintf("🟡 *%s* wants to join from *%s*\nDevice key `%s`", request.User, request.Hostname, request.Device)
 			var buttons []slack.BlockElement
+			if request.Owner != "" && !knownUser {
+				text = fmt.Sprintf("🟡 🤖 Agent *%s* (owner %s) wants to join from *%s*\nDevice key `%s`",
+					request.User, request.Owner, request.Hostname, request.Device)
+				buttons = append(buttons, slackButton("enroll", request.ID+"|agents", "Approve as agent", slack.StylePrimary))
+				buttons = append(buttons, slackButton("deny", request.ID, "Deny…", slack.StyleDanger))
+				return text, []slack.Block{slack.NewSectionBlock(slackText(text), nil, nil), slack.NewActionBlock("act-"+request.ID, buttons...)}
+			}
 			if knownUser {
 				text = fmt.Sprintf("🟡 *%s* (%s) wants to add a device: *%s*\nDevice key `%s`", request.User, group, request.Hostname, request.Device)
 				buttons = append(buttons, slackButton("enroll", request.ID+"|", "Approve", slack.StylePrimary))
@@ -331,6 +347,9 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 		}
 	}
 
+	if request.Kind == "extend" {
+		return renderSlackExtend(request, who)
+	}
 	maximum := time.Duration(request.MaxSeconds) * time.Second
 	cost := hourlyRate(request.Rate) * maximum.Hours()
 	summary := fmt.Sprintf("*%s · %s* · %s · max %s → at most %s", request.Provider, request.Hardware, request.Rate,
@@ -385,6 +404,50 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 		summary += fmt.Sprintf(" (approved %s, which was sold out)", request.Approved)
 	}
 	text := status + "\n" + summary + "\n" + reason
+	if request.Budget != "" && (request.State == "pending" || request.OverBudget) {
+		mark := "💸"
+		if request.OverBudget {
+			mark = "⚠️"
+		}
+		text += "\n" + mark + " " + request.Budget
+	}
+	blocks := []slack.Block{slack.NewSectionBlock(slackText(text), nil, nil)}
+	if len(actions) > 0 {
+		blocks = append(blocks, slack.NewActionBlock("act-"+request.ID, actions...))
+	}
+	return status, blocks
+}
+
+// renderSlackExtend draws a request for more time on a running instance.
+func renderSlackExtend(request serverRequest, who string) (string, []slack.Block) {
+	extra := time.Duration(request.MaxSeconds) * time.Second
+	what := fmt.Sprintf("`%s` %s longer · %s/%s · %s → at most %s more", request.Name, formatDuration(extra),
+		request.Provider, request.Hardware, request.Rate, formatDollars(hourlyRate(request.Rate)*extra.Hours()))
+	var status string
+	var actions []slack.BlockElement
+	switch request.State {
+	case "pending":
+		status = fmt.Sprintf("🟡 %s asks for more time: %s", who, what)
+		actions = []slack.BlockElement{
+			slackButton("approve", request.ID, "Approve", slack.StylePrimary),
+			slackButton("deny", request.ID, "Deny…", slack.StyleDanger),
+		}
+	case "approved":
+		status = fmt.Sprintf("🟢 %s · %s · approved by %s", who, what, request.DecidedBy)
+	case "denied":
+		status = fmt.Sprintf("🔴 %s · %s · denied by %s", who, what, request.DecidedBy)
+		if request.DenyReason != "" {
+			status += ": " + request.DenyReason
+		}
+	case "failed":
+		status = fmt.Sprintf("❌ %s · %s · %s", who, what, request.Error)
+	default:
+		status = fmt.Sprintf("⌛ %s · %s · %s with no decision", who, what, request.State)
+	}
+	text := status + "\n> " + strings.ReplaceAll(request.Reason, "\n", "\n> ")
+	if request.Budget != "" && (request.State == "pending" || request.OverBudget) {
+		text += "\n💸 " + request.Budget
+	}
 	blocks := []slack.Block{slack.NewSectionBlock(slackText(text), nil, nil)}
 	if len(actions) > 0 {
 		blocks = append(blocks, slack.NewActionBlock("act-"+request.ID, actions...))
@@ -666,8 +729,30 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 		}
 		return respond(fmt.Sprintf("Nothing called %s is running, and no user by that name has anything running. "+
 			"See `/hi status`.", slackEscape(fields[1])))
+	case fields[0] == "spend" && len(fields) <= 1:
+		text := s.spendSummary(monthStart(now), now)
+		return respond(text, slack.NewSectionBlock(slackText(slackEscape(text)), nil, nil))
+	case fields[0] == "users" && len(fields) == 1:
+		text := s.usersSummary(now)
+		return respond(text, slack.NewSectionBlock(slackText(slackEscape(text)), nil, nil))
+	case fields[0] == "audit" && len(fields) <= 2:
+		who := ""
+		if len(fields) == 2 {
+			who = fields[1]
+		}
+		text := s.recentAudit(who, 15)
+		return respond(text, slack.NewSectionBlock(slackText(slackEscape(text)), nil, nil))
+	case fields[0] == "budget" && (len(fields) == 3 || (len(fields) == 4 && fields[2] == "total")):
+		actor, _ := b.approver(command.UserID)
+		text, err := s.setBudget(fields[1], fields[len(fields)-1], len(fields) == 4, actor)
+		if err != nil {
+			return respond(err.Error())
+		}
+		s.notifyChannel(text)
+		return respond(text)
 	}
-	return respond("Usage: `/hi status`, `/hi stop <name>`, `/hi stop user <user>`, `/hi stop all`")
+	return respond("Usage: `/hi status`, `/hi stop <name | @user | all>`, `/hi spend`, `/hi users`, " +
+		"`/hi audit [user]`, `/hi budget <group> <usd>` (each user), `/hi budget <group> total <usd>`")
 }
 
 // ---------------------------------------------------------------------------

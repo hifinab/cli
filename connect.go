@@ -177,6 +177,8 @@ compute. Without it, hi compute uses your own keys as before.
 Usage:
   hi connect <server> [--user NAME] [--no-wait]
                         Enroll this device and wait for an admin's approval
+  hi connect <server> --agent NAME --owner PERSON
+                        Enroll an agent that runs on its own, such as a build bot
   hi connect status     Server, user, group, and managed providers
   hi connect key        Print this device's public key, for an admin to pre-approve
   hi disconnect         Forget the server and delete this device's key`)
@@ -186,6 +188,8 @@ func connectCommand(args []string, stdout, stderr io.Writer) error {
 	flags := &flagSet{newComputeFlags("connect", stderr)}
 	user := flags.String("user", currentUserName(), "your user name on the server")
 	noWait := flags.Bool("no-wait", false, "return while approval is pending")
+	agent := flags.String("agent", "", "enroll an agent that runs on its own, under this name")
+	owner := flags.String("owner", "", "the person responsible for the agent")
 	positional, err := flags.parse(args)
 	if err != nil {
 		return err
@@ -213,7 +217,15 @@ func connectCommand(args []string, stdout, stderr io.Writer) error {
 	hostname, _ := os.Hostname()
 	client := newServerClient(url, key)
 	var request serverRequest
-	if err := client.call(http.MethodPost, "/v1/enroll", apiEnroll{User: *user, Hostname: hostname}, &request); err != nil {
+	enroll := apiEnroll{User: *user, Hostname: hostname}
+	if *agent != "" {
+		if !validServerName(*agent) || !validServerName(*owner) {
+			return usageError{"usage: hi connect <server> --agent <name> --owner <person>"}
+		}
+		enroll = apiEnroll{User: *agent, Hostname: hostname, Agent: true, Owner: *owner}
+		*user = *agent
+	}
+	if err := client.call(http.MethodPost, "/v1/enroll", enroll, &request); err != nil {
 		return err
 	}
 	if err := saveServerConnection(serverConnection{URL: url, User: *user}); err != nil {
@@ -258,6 +270,7 @@ func refreshConnection(client *serverClient, user string, stdout io.Writer) erro
 	}
 	fmt.Fprintf(stdout, "Connected to %s as %s (%s).\n", client.url, me.User, me.Group)
 	printManagedProviders(me.Providers, stdout)
+	printBudget(me.Budget, me.OverBudget, stdout)
 	return nil
 }
 

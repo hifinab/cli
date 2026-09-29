@@ -98,6 +98,28 @@ Stopping never needs approval. You can stop your own machines only;
 `hi compute stop --all` stops all of yours and nobody else's. If you forget,
 the server stops the machine at its `--max`.
 
+### Ask for more time
+
+```sh
+hi compute extend rtx-4090-1c2d 2h --reason "needs two more epochs"
+```
+
+An extension goes through the same approval as a start. Once approved, the
+machine's limit moves, and `hi compute ls` shows the new time.
+
+### Budgets
+
+If your group has a monthly budget, `hi connect status`, `hi compute ls`, and
+every request show what you have spent this month:
+
+```text
+This month: $42.10 of iman's $100.00 · staff $120.00 of $300.00
+```
+
+Going over a budget never blocks you. The request shows a warning, the
+approvers see it too, and it waits for a person even if the policy would
+otherwise approve it by itself.
+
 ### Check your requests
 
 ```sh
@@ -127,6 +149,18 @@ hi compute requests r-9b41e0 --wait --timeout 10m
 `--no-wait` returns at once with exit status 3 and the request ID. Nobody can
 approve their own request, so an agent can't approve its own either. The
 [agent skill](/guide/reference/skill/) teaches agents this flow.
+
+An agent that runs on its own, such as a scheduled job on a build server,
+joins as itself with a person responsible for it:
+
+```sh
+hi connect compute.internal --agent build-bot --owner iman
+```
+
+Approvers see it as 🤖 **build-bot** (owner iman), with an *Approve as
+agent* button that puts it in the `agents` group. Requests from an agent on
+someone's laptop show as `iman via Claude Code`; set `HI_AGENT` to name any
+other agent.
 
 ### Leave the server
 
@@ -228,6 +262,51 @@ own requests need another approver.
 | `/hi stop all`           | A button to stop everything                           |
 
 Answers are visible only to you, and every stop needs a click to confirm.
+
+### Policy, budgets, and reports
+
+With no policy, every start needs a person. A policy lets groups run cheap,
+short jobs without waiting, caps what each group may use, and sets monthly
+budgets:
+
+```sh
+hi server policy example > /tmp/policy.json   # a starting point
+hi server policy edit                         # opens $EDITOR, checks, saves
+hi server policy show
+```
+
+| Setting                     | Meaning                                                   |
+|-----------------------------|-----------------------------------------------------------|
+| `max_hours`                 | Refuse starts and extensions that would run longer        |
+| `hardware`                  | Refuse other hardware                                     |
+| `auto_approve`              | Approve without a person up to this price and total time  |
+| `user_monthly_budget_usd`   | Warn when a user in the group goes over                   |
+| `group_monthly_budget_usd`  | Warn when the whole group goes over                       |
+
+Budgets warn and never block. An over-budget request shows ⚠️ and the spend
+in Slack, and always waits for a person. The channel gets one alert a month
+when a user or group crosses its budget. Changes apply to the next request;
+no restart needed.
+
+At 09:00 server time the channel gets a report: yesterday's spend every
+day, the week by user and group with the most-used hardware and silent
+devices on Mondays, and the month on the 1st. Turn any off with
+`"reports": {"daily": false}`.
+
+```sh
+hi server spend                 # this month, per user and group
+hi server spend --since 7d
+```
+
+In Slack:
+
+| Command                         | Does                                           |
+|---------------------------------|------------------------------------------------|
+| `/hi spend`                     | This month's spend per user and group          |
+| `/hi users`                     | Users, groups, devices, and spend              |
+| `/hi audit [user]`              | The last 15 audit entries                      |
+| `/hi budget <group> <usd>`      | Set each user's monthly budget in a group      |
+| `/hi budget <group> total <usd>` | Set the whole group's monthly budget          |
 
 ### Watch and stop
 

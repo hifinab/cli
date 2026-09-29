@@ -413,7 +413,7 @@ the request goes:
    hardware, `--max`, the user's SSH public key, and a short reason. `hi` asks
    for the reason, or it can be given with `--reason`.
 2. The server checks it against policy. The request can be refused outright
-   (hardware not allowed for the group, or over budget), approved
+   (hardware not allowed for the group, or longer than it may run), approved
    automatically by a rule, or sent to Slack.
 3. Slack shows:
 
@@ -488,31 +488,45 @@ Colab or own-key instances, or anything from other tools.
 
 ## Policy
 
-Policy is one TOML file on the server that admins edit with
-`hi server policy edit`. `hi` validates the file before it takes effect.
-`/hi budget` and `/hi user move` cover the two changes made most often, so
-admins rarely need the server box for day-to-day changes.
+Policy is one JSON file on the server, `policy.json`, that admins edit with
+`hi server policy edit`. `hi` checks it before saving and rejects unknown
+fields, so a typo can't silently turn a limit off. The server reads it on
+every request, so changes apply without a restart. `/hi budget` covers the
+change made most often, so admins rarely need the server box for day-to-day
+changes. With no policy file, every start needs a person and nothing else is
+limited.
 
-```toml
-[groups.staff]
-providers = ["runpod", "hf"]
-max_hours = 8
-monthly_budget_usd = 300
-auto_approve = { max_price_per_hour = 1.00, max_hours = 2 }
-
-[groups.students]
-providers = ["runpod"]
-gpus = ["RTX 4090", "L4", "A100"]
-max_hours = 4
-monthly_budget_usd = 50
-auto_approve = false        # every paid start needs a person
-
-[unleased_instances]
-action = "alert"            # or "stop"
+```json
+{
+  "groups": {
+    "staff": {
+      "max_hours": 8,
+      "auto_approve": { "max_price_per_hour": 1.00, "max_hours": 2 },
+      "user_monthly_budget_usd": 100,
+      "group_monthly_budget_usd": 300
+    },
+    "students": {
+      "max_hours": 4,
+      "hardware": ["l4", "rtx-4090", "rtx-a5000", "a40"],
+      "user_monthly_budget_usd": 25
+    }
+  },
+  "reports": { "daily": true, "weekly": true, "monthly": true }
+}
 ```
 
-Auto-approved starts still post in `#compute-approvals` for visibility, with
-only a **Stop** button.
+- `max_hours` and `hardware` are hard limits: a request outside them is
+  refused with the reason.
+- **Budgets warn and never block.** A request from a user or group that is
+  over budget shows ⚠️ with the spend in Slack and warns the user in the
+  terminal, and it always goes to a person, even within auto-approve limits.
+  The channel gets one alert per user or group per month when a budget is
+  crossed. The user also sees the spend in `hi connect status` and
+  `hi compute ls`.
+- `auto_approve` approves a start or extension within its price and total
+  hours, when the user and group are within budget. The message says
+  `approved by policy (staff: up to $1.00/h and 2h)` and keeps its Stop
+  button.
 
 ## Security
 

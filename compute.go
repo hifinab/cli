@@ -207,6 +207,8 @@ func runCompute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(computeBillingCommand(rest, stdout, stderr), stderr)
 	case "requests":
 		return exitCode(computeRequestsCommand(rest, stdout, stderr), stderr)
+	case "extend":
+		return exitCode(computeExtendCommand(rest, stdin, stdout, stderr), stderr)
 	case "wait":
 		code, err := computeWaitCommand(rest, stdout, stderr)
 		if err != nil {
@@ -276,6 +278,7 @@ Usage:
   hi compute wait <name>...           Wait for detached runs to finish
   hi compute billing [ACCOUNT]        Show or choose who pays (Hugging Face)
   hi compute requests [<id> [--wait]] Your requests to the hi server (when connected)
+  hi compute extend <name> <duration> Ask the hi server for more time
 
 Options for up and run:
   --on <provider>    colab, hf, or runpod (default: inferred from --gpu, or

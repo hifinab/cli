@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -172,8 +173,12 @@ func (p *managedProvider) account() (string, error) {
 	if err != nil {
 		return "", nil
 	}
-	return fmt.Sprintf("%s is managed by %s: you are %s (%s), and starting needs an approval.",
-		p.provider, p.url, me.User, me.Group), nil
+	text := fmt.Sprintf("%s is managed by %s: you are %s (%s), and starting needs an approval.",
+		p.provider, p.url, me.User, me.Group)
+	if me.Budget != "" {
+		text += "\n" + me.Budget
+	}
+	return text, nil
 }
 
 func (p *managedProvider) validateRun(runRequest) error {
@@ -223,7 +228,31 @@ func (p *managedProvider) computeRequest(request upRequest) apiComputeRequest {
 	return apiComputeRequest{
 		Provider: p.provider, Hardware: request.hardware.name, Name: request.name,
 		MaxSeconds: int64(request.max / time.Second), Image: request.image,
-		PublicKey: request.publicKey, Reason: request.reason,
+		PublicKey: request.publicKey, Reason: request.reason, Agent: agentName(),
+	}
+}
+
+// agentName names the coding agent running hi, so approvers see who is
+// really asking: $HI_AGENT, or an agent's own environment variable.
+func agentName() string {
+	if name := strings.TrimSpace(os.Getenv("HI_AGENT")); name != "" {
+		return name
+	}
+	if os.Getenv("CLAUDECODE") == "1" {
+		return "Claude Code"
+	}
+	return ""
+}
+
+// printBudget shows the user's spend this month when the server reports a
+// budget, as a warning when it is over.
+func printBudget(budget string, over bool, stdout io.Writer) {
+	switch {
+	case budget == "":
+	case over:
+		fmt.Fprintf(stdout, "Warning: %s Approvers see this too.\n", budget)
+	default:
+		fmt.Fprintln(stdout, budget)
 	}
 }
 
@@ -244,7 +273,11 @@ func (p *managedProvider) create(request upRequest, stdout, stderr io.Writer) er
 		return err
 	}
 	fmt.Fprintf(stdout, "Sent request %s to %s.\n", created.ID, p.url)
-	if request.noWait {
+	printBudget(created.Budget, created.OverBudget, stdout)
+	if created.State != "pending" && created.DecidedBy != "" {
+		fmt.Fprintf(stdout, "Approved by %s.\n", created.DecidedBy)
+	}
+	if request.noWait && created.State == "pending" {
 		return exitStatusError{code: exitPending, message: fmt.Sprintf(
 			"%s is waiting for approval; check it with `hi compute requests %s --wait`", created.ID, created.ID)}
 	}
@@ -271,7 +304,7 @@ func (p *managedProvider) waitForDecision(id string, timeout time.Duration, stdo
 			shown = line
 		}
 		switch request.State {
-		case "running", "stopped":
+		case "running", "stopped", "approved":
 			return request, nil
 		case "denied":
 			message := fmt.Sprintf("%s was denied by %s", id, request.DecidedBy)
@@ -296,6 +329,9 @@ func requestStateLine(request serverRequest) string {
 	switch request.State {
 	case "pending":
 		return "Waiting for approval… (Ctrl-C stops waiting; the request stays open)"
+	case "approved":
+		return fmt.Sprintf("Approved by %s: %s runs %s longer.", request.DecidedBy, request.Name,
+			formatDuration(time.Duration(request.MaxSeconds)*time.Second))
 	case "starting":
 		line := fmt.Sprintf("Approved by %s; starting", request.DecidedBy)
 		if request.Progress != "" {
@@ -476,4 +512,62 @@ func writeRequestsJSON(stdout io.Writer, value any) error {
 	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(value)
+}
+
+// ---------------------------------------------------------------------------
+// hi compute extend
+
+func computeExtendCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	flags := &flagSet{newComputeFlags("extend", stderr)}
+	reason := flags.String("reason", "", "why it needs longer; approvers see it")
+	noWait := flags.Bool("no-wait", false, "return while approval is pending")
+	positional, err := flags.parse(args)
+	if err != nil {
+		return err
+	}
+	if len(positional) != 2 {
+		return usageError{"usage: hi compute extend <name> <duration> [--reason R] [--no-wait]"}
+	}
+	extra, err := parseLifetime(positional[1])
+	if err != nil || extra == noLimit {
+		return usageError{fmt.Sprintf("invalid duration %q; use hours such as 1 or 1.5, or 30m", positional[1])}
+	}
+	provider, name, err := findInstance(positional[0])
+	if err != nil {
+		return err
+	}
+	managed, ok := provider.(*managedProvider)
+	if !ok {
+		return usageError{fmt.Sprintf("%s is not managed by a hi server; its limit was set when it started", name)}
+	}
+	*reason = strings.TrimSpace(*reason)
+	if *reason == "" {
+		if !isTerminal(stdin) {
+			return usageError{"approvers need a reason; add --reason \"why it needs longer\""}
+		}
+		fmt.Fprint(stdout, "Why does it need longer? (approvers see this) ")
+		line, err := readLine(stdin)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
+		if *reason = strings.TrimSpace(line); *reason == "" {
+			return errors.New("cancelled; approvers need a reason")
+		}
+	}
+	var created serverRequest
+	body := apiExtend{Seconds: int64(extra / time.Second), Reason: *reason, Agent: agentName()}
+	if err := managed.call(http.MethodPost, "/v1/instances/"+url.PathEscape(name)+"/extend", body, &created); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "Asked %s for %s more on %s (request %s).\n", managed.url, formatDuration(extra), name, created.ID)
+	printBudget(created.Budget, created.OverBudget, stdout)
+	if created.State != "pending" && created.DecidedBy != "" {
+		fmt.Fprintf(stdout, "Approved by %s.\n", created.DecidedBy)
+	}
+	if *noWait && created.State == "pending" {
+		return exitStatusError{code: exitPending, message: fmt.Sprintf(
+			"%s is waiting for approval; check it with `hi compute requests %s --wait`", created.ID, created.ID)}
+	}
+	_, err = managed.waitForDecision(created.ID, 0, stdout)
+	return err
 }

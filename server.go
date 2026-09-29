@@ -64,12 +64,20 @@ type serverState struct {
 	Devices  map[string]*serverDevice  `json:"devices"`
 	Requests map[string]*serverRequest `json:"requests"`
 	Leases   map[string]*serverLease   `json:"leases"`
+	// Alerts records budget alerts already sent, per month.
+	Alerts map[string]bool `json:"alerts,omitempty"`
+	// Reported records the last period each Slack report covered.
+	Reported map[string]string `json:"reported,omitempty"`
 }
 
 type serverUser struct {
 	Name  string    `json:"name"`
 	Group string    `json:"group"`
 	Added time.Time `json:"added"`
+	// Kind is "agent" for an agent that runs on its own; Owner is the
+	// person responsible for it.
+	Kind  string `json:"kind,omitempty"`
+	Owner string `json:"owner,omitempty"`
 }
 
 type serverDevice struct {
@@ -114,6 +122,15 @@ type serverRequest struct {
 	Ended      time.Time `json:"ended,omitzero"`
 	// SlackTS is the request's message in the approvals channel.
 	SlackTS string `json:"slack_ts,omitempty"`
+	// Agent names the coding agent that sent it for the user, if any.
+	Agent string `json:"agent,omitempty"`
+	// Budget is the user's and group's spend this month when it was sent.
+	Budget     string `json:"budget,omitempty"`
+	OverBudget bool   `json:"over_budget,omitempty"`
+	// Owner is the person responsible for an agent that enrolls itself.
+	// A request of kind "extend" asks for MaxSeconds more on the running
+	// instance Name.
+	Owner string `json:"owner,omitempty"`
 }
 
 // serverLease is a running instance the server started, and the limits it
@@ -415,6 +432,9 @@ type apiMe struct {
 	Group     string        `json:"group"`
 	Device    string        `json:"device"`
 	Providers []apiProvider `json:"providers"`
+	// Budget is this month's spend against the user's and group's budgets.
+	Budget     string `json:"budget,omitempty"`
+	OverBudget bool   `json:"over_budget,omitempty"`
 }
 
 type apiHardware struct {
@@ -435,6 +455,9 @@ type apiSSH struct {
 type apiEnroll struct {
 	User     string `json:"user"`
 	Hostname string `json:"hostname"`
+	// Agent and Owner enroll an agent that runs on its own.
+	Agent bool   `json:"agent,omitempty"`
+	Owner string `json:"owner,omitempty"`
 }
 
 type apiComputeRequest struct {
@@ -445,6 +468,13 @@ type apiComputeRequest struct {
 	Image      string `json:"image,omitempty"`
 	PublicKey  string `json:"public_key"`
 	Reason     string `json:"reason"`
+	Agent      string `json:"agent,omitempty"`
+}
+
+type apiExtend struct {
+	Seconds int64  `json:"seconds"`
+	Reason  string `json:"reason"`
+	Agent   string `json:"agent,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
@@ -470,6 +500,7 @@ func (s *hiServer) clientHandler() http.Handler {
 	mux.HandleFunc("GET /v1/instances", s.device(s.handleListInstances))
 	mux.HandleFunc("POST /v1/instances/{name}/stop", s.device(s.handleStopInstance))
 	mux.HandleFunc("GET /v1/instances/{name}/ssh", s.device(s.handleSSH))
+	mux.HandleFunc("POST /v1/instances/{name}/extend", s.device(s.handleExtend))
 	return mux
 }
 
@@ -523,6 +554,10 @@ func (s *hiServer) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, "use a user name of lowercase letters, digits, dots, or hyphens")
 		return
 	}
+	if enroll.Agent && !validServerName(enroll.Owner) {
+		writeAPIError(w, http.StatusBadRequest, "an agent needs --owner, the person responsible for it")
+		return
+	}
 	fingerprint := keyFingerprint(public)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -552,6 +587,9 @@ func (s *hiServer) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		PublicKey: base64.StdEncoding.EncodeToString(public),
 		Created:   computeNow(),
 	}
+	if enroll.Agent {
+		request.Agent, request.Owner = enroll.User, enroll.Owner
+	}
 	s.state.Requests[request.ID] = request
 	if err := s.saveLocked(); err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
@@ -563,9 +601,13 @@ func (s *hiServer) handleEnroll(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *hiServer) handleMe(w http.ResponseWriter, _ *http.Request, device serverDevice, _ []byte) {
+	policy := s.policy()
 	s.mu.Lock()
 	user := s.state.Users[device.User]
 	me := apiMe{User: user.Name, Group: user.Group, Device: device.Fingerprint}
+	if budget := s.budgetLocked(policy, user.Name, computeNow()); budget.IsSet || budget.UserSpend > 0 {
+		me.Budget, me.OverBudget = budget.text(), budget.over()
+	}
 	s.mu.Unlock()
 	providers := s.providerSnapshot()
 	names := make([]string, 0, len(providers))
@@ -673,10 +715,18 @@ func (s *hiServer) handleCreateRequest(w http.ResponseWriter, _ *http.Request, d
 		}
 	}
 
+	policy := s.policy()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if _, taken := s.state.Leases[input.Name]; taken || s.nameRequestedLocked(input.Name) {
+		s.mu.Unlock()
 		writeAPIError(w, http.StatusConflict, fmt.Sprintf("an instance named %q already exists; choose another --name", input.Name))
+		return
+	}
+	hours := float64(input.MaxSeconds) / 3600
+	autoApproved, budget, err := s.checkRequestLocked(policy, device.User, hardware.name, hardware.rate, hours)
+	if err != nil {
+		s.mu.Unlock()
+		writeAPIError(w, http.StatusForbidden, err.Error())
 		return
 	}
 	request := &serverRequest{
@@ -695,15 +745,106 @@ func (s *hiServer) handleCreateRequest(w http.ResponseWriter, _ *http.Request, d
 		Image:      input.Image,
 		PublicKey:  strings.TrimSpace(input.PublicKey),
 		Reason:     strings.TrimSpace(input.Reason),
+		Agent:      cleanAgentName(input.Agent),
+	}
+	if budget.IsSet {
+		request.Budget, request.OverBudget = budget.text(), budget.over()
 	}
 	s.state.Requests[request.ID] = request
-	if err := s.saveLocked(); err != nil {
+	err = s.saveLocked()
+	copy := *request
+	s.mu.Unlock()
+	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	s.audit(device.User, "requested compute", request.ID, describeServerRequest(request))
-	s.notifyRequest(request.ID)
-	writeJSON(w, http.StatusAccepted, request)
+	s.audit(device.User, "requested compute", request.ID, describeServerRequest(&copy))
+	if autoApproved != "" {
+		// decide notifies Slack once, already approved.
+		if decided, err := s.decide(copy.ID, autoApproved, true, "", ""); err == nil {
+			copy = decided
+		}
+	} else {
+		s.notifyRequest(copy.ID)
+	}
+	writeJSON(w, http.StatusAccepted, copy)
+}
+
+// cleanAgentName keeps an agent label short and plain.
+func cleanAgentName(name string) string {
+	name = strings.TrimSpace(name)
+	if len(name) > 40 {
+		name = name[:40]
+	}
+	return strings.Map(func(r rune) rune {
+		if r < ' ' || r == '<' || r == '>' || r == '&' {
+			return -1
+		}
+		return r
+	}, name)
+}
+
+// handleExtend asks for more time on one of the user's running instances.
+// It goes through the same approval as a start.
+func (s *hiServer) handleExtend(w http.ResponseWriter, r *http.Request, device serverDevice, body []byte) {
+	var input apiExtend
+	if err := json.Unmarshal(body, &input); err != nil || input.Seconds <= 0 {
+		writeAPIError(w, http.StatusBadRequest, "say how much longer, such as 1h")
+		return
+	}
+	if strings.TrimSpace(input.Reason) == "" || len(input.Reason) > 500 {
+		writeAPIError(w, http.StatusBadRequest, "a reason is required; approvers see it")
+		return
+	}
+	lease, ok := s.ownLease(r.PathValue("name"), device.User)
+	if !ok {
+		writeAPIError(w, http.StatusNotFound, fmt.Sprintf("you have no instance named %q", r.PathValue("name")))
+		return
+	}
+	policy := s.policy()
+	now := computeNow()
+	total := lease.Deadline.Sub(lease.Started).Hours() + float64(input.Seconds)/3600
+	s.mu.Lock()
+	for _, request := range s.state.Requests {
+		if request.Kind == "extend" && request.Name == lease.Name && request.State == "pending" {
+			s.mu.Unlock()
+			writeAPIError(w, http.StatusConflict, fmt.Sprintf("%s already asks for more time on %s", request.ID, lease.Name))
+			return
+		}
+	}
+	autoApproved, budget, err := s.checkRequestLocked(policy, device.User, lease.Hardware, lease.Rate, total)
+	if err != nil {
+		s.mu.Unlock()
+		writeAPIError(w, http.StatusForbidden, err.Error())
+		return
+	}
+	request := &serverRequest{
+		ID: newServerID("x"), Kind: "extend", State: "pending", User: device.User, Device: device.Fingerprint,
+		Hostname: device.Hostname, Created: now, Provider: lease.Provider, Hardware: lease.Hardware,
+		Rate: lease.Rate, Name: lease.Name, MaxSeconds: input.Seconds, Reason: strings.TrimSpace(input.Reason),
+		Agent: cleanAgentName(input.Agent),
+	}
+	if budget.IsSet {
+		request.Budget, request.OverBudget = budget.text(), budget.over()
+	}
+	s.state.Requests[request.ID] = request
+	err = s.saveLocked()
+	copy := *request
+	s.mu.Unlock()
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	s.audit(device.User, "asked for more time", copy.ID, fmt.Sprintf("%s by %s: %s", copy.Name,
+		formatDuration(time.Duration(copy.MaxSeconds)*time.Second), copy.Reason))
+	if autoApproved != "" {
+		if decided, err := s.decide(copy.ID, autoApproved, true, "", ""); err == nil {
+			copy = decided
+		}
+	} else {
+		s.notifyRequest(copy.ID)
+	}
+	writeJSON(w, http.StatusAccepted, copy)
 }
 
 // nameRequestedLocked reports an open request that will use this name.
@@ -858,6 +999,9 @@ func (s *hiServer) decide(id, actor string, approve bool, group, reason string) 
 		user, exists := s.state.Users[request.User]
 		if !exists {
 			user = &serverUser{Name: request.User, Group: group, Added: computeNow()}
+			if request.Owner != "" {
+				user.Kind, user.Owner = "agent", request.Owner
+			}
 			s.state.Users[request.User] = user
 		}
 		request.State, request.Group = "approved", user.Group
@@ -870,6 +1014,32 @@ func (s *hiServer) decide(id, actor string, approve bool, group, reason string) 
 		s.mu.Unlock()
 		s.audit(actor, "approved enrollment", id, fmt.Sprintf("%s (%s) on %s", request.User, user.Group, request.Hostname))
 		s.notifyRequest(id)
+		return copy, err
+	}
+	if request.Kind == "extend" {
+		lease, running := s.state.Leases[request.Name]
+		if !running {
+			request.State, request.Error = "failed", request.Name+" is no longer running"
+			err := s.saveLocked()
+			copy := *request
+			s.mu.Unlock()
+			s.notifyRequest(id)
+			return copy, err
+		}
+		lease.Deadline = lease.Deadline.Add(time.Duration(request.MaxSeconds) * time.Second)
+		lease.Warned = false
+		request.State = "approved"
+		deadline := lease.Deadline
+		original := lease.Request
+		err := s.saveLocked()
+		copy := *request
+		s.mu.Unlock()
+		s.audit(actor, "extended", request.Name, fmt.Sprintf("%s by %s, now stops at %s", id,
+			formatDuration(time.Duration(request.MaxSeconds)*time.Second), deadline.Local().Format("15:04")))
+		s.notifyRequest(id)
+		s.notifyRequest(original)
+		s.notifyThread(original, fmt.Sprintf("Extended by %s (%s, approved by %s). It now stops at %s.",
+			formatDuration(time.Duration(request.MaxSeconds)*time.Second), id, actor, deadline.Local().Format("15:04")))
 		return copy, err
 	}
 	request.State = "starting"
@@ -1121,6 +1291,8 @@ func (s *hiServer) reconcile() {
 				"Stop it on the provider's website if nobody expects it.", instance.name, name))
 		}
 	}
+	s.checkBudgets(now)
+	s.maybeReport(now)
 }
 
 // ---------------------------------------------------------------------------
@@ -1348,7 +1520,33 @@ func (s *hiServer) adminHandler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"removed": name})
 	})
 	s.approversHandler(mux)
+	mux.HandleFunc("GET /admin/spend", func(w http.ResponseWriter, r *http.Request) {
+		seconds, _ := strconv.ParseInt(r.URL.Query().Get("seconds"), 10, 64)
+		to := computeNow()
+		from := monthStart(to)
+		if seconds > 0 {
+			from = to.Add(-time.Duration(seconds) * time.Second)
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"text": s.spendSummary(from, to)})
+	})
 	return mux
+}
+
+// spendSummary is spend per user and group between from and to, as text.
+func (s *hiServer) spendSummary(from, to time.Time) string {
+	policy := s.policy()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rows, perGroup := s.spendTableLocked(policy, from, to)
+	if len(rows) == 0 {
+		return fmt.Sprintf("Nothing was spent since %s.", from.Local().Format("2 Jan 15:04"))
+	}
+	var total float64
+	for _, row := range rows {
+		total += row.Spend
+	}
+	return fmt.Sprintf("Since %s: %s\n\nBy user\n%s\n\nBy group\n%s", from.Local().Format("2 Jan 15:04"),
+		formatDollars(total), describeSpendRows(rows, 50), describeGroupSpend(policy, perGroup))
 }
 
 func managedProviderNames() []string {
@@ -1474,6 +1672,10 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(serverSlackCommand(rest, stdin, stdout, stderr), stderr)
 	case "approvers":
 		return exitCode(serverApproversCommand(rest, stdout, stderr), stderr)
+	case "policy":
+		return exitCode(serverPolicyCommand(rest, stdin, stdout, stderr), stderr)
+	case "spend":
+		return exitCode(serverSpendCommand(rest, stdout, stderr), stderr)
 	default:
 		fmt.Fprintf(stderr, "hi: unknown server command %q\n\n", command)
 		printServerUsage(stderr)
@@ -1505,6 +1707,9 @@ Usage:
   hi server approvers add <Slack ID> --name <user>
                                           Let someone approve and stop from Slack
   hi server approvers remove <Slack ID> | list
+  hi server policy show|edit|example|check
+                                          Groups: limits, auto-approve, budgets
+  hi server spend [--since 30d]           Spend per user and group
 
 Commands other than init and run talk to the running server through its
 admin socket, so they work only on the server box. Decisions are recorded

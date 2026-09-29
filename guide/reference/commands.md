@@ -41,6 +41,7 @@ description: Every hi command and option in one place.
 | `hi compute stop [<name> \| --all] [--yes]`          | Stop and release; without a name, pick from a list    |
 | `hi compute proxy <name>`                            | The SSH transport, for `ProxyCommand` (Colab)          |
 | `hi compute requests [<id> [--wait] [--timeout <d>]] [--json]` | Your requests to the hi server; exit 3 pending, 4 denied |
+| `hi compute extend <name> <duration> [--reason <r>] [--no-wait]` | Ask the hi server for more time |
 
 ### Options for up, run, and serve
 
@@ -77,6 +78,7 @@ See [Managed compute for a team](/guide/compute/managed/).
 | Command                                             | Does                                                 |
 |-----------------------------------------------------|------------------------------------------------------|
 | `hi connect <server> [--user <name>] [--no-wait]`   | Enroll this device and wait for approval             |
+| `hi connect <server> --agent <name> --owner <user>` | Enroll an agent that runs on its own                 |
 | `hi connect status`                                 | Server, user, group, and managed providers           |
 | `hi connect key`                                    | This device's public key, for an admin to pre-approve |
 | `hi disconnect`                                     | Forget the server and delete the device key          |
@@ -93,6 +95,8 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server audit [--since <d>]`                     | The audit log                                        |
 | `hi server slack setup`, `slack manifest`           | Connect a Slack app; print its manifest              |
 | `hi server approvers add <id> --name <user>`        | Let a Slack member approve and stop; `remove`, `list` |
+| `hi server policy show\|edit\|example\|check`       | Group limits, auto-approve, and budgets              |
+| `hi server spend [--since <d>]`                     | Spend per user and group                             |
 
 ## hi login
 

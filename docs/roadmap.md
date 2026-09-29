@@ -234,17 +234,24 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   (`fallback_price_factor`, `fallback_price_extra`), so cheap GPUs find a
   replacement while expensive ones stay near 2×.
 
-## Planned
-
 ### v0.11.0 — Managed compute: policy, budgets, and reports
 
-- [ ] Add groups, auto-approve rules, monthly budgets, and
-  `hi compute extend`.
-- [ ] Answer `/hi spend`, `/hi users`, `/hi budget`, and `/hi audit`, and
-  post daily, weekly, and monthly reports.
-- [ ] Label agents in requests, and add `hi connect --agent` for agents that
-  run on their own.
+- [x] Add `policy.json` with `hi server policy show|edit|example|check`:
+  per group `max_hours`, allowed `hardware`, `auto_approve`, and monthly
+  budgets per user and per group. It applies on the next request.
+- [x] Budgets warn and never block: over-budget requests show ⚠️ and the
+  spend, always wait for a person, and the channel gets one alert a month;
+  users see the spend in `hi connect status` and `hi compute ls`.
+- [x] Add `hi compute extend`, approved like a start.
+- [x] Answer `/hi spend`, `/hi users`, `/hi budget`, and `/hi audit`, add
+  `hi server spend`, and post daily, weekly, and monthly reports.
+- [x] Label requests from agents (`iman via Claude Code`), and add
+  `hi connect --agent <name> --owner <user>` for agents that run on their
+  own.
+- [ ] Verify live with a policy on aiw12.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+## Planned
 
 ### v0.12.0 — Managed compute: live dashboard
 
