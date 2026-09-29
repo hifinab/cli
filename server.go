@@ -29,10 +29,13 @@ import (
 // approval. See docs/specs/approved/hi_server.md.
 
 const (
-	serverDefaultPort   = 7373
-	serverClockSkew     = 5 * time.Minute
-	serverRequestExpiry = 30 * time.Minute
-	serverMaxBody       = 1 << 20
+	// serverFallbackFactor is how much more per hour a replacement may cost
+	// when the approved hardware is sold out, unless config.json says.
+	serverFallbackFactor = 2.0
+	serverDefaultPort    = 7373
+	serverClockSkew      = 5 * time.Minute
+	serverRequestExpiry  = 30 * time.Minute
+	serverMaxBody        = 1 << 20
 )
 
 var (
@@ -79,16 +82,19 @@ type serverDevice struct {
 // Compute requests move pending → starting → running → stopped, or end as
 // denied, expired, or failed.
 type serverRequest struct {
-	ID         string    `json:"id"`
-	Kind       string    `json:"kind"`
-	State      string    `json:"state"`
-	User       string    `json:"user"`
-	Device     string    `json:"device"`
-	Hostname   string    `json:"hostname,omitempty"`
-	Created    time.Time `json:"created"`
-	Provider   string    `json:"provider,omitempty"`
-	Hardware   string    `json:"hardware,omitempty"`
-	Rate       string    `json:"rate,omitempty"`
+	ID       string    `json:"id"`
+	Kind     string    `json:"kind"`
+	State    string    `json:"state"`
+	User     string    `json:"user"`
+	Device   string    `json:"device"`
+	Hostname string    `json:"hostname,omitempty"`
+	Created  time.Time `json:"created"`
+	Provider string    `json:"provider,omitempty"`
+	Hardware string    `json:"hardware,omitempty"`
+	Rate     string    `json:"rate,omitempty"`
+	// Approved is the hardware as approved, when a sold-out start used a
+	// replacement within the approval's bounds.
+	Approved   string    `json:"approved,omitempty"`
 	Name       string    `json:"name,omitempty"`
 	MaxSeconds int64     `json:"max_seconds,omitempty"`
 	Image      string    `json:"image,omitempty"`
@@ -127,6 +133,8 @@ type hiServer struct {
 	nonces    map[string]time.Time
 	unleased  map[string]bool
 	log       io.Writer
+	// fallbackFactor bounds replacements for sold-out hardware.
+	fallbackFactor float64
 }
 
 func serverDirectory(flagValue string) (string, error) {
@@ -149,6 +157,15 @@ func serverDirectory(flagValue string) (string, error) {
 
 type serverConfig struct {
 	Listen string `json:"listen"`
+	// FallbackPriceFactor bounds replacements for sold-out hardware: an
+	// approval covers free hardware with at least as much memory costing up
+	// to this many times the approved price. 1 turns replacements off.
+	FallbackPriceFactor float64 `json:"fallback_price_factor,omitempty"`
+}
+
+// fallbackProvider can suggest replacements for sold-out hardware.
+type fallbackProvider interface {
+	alternatives(name string, factor float64) ([]computeHardware, error)
 }
 
 func openServer(dir string, log io.Writer) (*hiServer, error) {
@@ -159,6 +176,8 @@ func openServer(dir string, log io.Writer) (*hiServer, error) {
 		nonces:    map[string]time.Time{},
 		unleased:  map[string]bool{},
 		log:       log,
+
+		fallbackFactor: serverFallbackFactor,
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "state.json"))
 	switch {
@@ -250,6 +269,7 @@ type auditEntry struct {
 
 // audit appends one line to the audit log. It never records keys.
 func (s *hiServer) audit(actor, action, subject, detail string) {
+	detail = strings.Join(strings.Fields(strings.ReplaceAll(detail, "\n", " · ")), " ")
 	entry := auditEntry{Time: computeNow().UTC(), Actor: actor, Action: action, Subject: subject, Detail: detail}
 	data, _ := json.Marshal(entry)
 	file, err := os.OpenFile(filepath.Join(s.dir, "audit.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
@@ -868,12 +888,49 @@ func (s *hiServer) start(request serverRequest) {
 		return
 	}
 	lifetime := time.Duration(request.MaxSeconds) * time.Second
-	started := computeNow()
 	progress := progressWriter{server: s, id: request.ID}
-	err = provider.create(upRequest{
-		name: request.Name, hardware: hardware, max: lifetime, image: request.Image,
-		publicKey: request.PublicKey, brokered: true,
-	}, progress, progress)
+	started := computeNow()
+	create := func(hardware computeHardware) error {
+		started = computeNow()
+		return provider.create(upRequest{
+			name: request.Name, hardware: hardware, max: lifetime, image: request.Image,
+			publicKey: request.PublicKey, brokered: true,
+		}, progress, progress)
+	}
+	err = create(hardware)
+	// Sold out: the approval covers free hardware with at least as much
+	// memory, up to fallbackFactor times the approved price.
+	var soldOut noCapacityError
+	if err != nil && errors.As(err, &soldOut) && s.fallbackFactor > 1 {
+		if fallback, ok := provider.(fallbackProvider); ok {
+			alternatives, listErr := fallback.alternatives(hardware.name, s.fallbackFactor)
+			if listErr == nil && len(alternatives) == 0 {
+				err = fmt.Errorf("%s is sold out, and nothing free with as much memory costs at most %gx its %s",
+					hardware.name, s.fallbackFactor, hardware.rate)
+			}
+			for i, alternative := range alternatives {
+				if i == 3 {
+					break
+				}
+				fmt.Fprintf(progress, "%s is sold out; starting %s (%s) instead\n", hardware.name, alternative.name, alternative.rate)
+				s.audit("server", "replaced sold-out hardware", request.ID, fmt.Sprintf("%s (%s) with %s (%s), within %gx",
+					hardware.name, hardware.rate, alternative.name, alternative.rate, s.fallbackFactor))
+				if err = create(alternative); err == nil {
+					s.mu.Lock()
+					if current, ok := s.state.Requests[request.ID]; ok {
+						current.Approved = fmt.Sprintf("%s (%s)", request.Hardware, request.Rate)
+						current.Hardware, current.Rate = alternative.name, alternative.rate
+					}
+					s.mu.Unlock()
+					request.Hardware, request.Rate = alternative.name, alternative.rate
+					break
+				}
+				if !errors.As(err, &soldOut) {
+					break
+				}
+			}
+		}
+	}
 	if err != nil {
 		fail(err)
 		return
@@ -889,8 +946,8 @@ func (s *hiServer) start(request serverRequest) {
 	}
 	s.saveLocked()
 	s.mu.Unlock()
-	s.audit("server", "started", request.Name, fmt.Sprintf("%s for %s, stops at %s", request.ID, request.User,
-		started.Add(lifetime).Local().Format("15:04")))
+	s.audit("server", "started", request.Name, fmt.Sprintf("%s on %s for %s, stops at %s", request.ID, request.Hardware,
+		request.User, started.Add(lifetime).Local().Format("15:04")))
 }
 
 // stopLease terminates an instance and ends its lease.
@@ -903,8 +960,8 @@ func (s *hiServer) stopLease(lease serverLease, actor string) error {
 		return fmt.Errorf("stop %s: %w", lease.Name, err)
 	}
 	s.endLease(lease.Name, actor)
-	s.audit(actor, "stopped", lease.Name, fmt.Sprintf("%s after %s", lease.User,
-		formatDuration(computeNow().Sub(lease.Started))))
+	s.audit(actor, "stopped", lease.Name, fmt.Sprintf("ran %s, started by %s",
+		formatDuration(computeNow().Sub(lease.Started)), lease.User))
 	return nil
 }
 
@@ -1440,6 +1497,9 @@ func serverRunCommand(args []string, stdout, stderr io.Writer) error {
 	server, err := openServer(dir, stdout)
 	if err != nil {
 		return err
+	}
+	if config.FallbackPriceFactor != 0 {
+		server.fallbackFactor = config.FallbackPriceFactor
 	}
 	if len(server.providers) == 0 {
 		fmt.Fprintln(stderr, "hi: warning: no provider keys yet; add one with `hi server provider add runpod`")

@@ -266,7 +266,7 @@ func runpodError(status int, data []byte) error {
 	case http.StatusForbidden:
 		return fmt.Errorf("RunPod refused: %s (the API key may be read-only)", detail)
 	case http.StatusBadRequest:
-		return fmt.Errorf("RunPod could not start it: %s\nThis usually means none of that hardware is free right now; try another --gpu", detail)
+		return noCapacityError{fmt.Errorf("RunPod could not start it: %s\nThis usually means none of that hardware is free right now; try another --gpu", detail)}
 	case http.StatusTooManyRequests:
 		return errors.New("RunPod is rate limiting requests; try again in a minute")
 	}
@@ -435,6 +435,37 @@ func (p *runpodProvider) freeAlternatives(name string) string {
 		}
 	}
 	return strings.Join(names, ", ")
+}
+
+// alternatives lists free hardware of the same kind, with at least the
+// memory of name, costing at most factor times its price, cheapest first.
+func (p *runpodProvider) alternatives(name string, factor float64) ([]computeHardware, error) {
+	p.forgetHardware() // availability is stale by now
+	wanted, err := p.option(name)
+	if err != nil {
+		return nil, err
+	}
+	options, err := p.hardwareOptions()
+	if err != nil {
+		return nil, err
+	}
+	var result []runpodOption
+	for _, option := range options {
+		switch {
+		case option.hardware.name == name,
+			(option.gpuID != "") != (wanted.gpuID != ""),
+			option.gpuID != "" && (!option.available || option.memoryGB < wanted.memoryGB),
+			option.hourly > wanted.hourly*factor:
+			continue
+		}
+		result = append(result, option)
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].hourly < result[j].hourly })
+	hardware := make([]computeHardware, len(result))
+	for i, option := range result {
+		hardware[i] = option.hardware
+	}
+	return hardware, nil
 }
 
 func (p *runpodProvider) option(name string) (runpodOption, error) {

@@ -433,6 +433,10 @@ the request goes:
    Slack message to `🟢 approved by bob · running`. The client prints the name
    and SSH details as `hi compute up` does today. A linked user also gets a
    direct message.
+6. If the approved hardware is sold out when the server starts it, the
+   approval still counts: the server starts the cheapest free hardware with
+   at least as much memory, costing at most `fallback_price_factor` (default
+   2) times the approved price, and tells the user and the audit log.
 
 `hi compute run` follows the same flow.
 

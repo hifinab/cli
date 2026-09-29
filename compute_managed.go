@@ -303,6 +303,10 @@ func requestStateLine(request serverRequest) string {
 		}
 		return line
 	case "running":
+		if request.Approved != "" {
+			return fmt.Sprintf("%s is running on %s (%s); the approved %s was sold out.",
+				request.Name, request.Hardware, request.Rate, request.Approved)
+		}
 		return fmt.Sprintf("%s is running.", request.Name)
 	case "stopped":
 		return fmt.Sprintf("%s has stopped.", request.Name)
@@ -440,6 +444,9 @@ func printRequest(request serverRequest, stdout io.Writer) {
 	fmt.Fprintf(stdout, "Request:   %s\n", request.ID)
 	fmt.Fprintf(stdout, "State:     %s\n", request.State)
 	fmt.Fprintf(stdout, "Instance:  %s/%s on %s (%s)\n", request.Provider, request.Name, request.Hardware, request.Rate)
+	if request.Approved != "" {
+		fmt.Fprintf(stdout, "Approved:  %s, sold out; replaced within the approval's price bound\n", request.Approved)
+	}
 	fmt.Fprintf(stdout, "Max:       %s\n", formatDuration(time.Duration(request.MaxSeconds)*time.Second))
 	fmt.Fprintf(stdout, "Reason:    %s\n", request.Reason)
 	if request.DecidedBy != "" {

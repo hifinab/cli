@@ -227,6 +227,11 @@ func runCompute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 }
 
+// noCapacityError means the provider has none of the chosen hardware free.
+type noCapacityError struct{ error }
+
+func (e noCapacityError) Unwrap() error { return e.error }
+
 type usageError struct{ message string }
 
 func (e usageError) Error() string { return e.message }

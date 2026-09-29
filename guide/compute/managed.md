@@ -75,6 +75,14 @@ Two things differ from using your own key:
   Check it later with `hi compute requests`. A request with no decision
   expires after 30 minutes.
 
+If the approved hardware is sold out by the time it starts, the approval
+still counts. The server starts the cheapest free hardware with at least as
+much memory, costing at most twice the approved price, and says so:
+
+```text
+rtx-4090-1c2d is running on rtx-3090 ($0.50/h); the approved l4 ($0.49/h) was sold out.
+```
+
 After that, `ssh`, `tunnel`, `logs`, `ls`, and `stop` work as usual. The
 machine accepts the SSH key from your `~/.ssh`, and connections go straight
 to it, not through the server.
@@ -178,6 +186,11 @@ hi server stop --user alice       # everything alice runs
 hi server stop --all
 hi server audit --since 24h       # requests, approvals, starts, and stops
 ```
+
+When approved hardware is sold out, the server starts a replacement with
+at least as much memory at up to twice the approved price, and records it in
+the audit log. Change the bound with `"fallback_price_factor"` in the
+server's `config.json` (`1` turns replacements off), then restart the server.
 
 Every 30 seconds the server checks each provider account. It stops machines
 past their `--max`, and it records a machine it didn't start, such as one

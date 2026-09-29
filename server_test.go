@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -22,9 +23,41 @@ type fakeManaged struct {
 	mu        sync.Mutex
 	instances map[string]upRequest
 	stopped   []string
+	soldOut   map[string]bool
 }
 
-func newFakeManaged() *fakeManaged { return &fakeManaged{instances: map[string]upRequest{}} }
+func newFakeManaged() *fakeManaged {
+	return &fakeManaged{instances: map[string]upRequest{}, soldOut: map[string]bool{}}
+}
+
+var fakeHardware = []computeHardware{
+	{name: "l4", kind: "GPU", memory: "24 GB", rate: "$0.49/h", paid: true},
+	{name: "rtx-3090", kind: "GPU", memory: "24 GB", rate: "$0.50/h", paid: true},
+	{name: "rtx-4090", kind: "GPU", memory: "24 GB", rate: "$0.74/h", paid: true},
+	{name: "a100", kind: "GPU", memory: "80 GB", rate: "$1.99/h", paid: true},
+}
+
+func fakeHourly(hardware computeHardware) float64 {
+	var hourly float64
+	fmt.Sscanf(hardware.rate, "$%f/h", &hourly)
+	return hourly
+}
+
+func (f *fakeManaged) alternatives(name string, factor float64) ([]computeHardware, error) {
+	var wanted computeHardware
+	for _, hardware := range fakeHardware {
+		if hardware.name == name {
+			wanted = hardware
+		}
+	}
+	var result []computeHardware
+	for _, hardware := range fakeHardware {
+		if hardware.name != name && !f.soldOut[hardware.name] && fakeHourly(hardware) <= fakeHourly(wanted)*factor {
+			result = append(result, hardware)
+		}
+	}
+	return result, nil
+}
 
 func (*fakeManaged) name() string                  { return "runpod" }
 func (*fakeManaged) check() providerStatus         { return providerStatus{installed: true, signedIn: true} }
@@ -41,13 +74,14 @@ func (*fakeManaged) runJob(runRequest, io.Reader, io.Writer, io.Writer) (int, er
 func (*fakeManaged) wait(string, io.Writer, io.Writer) (int, error)                  { return 0, nil }
 func (*fakeManaged) logs(string, bool, int, io.Reader, io.Writer, io.Writer) error   { return nil }
 
-func (*fakeManaged) hardware() ([]computeHardware, error) {
-	return []computeHardware{{name: "rtx-4090", kind: "GPU", memory: "24 GB", rate: "$0.74/h", paid: true}}, nil
-}
+func (*fakeManaged) hardware() ([]computeHardware, error) { return fakeHardware, nil }
 
 func (f *fakeManaged) create(request upRequest, stdout, _ io.Writer) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.soldOut[request.hardware.name] {
+		return noCapacityError{fmt.Errorf("none of %s is free", request.hardware.name)}
+	}
 	f.instances[request.name] = request
 	io.WriteString(stdout, "Created pod abc; waiting for it to start\n")
 	return nil
@@ -578,5 +612,54 @@ func TestProviderAddWorksBeforeTheServerRuns(t *testing.T) {
 	code = run([]string{"server", "provider", "add", "runpd", "--dir", dir}, strings.NewReader("x\n"), &stdout, &stderr)
 	if code != 2 {
 		t.Fatalf("a misspelled provider was accepted: %d", code)
+	}
+}
+
+func TestSoldOutHardwareIsReplacedWithinTheApprovedPrice(t *testing.T) {
+	ts := newTestServer(t)
+	ts.connectAs(t, "alice", "staff")
+	ts.fake.soldOut["l4"] = true
+	runHi("compute", "up", "--on", "runpod", "--gpu", "l4", "--name", "swap", "--max", "1h", "--reason", "x", "--yes", "--no-wait")
+	id := ts.pending(t, "compute")
+	if _, err := ts.server.decide(id, "bob", true, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	code, stdout, stderr := runHi("compute", "requests", id, "--wait", "--timeout", "5s")
+	if code != 0 || !strings.Contains(stdout, "swap is running on rtx-3090 ($0.50/h); the approved l4 ($0.49/h) was sold out") {
+		t.Fatalf("replacement: code %d\n%s%s", code, stdout, stderr)
+	}
+	if started, ok := ts.fake.started("swap"); !ok || started.hardware.name != "rtx-3090" {
+		t.Fatalf("started %+v", started)
+	}
+	if lease := ts.server.state.Leases["swap"]; lease.Hardware != "rtx-3090" || lease.Rate != "$0.50/h" {
+		t.Fatalf("lease %+v", lease)
+	}
+}
+
+func TestSoldOutHardwareFailsWhenNothingFitsThePriceBound(t *testing.T) {
+	ts := newTestServer(t)
+	ts.connectAs(t, "alice", "staff")
+	ts.server.fallbackFactor = 1.01
+	ts.fake.soldOut["l4"] = true
+	runHi("compute", "up", "--on", "runpod", "--gpu", "l4", "--name", "nope", "--max", "1h", "--reason", "x", "--yes", "--no-wait")
+	id := ts.pending(t, "compute")
+	if _, err := ts.server.decide(id, "bob", true, "", ""); err != nil {
+		t.Fatal(err)
+	}
+	code, _, stderr := runHi("compute", "requests", id, "--wait", "--timeout", "5s")
+	if code != 1 || !strings.Contains(stderr, "costs at most 1.01x") {
+		t.Fatalf("code %d, stderr %s", code, stderr)
+	}
+	if _, ok := ts.fake.started("nope"); ok {
+		t.Fatal("a replacement above the price bound started")
+	}
+}
+
+func TestAuditEntriesStayOnOneLine(t *testing.T) {
+	ts := newTestServer(t)
+	ts.server.audit("server", "failed to start", "r-1", "first line\nsecond line")
+	data, _ := os.ReadFile(filepath.Join(ts.dir, "audit.jsonl"))
+	if !strings.Contains(string(data), `"detail":"first line · second line"`) {
+		t.Fatalf("audit: %s", data)
 	}
 }

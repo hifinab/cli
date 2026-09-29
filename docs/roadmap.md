@@ -159,8 +159,9 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Keep a never-connected `hi` exactly as it is today. Colab is never
   managed.
 - [x] Document it in the guide and teach it to agents in `hi skill`.
-- [ ] Verify with a live RunPod account over NetBird: enroll, approve, SSH,
-  tunnel, stop, and a pod stopped by the server at `--max`.
+- [x] Verify with a live RunPod account over NetBird: enroll, approve, SSH,
+  tunnel, stop, and a pod stopped by the server at `--max` (2026-09-29,
+  aiw12 serving aiw9).
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
 
 ### v0.9.1 — Visible key entry
@@ -169,6 +170,15 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   `hi net`) show a `*` per character, so a paste is visibly received.
 - [x] `hi server provider add` works before the server is started, and checks
   the provider name before asking for the key.
+
+### v0.9.2 — Approvals survive sold-out hardware
+
+- [x] When approved hardware is sold out, the server starts the cheapest free
+  hardware with at least as much memory at up to twice the approved price
+  (`fallback_price_factor` in the server's `config.json`), instead of failing
+  and needing a second approval.
+- [x] Audit entries stay on one line, and stops read `ran 2m, started by
+  iman`.
 
 ## Planned
 
