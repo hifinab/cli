@@ -140,8 +140,6 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Menu lists stay still while the cursor moves; long lists scroll only
   at the edge.
 
-## Planned
-
 ### v0.9.0 — Managed compute: server and brokered RunPod
 
 - [x] Add `hi server` on a dedicated box in the VPN. It holds the provider
@@ -164,6 +162,8 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [ ] Verify with a live RunPod account over NetBird: enroll, approve, SSH,
   tunnel, stop, and a pod stopped by the server at `--max`.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+## Planned
 
 ### v0.10.0 — Managed compute: Slack
 
