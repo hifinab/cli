@@ -248,8 +248,14 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Label requests from agents (`iman via Claude Code`), and add
   `hi connect --agent <name> --owner <user>` for agents that run on their
   own.
-- [ ] Verify live with a policy on aiw12.
+- [x] Verify live with a policy on aiw12 (2026-09-29): a staff start
+  approved by policy, then stopped by the server at its limit.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.11.1 — Say who approved once
+
+- [x] Waiting on a request prints "Approved by …" once, then the start's
+  progress, instead of repeating the approver on every line.
 
 ## Planned
 

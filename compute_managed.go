@@ -274,9 +274,6 @@ func (p *managedProvider) create(request upRequest, stdout, stderr io.Writer) er
 	}
 	fmt.Fprintf(stdout, "Sent request %s to %s.\n", created.ID, p.url)
 	printBudget(created.Budget, created.OverBudget, stdout)
-	if created.State != "pending" && created.DecidedBy != "" {
-		fmt.Fprintf(stdout, "Approved by %s.\n", created.DecidedBy)
-	}
 	if request.noWait && created.State == "pending" {
 		return exitStatusError{code: exitPending, message: fmt.Sprintf(
 			"%s is waiting for approval; check it with `hi compute requests %s --wait`", created.ID, created.ID)}
@@ -293,10 +290,16 @@ func (p *managedProvider) waitForDecision(id string, timeout time.Duration, stdo
 		deadline = computeNow().Add(timeout)
 	}
 	shown := ""
+	approvalShown := false
 	for {
 		var request serverRequest
 		if err := p.call(http.MethodGet, "/v1/requests/"+url.PathEscape(id), nil, &request); err != nil {
 			return request, err
+		}
+		// Say who approved once, even when the start was too quick to see.
+		if !approvalShown && request.DecidedBy != "" && request.State != "denied" {
+			fmt.Fprintf(stdout, "Approved by %s.\n", request.DecidedBy)
+			approvalShown = true
 		}
 		line := requestStateLine(request)
 		if line != shown {
@@ -330,10 +333,9 @@ func requestStateLine(request serverRequest) string {
 	case "pending":
 		return "Waiting for approval… (Ctrl-C stops waiting; the request stays open)"
 	case "approved":
-		return fmt.Sprintf("Approved by %s: %s runs %s longer.", request.DecidedBy, request.Name,
-			formatDuration(time.Duration(request.MaxSeconds)*time.Second))
+		return fmt.Sprintf("%s runs %s longer.", request.Name, formatDuration(time.Duration(request.MaxSeconds)*time.Second))
 	case "starting":
-		line := fmt.Sprintf("Approved by %s; starting", request.DecidedBy)
+		line := "Starting"
 		if request.Progress != "" {
 			line += ": " + request.Progress
 		}
@@ -561,9 +563,6 @@ func computeExtendCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 	}
 	fmt.Fprintf(stdout, "Asked %s for %s more on %s (request %s).\n", managed.url, formatDuration(extra), name, created.ID)
 	printBudget(created.Budget, created.OverBudget, stdout)
-	if created.State != "pending" && created.DecidedBy != "" {
-		fmt.Fprintf(stdout, "Approved by %s.\n", created.DecidedBy)
-	}
 	if *noWait && created.State == "pending" {
 		return exitStatusError{code: exitPending, message: fmt.Sprintf(
 			"%s is waiting for approval; check it with `hi compute requests %s --wait`", created.ID, created.ID)}

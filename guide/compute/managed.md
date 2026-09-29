@@ -57,8 +57,9 @@ Start runpod/rtx-4090-1c2d on rtx-4090 ($0.74/h), stopping after 2h at 16:05.
 Start it? [y/N] y
 Sent request r-9b41e0 to http://compute.internal:7373.
 Waiting for approval… (Ctrl-C stops waiting; the request stays open)
-Approved by bob; starting: Created pod 7xk2q9; waiting for it to start (this can take a few minutes)...
-Approved by bob; starting: running
+Approved by bob.
+Starting: Created pod 7xk2q9; waiting for it to start (this can take a few minutes)...
+Starting: running
 rtx-4090-1c2d is running.
 
 rtx-4090-1c2d is up. Next:
