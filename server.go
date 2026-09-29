@@ -921,6 +921,17 @@ func (s *hiServer) start(request serverRequest) {
 			if listErr == nil && len(alternatives) == 0 {
 				err = fmt.Errorf("%s is sold out, and nothing free with as much memory costs at most %gx its %s",
 					hardware.name, s.fallbackFactor, hardware.rate)
+				// Say what is free at any price, so the next request can ask for it.
+				if free, _ := fallback.alternatives(hardware.name, 1e6); len(free) > 0 {
+					var names []string
+					for i, option := range free {
+						if i == 3 {
+							break
+						}
+						names = append(names, fmt.Sprintf("%s (%s)", option.name, option.rate))
+					}
+					err = fmt.Errorf("%w. Free now with as much memory: %s", err, strings.Join(names, ", "))
+				}
 			}
 			for i, alternative := range alternatives {
 				if i == 3 {

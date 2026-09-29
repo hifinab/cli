@@ -305,3 +305,32 @@ func TestSlackSetupAndApproversWorkWithoutTheServerRunning(t *testing.T) {
 		t.Fatalf("manifest: %s", stdout)
 	}
 }
+
+func TestSlackMessagesKeepTheApproverAndRoundSmallCosts(t *testing.T) {
+	now := time.Now()
+	request := serverRequest{ID: "r-1", Kind: "compute", State: "stopped", User: "iman", Name: "quick",
+		Provider: "runpod", Hardware: "l4", Rate: "$0.49/h", MaxSeconds: 600, DecidedBy: "hi", StoppedBy: "hi",
+		Started: now.Add(-30 * time.Second), Ended: now}
+	text, _ := renderSlackRequest(request, nil, "staff", true, now)
+	if !strings.Contains(text, "approved by hi · stopped by hi · ran 30s, under $0.01") {
+		t.Fatalf("stopped: %s", text)
+	}
+	request.State, request.Error = "failed", "l4 is sold out"
+	if text, _ := renderSlackRequest(request, nil, "staff", true, now); !strings.Contains(text, "approved by hi · could not start") {
+		t.Fatalf("failed: %s", text)
+	}
+}
+
+func TestSoldOutFailureSaysWhatIsFree(t *testing.T) {
+	ts := newTestServer(t)
+	ts.connectAs(t, "alice", "staff")
+	ts.server.fallbackFactor = 1.01
+	ts.fake.soldOut["l4"] = true
+	runHi("compute", "up", "--on", "runpod", "--gpu", "l4", "--name", "nope", "--max", "1h", "--reason", "x", "--yes", "--no-wait")
+	id := ts.pending(t, "compute")
+	ts.server.decide(id, "bob", true, "", "")
+	_, _, stderr := runHi("compute", "requests", id, "--wait", "--timeout", "5s")
+	if !strings.Contains(stderr, "Free now with as much memory: rtx-3090 ($0.50/h), rtx-4090 ($0.74/h), a100 ($1.99/h)") {
+		t.Fatalf("stderr %s", stderr)
+	}
+}

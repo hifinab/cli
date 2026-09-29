@@ -268,6 +268,14 @@ func formatDollars(amount float64) string {
 	return fmt.Sprintf("$%.2f", amount)
 }
 
+// aboutDollars describes a cost estimate, such as "about $0.04".
+func aboutDollars(amount float64) string {
+	if amount < 0.005 {
+		return "under $0.01"
+	}
+	return "about " + formatDollars(amount)
+}
+
 // renderSlackRequest draws a request's message as it stands now.
 func renderSlackRequest(request serverRequest, lease *serverLease, group string, knownUser bool, now time.Time) (string, []slack.Block) {
 	who := fmt.Sprintf("*%s*", request.User)
@@ -334,15 +342,17 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 		}
 	case "stopped":
 		ran := request.Ended.Sub(request.Started)
-		status = fmt.Sprintf("⚪ %s · `%s` · stopped by %s · ran %s, about %s", who, request.Name,
-			describeStopper(request.StoppedBy), formatDuration(ran), formatDollars(hourlyRate(request.Rate)*ran.Hours()))
+		status = fmt.Sprintf("⚪ %s · `%s` · approved by %s · stopped by %s · ran %s, %s", who, request.Name,
+			request.DecidedBy, describeStopper(request.StoppedBy), formatDuration(ran),
+			aboutDollars(hourlyRate(request.Rate)*ran.Hours()))
 	case "denied":
 		status = fmt.Sprintf("🔴 %s · `%s` · denied by %s", who, request.Name, request.DecidedBy)
 		if request.DenyReason != "" {
 			status += ": " + request.DenyReason
 		}
 	case "failed":
-		status = fmt.Sprintf("❌ %s · `%s` · could not start: %s", who, request.Name, strings.ReplaceAll(request.Error, "\n", " "))
+		status = fmt.Sprintf("❌ %s · `%s` · approved by %s · could not start: %s", who, request.Name, request.DecidedBy,
+			strings.ReplaceAll(request.Error, "\n", " "))
 	case "expired":
 		status = fmt.Sprintf("⌛ %s · `%s` · expired with no decision", who, request.Name)
 	default:

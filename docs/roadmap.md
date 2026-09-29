@@ -188,8 +188,16 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   states, and threaded alerts, and answers `/hi status` and `/hi stop`.
 - [x] Add `hi server approvers`, which maps Slack members to `hi` users, so
   nobody approves their own request from Slack either.
-- [ ] Verify with a live Slack workspace.
+- [x] Verify with a live Slack workspace (2026-09-29): approve from a
+  button, a sold-out L4 replaced by an RTX A5000, and a Stop click.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.10.1 — Clearer Slack messages
+
+- [x] A request that fails because hardware is sold out lists what is free
+  now with as much memory, and its price.
+- [x] Final Slack messages keep who approved them, and costs under a cent
+  read "under $0.01".
 
 ## Planned
 
