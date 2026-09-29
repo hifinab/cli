@@ -36,6 +36,12 @@ const slackManifest = `{
   "settings": { "interactivity": { "is_enabled": true }, "socket_mode_enabled": true, "org_deploy_enabled": false, "token_rotation_enabled": false }
 }`
 
+// slackReplace replaces a private message a button was clicked in; tests
+// replace it.
+var slackReplace = func(responseURL, text string) error {
+	return slack.PostWebhook(responseURL, &slack.WebhookMessage{Text: text, ReplaceOriginal: true})
+}
+
 // slackWarnAt is the share of an instance's lifetime after which its thread
 // gets a warning.
 const slackWarnAt = 0.8
@@ -369,6 +375,45 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 	return status, blocks
 }
 
+// slackName turns "@alice" or Slack's "<@U123|alice>" into "alice".
+func slackName(field string) string {
+	if strings.HasPrefix(field, "<@") && strings.HasSuffix(field, ">") {
+		if _, name, found := strings.Cut(strings.TrimSuffix(field, ">"), "|"); found {
+			return name
+		}
+	}
+	return strings.TrimPrefix(field, "@")
+}
+
+func waitingText(pending int) string {
+	switch pending {
+	case 0:
+		return "Nothing is waiting for a decision."
+	case 1:
+		return "1 request is waiting for a decision."
+	}
+	return fmt.Sprintf("%d requests are waiting for a decision.", pending)
+}
+
+func stopUserResponse(user string, leases []serverLease, respond func(string, ...slack.Block) map[string]any) map[string]any {
+	count := 0
+	for _, lease := range leases {
+		if lease.User == user {
+			count++
+		}
+	}
+	if count == 0 {
+		return respond(user + " has nothing running.")
+	}
+	noun := "instance"
+	if count > 1 {
+		noun = "instances"
+	}
+	text := fmt.Sprintf("Stop %s's %d %s?", user, count, noun)
+	return respond(text, slack.NewSectionBlock(slackText(text), nil, nil),
+		slack.NewActionBlock("stop-user", slackButton("stop_user", user, "Stop them", slack.StyleDanger)))
+}
+
 func describeStopper(stoppedBy string) string {
 	switch stoppedBy {
 	case "limit":
@@ -443,6 +488,18 @@ func (b *slackBridge) handleInteraction(callback slack.InteractionCallback) {
 	}
 	if err != nil {
 		reply(err.Error())
+		return
+	}
+	// A private /hi answer keeps no stale buttons: say what was done instead.
+	if callback.Container.IsEphemeral && callback.ResponseURL != "" && strings.HasPrefix(action.ActionID, "stop") {
+		done := map[string]string{
+			"stop":      "Stopped `" + action.Value + "`.",
+			"stop_user": "Stopped everything " + action.Value + " was running.",
+			"stop_all":  "Stopped everything.",
+		}[action.ActionID]
+		if err := slackReplace(callback.ResponseURL, done); err != nil {
+			fmt.Fprintf(s.log, "slack: %v\n", err)
+		}
 	}
 }
 
@@ -514,6 +571,9 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 		return respond("Only approvers can use /hi. An admin adds approvers with `hi server approvers add`.")
 	}
 	fields := strings.Fields(command.Text)
+	for i, field := range fields {
+		fields[i] = slackName(field)
+	}
 	s.mu.Lock()
 	leases := make([]serverLease, 0, len(s.state.Leases))
 	for _, lease := range s.state.Leases {
@@ -532,7 +592,7 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 	switch {
 	case len(fields) == 0 || fields[0] == "status":
 		if len(leases) == 0 {
-			return respond(fmt.Sprintf("Nothing is running. %d waiting for a decision.", pending))
+			return respond("Nothing is running. " + waitingText(pending))
 		}
 		var rate float64
 		blocks := []slack.Block{}
@@ -542,7 +602,7 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 				lease.Hardware, lease.Rate, formatDuration(now.Sub(lease.Started)), lease.Deadline.Local().Format("15:04"))
 			blocks = append(blocks, slack.NewSectionBlock(slackText(line), nil, slack.NewAccessory(stopButton(lease.Name))))
 		}
-		header := fmt.Sprintf("%d running, %s/h now. %d waiting for a decision.", len(leases), formatDollars(rate), pending)
+		header := fmt.Sprintf("%d running, %s/h now. %s", len(leases), formatDollars(rate), waitingText(pending))
 		return respond(header, append([]slack.Block{slack.NewSectionBlock(slackText(header), nil, nil)}, blocks...)...)
 	case fields[0] == "stop" && len(fields) == 2 && fields[1] == "all":
 		if len(leases) == 0 {
@@ -552,18 +612,7 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 		return respond(text, slack.NewSectionBlock(slackText(text), nil, nil),
 			slack.NewActionBlock("stop-all", slackButton("stop_all", "all", "Stop all", slack.StyleDanger)))
 	case fields[0] == "stop" && len(fields) == 3 && fields[1] == "user":
-		count := 0
-		for _, lease := range leases {
-			if lease.User == fields[2] {
-				count++
-			}
-		}
-		if count == 0 {
-			return respond(fields[2] + " has nothing running.")
-		}
-		text := fmt.Sprintf("Stop all %d of %s's instances?", count, fields[2])
-		return respond(text, slack.NewSectionBlock(slackText(text), nil, nil),
-			slack.NewActionBlock("stop-user", slackButton("stop_user", fields[2], "Stop them", slack.StyleDanger)))
+		return stopUserResponse(fields[2], leases, respond)
 	case fields[0] == "stop" && len(fields) == 2:
 		for _, lease := range leases {
 			if lease.Name == fields[1] {
@@ -572,7 +621,14 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 				return respond(text, slack.NewSectionBlock(slackText(text), nil, slack.NewAccessory(stopButton(lease.Name))))
 			}
 		}
-		return respond(fields[1] + " is not running.")
+		// Not an instance: `/hi stop alice` means alice's instances.
+		for _, lease := range leases {
+			if lease.User == fields[1] {
+				return stopUserResponse(fields[1], leases, respond)
+			}
+		}
+		return respond(fmt.Sprintf("Nothing called %s is running, and no user by that name has anything running. "+
+			"See `/hi status`.", fields[1]))
 	}
 	return respond("Usage: `/hi status`, `/hi stop <name>`, `/hi stop user <user>`, `/hi stop all`")
 }

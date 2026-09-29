@@ -199,6 +199,15 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Final Slack messages keep who approved them, and costs under a cent
   read "under $0.01".
 
+### v0.10.2 — Friendlier /hi
+
+- [x] `/hi stop @alice` and `/hi stop user @alice` accept Slack mentions, and
+  `/hi stop <user>` stops that user's instances when no instance has the name.
+- [x] After a stop from a private `/hi` answer, the answer says what was
+  stopped instead of keeping a live button.
+- [x] `/hi status` says "Nothing is waiting for a decision" instead of "0
+  waiting".
+
 ## Planned
 
 ### v0.11.0 — Managed compute: policy, budgets, and reports

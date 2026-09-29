@@ -228,7 +228,7 @@ func TestSlashCommandShowsStatusAndConfirmsStops(t *testing.T) {
 
 	encode := func(v any) string { data, _ := json.Marshal(v); return string(data) }
 	response := encode(ts.server.slack.slashResponse(slack.SlashCommand{UserID: "UBOB", Text: "status"}))
-	if !strings.Contains(response, "1 running, $0.49/h now") || !strings.Contains(response, `"action_id":"stop"`) {
+	if !strings.Contains(response, "1 running, $0.49/h now. Nothing is waiting") || !strings.Contains(response, `"action_id":"stop"`) {
 		t.Fatalf("/hi status: %s", response)
 	}
 	response = encode(ts.server.slack.slashResponse(slack.SlashCommand{UserID: "UBOB", Text: "stop all"}))
@@ -332,5 +332,36 @@ func TestSoldOutFailureSaysWhatIsFree(t *testing.T) {
 	_, _, stderr := runHi("compute", "requests", id, "--wait", "--timeout", "5s")
 	if !strings.Contains(stderr, "Free now with as much memory: rtx-3090 ($0.50/h), rtx-4090 ($0.74/h), a100 ($1.99/h)") {
 		t.Fatalf("stderr %s", stderr)
+	}
+}
+
+func TestSlashStopUnderstandsMentionsAndReplacesItsPrompt(t *testing.T) {
+	ts := newTestServer(t)
+	withSlack(t, ts)
+	now := time.Now()
+	ts.fake.instances["job"] = upRequest{name: "job"}
+	ts.server.state.Leases["job"] = &serverLease{Name: "job", Provider: "runpod", Hardware: "l4", Rate: "$0.49/h",
+		User: "iman", Started: now.Add(-time.Minute), Deadline: now.Add(time.Hour)}
+	encode := func(v any) string { data, _ := json.Marshal(v); return string(data) }
+	for _, text := range []string{"stop @iman", "stop user @iman", "stop user <@U123|iman>"} {
+		response := encode(ts.server.slack.slashResponse(slack.SlashCommand{UserID: "UBOB", Text: text}))
+		if !strings.Contains(response, "Stop iman's 1 instance?") || !strings.Contains(response, `"value":"iman"`) {
+			t.Fatalf("/hi %s: %s", text, response)
+		}
+	}
+
+	var replaced string
+	previous := slackReplace
+	slackReplace = func(url, text string) error { replaced = url + " " + text; return nil }
+	defer func() { slackReplace = previous }()
+	callback := click("stop_user", "iman", "UBOB")
+	callback.Container.IsEphemeral = true
+	callback.ResponseURL = "https://hooks.slack.test/1"
+	ts.server.slack.handleInteraction(callback)
+	if replaced != "https://hooks.slack.test/1 Stopped everything iman was running." {
+		t.Fatalf("the private prompt was not replaced: %q", replaced)
+	}
+	if _, running := ts.server.state.Leases["job"]; running {
+		t.Fatal("job is still leased")
 	}
 }
