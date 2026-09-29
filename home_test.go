@@ -130,3 +130,14 @@ func TestDevicesRecordTheirHiVersion(t *testing.T) {
 		t.Fatalf("devices: %+v", rows)
 	}
 }
+
+func TestHomeSaysStartingForApprovedRequests(t *testing.T) {
+	now := time.Now()
+	snapshot := liveSnapshot{Now: now, Waiting: []liveRequest{{ID: "r-1", State: "starting", User: "iman", Hardware: "a4000",
+		Rate: "$0.80/h", Seconds: 600, Created: now.Add(-15 * time.Second)}}}
+	data, _ := json.Marshal(renderApproverHome(snapshot, nil, now))
+	if !strings.Contains(string(data), "approved, starting") || strings.Contains(string(data), "waiting 15s") ||
+		strings.Contains(string(data), `"action_id":"approve"`) {
+		t.Fatalf("home: %s", data)
+	}
+}

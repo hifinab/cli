@@ -327,8 +327,14 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   own machines in App Home and can stop them.
 - [x] Send linked users direct messages when their requests are approved,
   denied (with the reason), started, near their limit, or stopped.
-- [ ] Verify live after updating the Slack app's manifest.
+- [x] Verify live after updating the Slack app's manifest (2026-09-29):
+  Home tab, `/hi link`, and messages about a request.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.14.1 — Home says starting
+
+- [x] The Home tab shows an approved request that is still starting as
+  "approved, starting", not as waiting.
 
 ## Planned
 

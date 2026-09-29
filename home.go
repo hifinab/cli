@@ -271,8 +271,12 @@ func renderApproverHome(snapshot liveSnapshot, devices []deviceRow, now time.Tim
 		if request.Kind == "extend" {
 			what = fmt.Sprintf("`%s` %s longer", slackEscape(request.Name), formatDuration(time.Duration(request.Seconds)*time.Second))
 		}
-		text := fmt.Sprintf("*%s* (%s) · %s · %s · waiting %s\n> %s", slackEscape(request.User), request.Group,
-			slackEscape(what), request.Rate, formatDuration(now.Sub(request.Created)), slackEscape(request.Reason))
+		state := "waiting " + formatDuration(now.Sub(request.Created))
+		if request.State == "starting" {
+			state = "🔵 approved, starting"
+		}
+		text := fmt.Sprintf("*%s* (%s) · %s · %s · %s\n> %s", slackEscape(request.User), request.Group,
+			slackEscape(what), request.Rate, state, slackEscape(request.Reason))
 		if isCommunityHardware(request.Hardware) {
 			text += "\n⚠️ Community Cloud: a third-party host. No tokens, passwords, or sensitive data."
 		}
@@ -335,8 +339,12 @@ func renderUserHome(snapshot liveSnapshot, user string, now time.Time) []slack.B
 		blocks = append(blocks, homeContext("Nothing is waiting."))
 	}
 	for _, request := range snapshot.Waiting {
+		state := "waiting for approval"
+		if request.State == "starting" {
+			state = "🔵 approved, starting"
+		}
 		blocks = append(blocks, slack.NewSectionBlock(slackText(fmt.Sprintf("`%s` · %s · %s · %s", slackEscape(request.Name),
-			slackEscape(request.Hardware), request.Rate, request.State)), nil, nil))
+			slackEscape(request.Hardware), request.Rate, state)), nil, nil))
 	}
 	if budget := homeBudgets(snapshot.Budgets); budget != nil {
 		blocks = append(blocks, homeHeader("Your budget"))
