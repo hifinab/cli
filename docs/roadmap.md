@@ -222,6 +222,11 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   turns 🟢 when ready, shows the provider's progress, and the thread notes
   the approval at once.
 
+### v0.10.5 — Running times that stay true
+
+- [x] A running instance's Slack message shows "running since 12:56, stops
+  at 13:06" instead of a running time that goes stale.
+
 ## Planned
 
 ### v0.11.0 — Managed compute: policy, budgets, and reports

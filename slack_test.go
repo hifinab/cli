@@ -410,3 +410,14 @@ func TestSlackSaysHowLongStartingTakes(t *testing.T) {
 		t.Fatalf("starting message: %s", text)
 	}
 }
+
+func TestRunningMessageShowsClockTimes(t *testing.T) {
+	started := time.Date(2026, 9, 29, 12, 56, 0, 0, time.Local)
+	request := serverRequest{ID: "r-1", Kind: "compute", State: "running", User: "iman", Name: "x", Provider: "runpod",
+		Hardware: "a40", Rate: "$0.49/h", MaxSeconds: 600, DecidedBy: "hi"}
+	lease := &serverLease{Name: "x", Started: started, Deadline: started.Add(10 * time.Minute)}
+	text, _ := renderSlackRequest(request, lease, "staff", true, started.Add(time.Minute))
+	if !strings.Contains(text, "running since 12:56, stops at 13:06") {
+		t.Fatalf("running message: %s", text)
+	}
+}

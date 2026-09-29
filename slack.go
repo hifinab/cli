@@ -359,7 +359,8 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 	case "running":
 		status = fmt.Sprintf("🟢 %s · `%s` · approved by %s · running", who, request.Name, request.DecidedBy)
 		if lease != nil {
-			status += fmt.Sprintf(" %s, stops at %s", formatDuration(now.Sub(lease.Started)), lease.Deadline.Local().Format("15:04"))
+			// Times, not durations: the message is only redrawn when something happens.
+			status += fmt.Sprintf(" since %s, stops at %s", lease.Started.Local().Format("15:04"), lease.Deadline.Local().Format("15:04"))
 			actions = []slack.BlockElement{stopButton(request.Name)}
 		}
 	case "stopped":
