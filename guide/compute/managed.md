@@ -163,6 +163,16 @@ agent* button that puts it in the `agents` group. Requests from an agent on
 someone's laptop show as `iman via Claude Code`; set `HI_AGENT` to name any
 other agent.
 
+### Watch your machines live
+
+```sh
+hi compute live
+```
+
+A full-screen view of your managed machines: running time, cost so far, a
+bar towards each time limit, your requests, and your budget. Select a
+machine with the arrow keys and press `s` to stop it, or `q` to quit.
+
 ### Leave the server
 
 ```sh
@@ -308,6 +318,73 @@ In Slack:
 | `/hi audit [user]`              | The last 15 audit entries                      |
 | `/hi budget <group> <usd>`      | Set each user's monthly budget in a group      |
 | `/hi budget <group> total <usd>` | Set the whole group's monthly budget          |
+
+### Live dashboard
+
+On the server box:
+
+```sh
+hi server live
+```
+
+```text
+hi compute · live                                        Tue 29 Sep 14:32:05
+3 running   $2.07/h now   $4.10 today   $41.20 this month of $2500.00
+────────────────────────────────────────────────────────────────────────────
+Running
+▸ train     iman via Claude Code staff  runpod l4    48m  $0.39  ████████░░ stops 14:44
+    fine-tune pricing model   ssh · tunnel
+  sweep     sam        students  runpod rtx-4090@community  12m  $0.07 ██░░░░░░░░ stops 15:20
+    thesis LoRA sweep   community cloud
+Waiting
+  dana      students  a100 2h                waiting 3m
+Budgets this month
+  staff      ███░░░░░░░░░░░░░  $38.10 of $2000.00
+Activity
+  14:31  sam opened ssh to sweep
+  14:29  dana requested runpod/big
+↑↓ select · a approve · d deny · s stop · q quit
+```
+
+It updates every second. `a` approves the selected request, `d` asks for a
+reason and denies it, and `s` stops the selected machine after a yes; each
+is logged and posted in Slack like a button click. The second line of each
+machine shows the reason it was requested and what its user is doing:
+connected clients report when they open `ssh`, a tunnel, `logs`, or
+`serve`, with the command and instance names only.
+
+### A wall screen
+
+`hi server live --wall` is the same dashboard, read-only, for a shared
+screen. It shows initials instead of names and hides reasons (`--names full`
+and `--reasons` turn them on), fills whatever screen it gets, and takes
+turns showing what doesn't fit. If the server stops answering, it dims and
+says `Reconnecting…` instead of going blank.
+
+To show it on screens without installing anything on them, run it once in a
+tmux session on the server box that screens attach to over SSH:
+
+```sh
+sudo ~/.local/bin/hi server wall setup
+sudo ~/.local/bin/hi server wall add office-tv ~/office-tv.pub
+```
+
+Then on the screen: `ssh -t hi-wall@<server box>`.
+
+- The session runs as a separate `hi-wall` account with a viewer key: it can
+  watch the dashboard and nothing else, and cannot read the server's state
+  or provider keys.
+- A screen's key can only attach read-only (`tmux attach -r`): asking for a
+  shell or another command still gives only the dashboard, and port
+  forwarding is refused.
+- A systemd service (`hi-wall-live`) keeps the session running across
+  crashes and reboots. Rerun `setup` after updating `hi`.
+- All screens on one session share its size. For a screen of another size,
+  add a session: `sudo hi server wall setup --session tv --size 240x67`, and
+  `wall add … --session tv`.
+
+A device elsewhere can also run `hi server live --wall` itself, if an admin
+makes it a viewer with `hi server viewer add <name> --key <key from hi connect key>`.
 
 ### Watch and stop
 

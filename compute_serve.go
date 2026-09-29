@@ -188,6 +188,7 @@ func computeServeCommand(args []string, stdin io.Reader, stdout, stderr io.Write
 	if err != nil {
 		return err
 	}
+	defer reportActivity(provider, instance, "serve")()
 	fmt.Fprintf(stdout, "Starting %s:%s on %s (a fresh machine needs a few minutes to build and download).\n",
 		recipe.repo, recipe.quant, instance)
 	if err := startRemoteServer(target, recipe, stderr); err != nil {
@@ -358,6 +359,7 @@ func sshLogs(provider computeProvider, name string, follow bool, lines int, stdi
 	if err != nil {
 		return err
 	}
+	defer reportActivity(provider, name, "logs")()
 	tail := fmt.Sprintf("tail -n %d", lines)
 	if follow {
 		tail += " -F"

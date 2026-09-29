@@ -292,16 +292,25 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Never move an approved Secure Cloud start onto Community Cloud when
   hardware is sold out; Community starts are replaced only on Community.
 
-## Planned
-
 ### v0.13.0 — Managed compute: live dashboard
 
-- [ ] Add `hi server live` for approvers and `--wall` for shared screens.
-- [ ] Run the wall in a tmux session that screens attach to read-only over
-  SSH, set up by `hi server wall`.
-- [ ] Add `hi compute live` for users, client activity events, and provider
-  GPU metrics where the provider has them.
+- [x] Add `hi server live` for admins on the server box: running machines
+  with cost and a bar towards each limit, waiting requests, budgets, and
+  activity, updated every second; `a`, `d`, and `s` approve, deny, and stop.
+- [x] Add `--wall`: read-only, initials and no reasons by default, fills the
+  screen and rotates what doesn't fit, dims while reconnecting.
+- [x] Run the wall in a tmux session as a separate `hi-wall` account that
+  screens attach to read-only over SSH, set up by `sudo hi server wall`.
+- [x] Add viewer devices (`hi server viewer add`), which may only watch, and
+  `hi compute live` for users' own machines.
+- [x] Report client activity (`ssh`, `tunnel`, `logs`, `serve`) to the
+  dashboard, with command and instance names only.
+- [ ] Provider GPU metrics, such as an idle GPU flag. Deferred with the
+  providers work.
+- [ ] Verify the wall live on aiw12.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+## Planned
 
 ### v0.14.0 — Managed compute: Slack App Home
 

@@ -42,6 +42,7 @@ description: Every hi command and option in one place.
 | `hi compute proxy <name>`                            | The SSH transport, for `ProxyCommand` (Colab)          |
 | `hi compute requests [<id> [--wait] [--timeout <d>]] [--json]` | Your requests to the hi server; exit 3 pending, 4 denied |
 | `hi compute extend <name> <duration> [--reason <r>] [--no-wait]` | Ask the hi server for more time |
+| `hi compute live`                                    | Live view of your managed machines                     |
 
 ### Options for up, run, and serve
 
@@ -97,6 +98,9 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server approvers add <id> --name <user>`        | Let a Slack member approve and stop; `remove`, `list` |
 | `hi server policy show\|edit\|example\|check`       | Group limits, auto-approve, and budgets              |
 | `hi server spend [--since <d>]`                     | Spend per user and group                             |
+| `hi server live [--wall] [--names full] [--reasons]` | Live dashboard; `--wall` is read-only               |
+| `sudo hi server wall setup\|add\|remove\|list`       | Show the wall on screens over SSH                    |
+| `hi server viewer add <name> --key <k>`             | A device that may only watch                         |
 
 ## hi login
 

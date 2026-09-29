@@ -165,6 +165,8 @@ type hiServer struct {
 	fallback priceBound
 	// slack is the Slack bridge, or nil when Slack isn't set up.
 	slack *slackBridge
+	// feed is recent activity for the live dashboard.
+	feed liveFeed
 }
 
 func serverDirectory(flagValue string) (string, error) {
@@ -259,6 +261,7 @@ func openServer(dir string, log io.Writer) (*hiServer, error) {
 	for name, key := range server.keys {
 		server.enableProvider(name, key)
 	}
+	server.feed.loadRecentAudit(dir)
 	// A start interrupted by a restart can't be resumed. If the instance was
 	// created, the reconciler reports it as unleased.
 	for _, request := range server.state.Requests {
@@ -319,6 +322,7 @@ type auditEntry struct {
 func (s *hiServer) audit(actor, action, subject, detail string) {
 	detail = strings.Join(strings.Fields(strings.ReplaceAll(detail, "\n", " · ")), " ")
 	entry := auditEntry{Time: computeNow().UTC(), Actor: actor, Action: action, Subject: subject, Detail: detail}
+	s.feed.add(auditEvent(entry))
 	data, _ := json.Marshal(entry)
 	file, err := os.OpenFile(filepath.Join(s.dir, "audit.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err == nil {
@@ -504,6 +508,8 @@ func (s *hiServer) clientHandler() http.Handler {
 	mux.HandleFunc("POST /v1/instances/{name}/stop", s.device(s.handleStopInstance))
 	mux.HandleFunc("GET /v1/instances/{name}/ssh", s.device(s.handleSSH))
 	mux.HandleFunc("POST /v1/instances/{name}/extend", s.device(s.handleExtend))
+	mux.HandleFunc("GET /v1/live", s.device(s.handleLive))
+	mux.HandleFunc("POST /v1/activity", s.device(s.handleActivity))
 	return mux
 }
 
@@ -686,6 +692,10 @@ func (s *hiServer) handleHardware(w http.ResponseWriter, r *http.Request, _ serv
 }
 
 func (s *hiServer) handleCreateRequest(w http.ResponseWriter, _ *http.Request, device serverDevice, body []byte) {
+	if s.isViewer(device.User) {
+		writeAPIError(w, http.StatusForbidden, "a viewer can only watch")
+		return
+	}
 	var input apiComputeRequest
 	if err := json.Unmarshal(body, &input); err != nil {
 		writeAPIError(w, http.StatusBadRequest, "malformed request")
@@ -808,6 +818,10 @@ func cleanAgentName(name string) string {
 // handleExtend asks for more time on one of the user's running instances.
 // It goes through the same approval as a start.
 func (s *hiServer) handleExtend(w http.ResponseWriter, r *http.Request, device serverDevice, body []byte) {
+	if s.isViewer(device.User) {
+		writeAPIError(w, http.StatusForbidden, "a viewer can only watch")
+		return
+	}
 	var input apiExtend
 	if err := json.Unmarshal(body, &input); err != nil || input.Seconds <= 0 {
 		writeAPIError(w, http.StatusBadRequest, "say how much longer, such as 1h")
@@ -1435,12 +1449,11 @@ func (s *hiServer) adminHandler() http.Handler {
 		}
 		var public ed25519.PublicKey
 		if input.Key != "" {
-			raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(input.Key))
-			if err != nil || len(raw) != ed25519.PublicKeySize {
-				writeAPIError(w, http.StatusBadRequest, "that is not a device key; get it with `hi connect key` on the device")
+			var err error
+			if public, err = decodeDeviceKey(input.Key); err != nil {
+				writeAPIError(w, http.StatusBadRequest, err.Error())
 				return
 			}
-			public = raw
 		}
 		s.mu.Lock()
 		user, exists := s.state.Users[input.Name]
@@ -1545,6 +1558,22 @@ func (s *hiServer) adminHandler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"removed": name})
 	})
 	s.approversHandler(mux)
+	mux.HandleFunc("GET /admin/live", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, s.liveSnapshot(""))
+	})
+	mux.HandleFunc("POST /admin/viewers", func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			As   string `json:"as"`
+			Name string `json:"name"`
+			Key  string `json:"key"`
+		}
+		json.NewDecoder(io.LimitReader(r.Body, serverMaxBody)).Decode(&input)
+		if err := s.addViewer(input.Name, input.Key, input.As); err != nil {
+			writeAPIError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"viewer": input.Name})
+	})
 	mux.HandleFunc("GET /admin/spend", func(w http.ResponseWriter, r *http.Request) {
 		seconds, _ := strconv.ParseInt(r.URL.Query().Get("seconds"), 10, 64)
 		to := computeNow()
@@ -1572,6 +1601,23 @@ func (s *hiServer) spendSummary(from, to time.Time) string {
 	}
 	return fmt.Sprintf("Since %s: %s\n\nBy user\n%s\n\nBy group\n%s", from.Local().Format("2 Jan 15:04"),
 		formatDollars(total), describeSpendRows(rows, 50), describeGroupSpend(policy, perGroup))
+}
+
+// decodeDeviceKey reads a device key as `hi connect key` prints it.
+func decodeDeviceKey(key string) (ed25519.PublicKey, error) {
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(key))
+	if err != nil || len(raw) != ed25519.PublicKeySize {
+		return nil, errors.New("that is not a device key; get it with `hi connect key` on the device")
+	}
+	return ed25519.PublicKey(raw), nil
+}
+
+// isViewer reports a device that may only watch the dashboard.
+func (s *hiServer) isViewer(user string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.state.Users[user]
+	return ok && record.Kind == "viewer"
 }
 
 func managedProviderNames() []string {
@@ -1701,6 +1747,12 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(serverPolicyCommand(rest, stdin, stdout, stderr), stderr)
 	case "spend":
 		return exitCode(serverSpendCommand(rest, stdout, stderr), stderr)
+	case "viewer":
+		return exitCode(serverViewerCommand(rest, stdout, stderr), stderr)
+	case "live":
+		return exitCode(serverLiveCommand(rest, stdin, stdout, stderr), stderr)
+	case "wall":
+		return exitCode(serverWallCommand(rest, stdout, stderr), stderr)
 	default:
 		fmt.Fprintf(stderr, "hi: unknown server command %q\n\n", command)
 		printServerUsage(stderr)
@@ -1735,6 +1787,9 @@ Usage:
   hi server policy show|edit|example|check
                                           Groups: limits, auto-approve, budgets
   hi server spend [--since 30d]           Spend per user and group
+  hi server live [--wall]                 Live dashboard; --wall is read-only for a shared screen
+  hi server wall setup|add|remove|list    Show the wall dashboard on screens over SSH (needs sudo)
+  hi server viewer add <name> --key K     A device that may only watch the dashboard
 
 Commands other than init and run talk to the running server through its
 admin socket, so they work only on the server box. Decisions are recorded

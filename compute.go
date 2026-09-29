@@ -221,6 +221,8 @@ func runCompute(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(computeRequestsCommand(rest, stdout, stderr), stderr)
 	case "extend":
 		return exitCode(computeExtendCommand(rest, stdin, stdout, stderr), stderr)
+	case "live":
+		return exitCode(computeLiveCommand(rest, stdin, stdout, stderr), stderr)
 	case "wait":
 		code, err := computeWaitCommand(rest, stdout, stderr)
 		if err != nil {
@@ -291,6 +293,7 @@ Usage:
   hi compute billing [ACCOUNT]        Show or choose who pays (Hugging Face)
   hi compute requests [<id> [--wait]] Your requests to the hi server (when connected)
   hi compute extend <name> <duration> Ask the hi server for more time
+  hi compute live                     Live view of your managed machines and budget
 
 Options for up and run:
   --on <provider>    colab, hf, runpod, or shadeform (default: inferred from --gpu, or
@@ -1039,6 +1042,7 @@ func computeSSHCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	if err != nil {
 		return err
 	}
+	defer reportActivity(provider, name, "ssh")()
 	sshArgs := append([]string{}, target.options...)
 	if len(remote) == 0 {
 		sshArgs = append(sshArgs, "-t")
@@ -1067,6 +1071,7 @@ func computeTunnelCommand(args []string, stdin io.Reader, stdout, stderr io.Writ
 	if err != nil {
 		return err
 	}
+	defer reportActivity(provider, name, "tunnel")()
 	sshArgs := append([]string{"-N", "-o", "ExitOnForwardFailure=yes"}, target.options...)
 	sshArgs = append(sshArgs,
 		"-L", fmt.Sprintf("127.0.0.1:%d:127.0.0.1:%d", localPort, remotePort),
