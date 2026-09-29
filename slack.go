@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/slack-go/slack"
+	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 )
 
@@ -27,13 +28,14 @@ import (
 const slackManifest = `{
   "display_information": { "name": "hi compute", "description": "Approve and control GPU compute started with hi" },
   "features": {
+    "app_home": { "home_tab_enabled": true, "messages_tab_enabled": true, "messages_tab_read_only_enabled": true },
     "bot_user": { "display_name": "hi compute", "always_online": true },
     "slash_commands": [
-      { "command": "/hi", "description": "GPU compute: status, stop, spend, budgets", "usage_hint": "status | stop <name|@user|all> | spend | users | audit | budget <group> <usd>", "should_escape": false }
+      { "command": "/hi", "description": "GPU compute: status, stop, spend, budgets", "usage_hint": "status | stop <name|@user|all> | spend | users | audit | budget <group> <usd> | link <user>", "should_escape": false }
     ]
   },
   "oauth_config": { "scopes": { "bot": ["chat:write", "commands", "users:read", "im:write"] } },
-  "settings": { "interactivity": { "is_enabled": true }, "socket_mode_enabled": true, "org_deploy_enabled": false, "token_rotation_enabled": false }
+  "settings": { "event_subscriptions": { "bot_events": ["app_home_opened"] }, "interactivity": { "is_enabled": true }, "socket_mode_enabled": true, "org_deploy_enabled": false, "token_rotation_enabled": false }
 }`
 
 // slackReplace replaces a private message a button was clicked in; tests
@@ -53,6 +55,9 @@ type slackConfig struct {
 	// Approvers maps Slack member IDs to hi user names, so nobody can
 	// approve their own request from Slack either.
 	Approvers map[string]string `json:"approvers"`
+	// Links maps Slack members to hi users who linked their account from
+	// their own device, for the Home tab and direct messages.
+	Links map[string]string `json:"links,omitempty"`
 }
 
 func slackConfigPath(dir string) string { return filepath.Join(dir, "slack.json") }
@@ -93,6 +98,7 @@ type slackAPI interface {
 	UpdateMessage(channelID, timestamp string, options ...slack.MsgOption) (string, string, string, error)
 	PostEphemeral(channelID, userID string, options ...slack.MsgOption) (string, error)
 	OpenView(triggerID string, view slack.ModalViewRequest) (*slack.ViewResponse, error)
+	PublishView(userID string, view slack.HomeTabViewRequest, hash string) (*slack.ViewResponse, error)
 }
 
 type slackBridge struct {
@@ -102,6 +108,7 @@ type slackBridge struct {
 
 	mu     sync.Mutex
 	config slackConfig
+	links  slackLinks
 
 	queue chan func()
 }
@@ -160,6 +167,15 @@ func (s *hiServer) notifyRequest(id string) {
 func (s *hiServer) notifyThread(id, text string) {
 	if s.slack == nil {
 		return
+	}
+	s.mu.Lock()
+	var requester, name string
+	if request, ok := s.state.Requests[id]; ok {
+		requester, name = request.User, request.Name
+	}
+	s.mu.Unlock()
+	if requester != "" {
+		s.notifyUser(requester, fmt.Sprintf("`%s`: %s", name, text))
 	}
 	s.slack.enqueue(func() {
 		s.mu.Lock()
@@ -527,6 +543,19 @@ func (b *slackBridge) handleInteraction(callback slack.InteractionCallback) {
 		}
 	}
 	if !ok {
+		// A linked user may stop their own machines, from the Home tab or a
+		// direct message; nothing else.
+		if linked, isLinked := b.linkedUser(callback.User.ID); isLinked && callback.Type == slack.InteractionTypeBlockActions &&
+			len(callback.ActionCallback.BlockActions) > 0 && callback.ActionCallback.BlockActions[0].ActionID == "stop" {
+			name := callback.ActionCallback.BlockActions[0].Value
+			if lease, owns := s.ownLease(name, linked); owns {
+				if err := s.stopLease(lease, linked); err != nil {
+					reply(err.Error())
+				}
+				b.enqueue(func() { b.publishHome(callback.User.ID) })
+				return
+			}
+		}
 		s.audit("slack:"+callback.User.ID, "refused action", string(callback.Type), "not an approver")
 		reply("Only approvers can do that. An admin adds approvers with `hi server approvers add`.")
 		return
@@ -648,6 +677,12 @@ func (b *slackBridge) slashResponse(command slack.SlashCommand) map[string]any {
 			response["blocks"] = blocks
 		}
 		return response
+	}
+	if fields := strings.Fields(command.Text); len(fields) == 2 && fields[0] == "link" {
+		return respond(b.startLink(command.UserID, strings.ToLower(slackName(fields[1]))))
+	}
+	if strings.TrimSpace(command.Text) == "unlink" {
+		return respond(b.unlink(command.UserID))
 	}
 	if _, ok := b.approver(command.UserID); !ok {
 		s.audit("slack:"+command.UserID, "refused command", "/hi "+command.Text, "not an approver")
@@ -779,6 +814,23 @@ func (b *slackBridge) run(ctx context.Context) {
 					}
 					if ok {
 						go b.handleInteraction(callback)
+					}
+				case socketmode.EventTypeEventsAPI:
+					if event.Request != nil {
+						client.Ack(*event.Request)
+					}
+					if outer, ok := event.Data.(slackevents.EventsAPIEvent); ok {
+						var opened *slackevents.AppHomeOpenedEvent
+						switch inner := outer.InnerEvent.Data.(type) {
+						case *slackevents.AppHomeOpenedEvent:
+							opened = inner
+						case slackevents.AppHomeOpenedEvent:
+							opened = &inner
+						}
+						if opened != nil && opened.Tab == "home" {
+							user := opened.User
+							b.enqueue(func() { b.publishHome(user) })
+						}
 					}
 				case socketmode.EventTypeSlashCommand:
 					command, ok := event.Data.(slack.SlashCommand)

@@ -162,6 +162,12 @@ func runConnect(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return exitCode(connectStatusCommand(args[1:], stdout), stderr)
 		case "key":
 			return exitCode(connectKeyCommand(args[1:], stdout), stderr)
+		case "slack":
+			if err := connectSlackCommand(args[1:]); err != nil {
+				return exitCode(err, stderr)
+			}
+			fmt.Fprintln(stdout, "Linked. Slack now sends you messages about your requests, and its Home tab shows your machines.")
+			return 0
 		case "help", "-h", "--help":
 			printConnectUsage(stdout)
 			return 0
@@ -181,6 +187,7 @@ Usage:
                         Enroll an agent that runs on its own, such as a build bot
   hi connect status     Server, user, group, and managed providers
   hi connect key        Print this device's public key, for an admin to pre-approve
+  hi connect slack CODE Link your Slack account, with the code from /hi link
   hi disconnect         Forget the server and delete this device's key`)
 }
 

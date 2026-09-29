@@ -89,6 +89,8 @@ type serverDevice struct {
 	Hostname    string    `json:"hostname"`
 	Added       time.Time `json:"added"`
 	LastSeen    time.Time `json:"last_seen"`
+	// Version is the hi version the device last connected with.
+	Version string `json:"version,omitempty"`
 }
 
 // serverRequest is an enrollment ("enroll") or a compute start ("compute").
@@ -510,6 +512,7 @@ func (s *hiServer) clientHandler() http.Handler {
 	mux.HandleFunc("POST /v1/instances/{name}/extend", s.device(s.handleExtend))
 	mux.HandleFunc("GET /v1/live", s.device(s.handleLive))
 	mux.HandleFunc("POST /v1/activity", s.device(s.handleActivity))
+	mux.HandleFunc("POST /v1/slack-link", s.device(s.handleSlackLink))
 	return mux
 }
 
@@ -546,6 +549,9 @@ func (s *hiServer) device(next deviceHandler) http.HandlerFunc {
 			return
 		}
 		device.LastSeen = computeNow()
+		if agent := r.UserAgent(); strings.HasPrefix(agent, "hi/") && len(agent) < 40 {
+			device.Version = strings.TrimPrefix(agent, "hi/")
+		}
 		copy := *device
 		s.mu.Unlock()
 		next(w, r, copy, body)
@@ -1032,6 +1038,13 @@ func (s *hiServer) decide(id, actor string, approve bool, group, reason string) 
 		s.mu.Unlock()
 		s.audit(actor, "denied", id, reason)
 		s.notifyRequest(id)
+		if copy.Kind != "enroll" {
+			text := fmt.Sprintf("Your request %s for `%s` was denied by %s.", id, copy.Name, actor)
+			if reason != "" {
+				text += " Reason: " + reason
+			}
+			s.notifyUser(copy.User, text)
+		}
 		return copy, err
 	}
 	if request.Kind == "enroll" {

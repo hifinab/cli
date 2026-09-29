@@ -163,6 +163,22 @@ agent* button that puts it in the `agents` group. Requests from an agent on
 someone's laptop show as `iman via Claude Code`; set `HI_AGENT` to name any
 other agent.
 
+### Link your Slack account
+
+Link your Slack account to get a message when your request is approved,
+denied (with the reason), started, near its time limit, or stopped, and to
+see and stop your machines from the app's Home tab in Slack:
+
+1. In Slack, type `/hi link <your hi user name>`, such as `/hi link iman`.
+2. Run the command it replies with on your own device, within 10 minutes:
+
+   ```sh
+   hi connect slack 4F7K2Q
+   ```
+
+The code only works from a device that is connected as that user, so nobody
+can link themselves to someone else. `/hi unlink` undoes it.
+
 ### Watch your machines live
 
 ```sh
@@ -318,6 +334,27 @@ In Slack:
 | `/hi audit [user]`              | The last 15 audit entries                      |
 | `/hi budget <group> <usd>`      | Set each user's monthly budget in a group      |
 | `/hi budget <group> total <usd>` | Set the whole group's monthly budget          |
+
+### Slack Home tab
+
+Open the hi compute app in Slack for a dashboard that is rebuilt each time
+you open it:
+
+- **Now:** each running machine with its user, hardware, cost so far, and a
+  **Stop** button, plus **Stop all…**.
+- **Waiting:** requests with **Approve** and **Deny…** buttons.
+- **This month:** spend per group against its budget.
+- **Devices:** each device, when it was last seen, and its `hi` version,
+  flagged when it is older than the server's or silent for a week.
+
+A linked user who isn't an approver sees only their own machines, requests,
+and budget there, and can stop their own machines. Anyone else is told how
+to link.
+
+The Home tab needs two settings in the Slack app that older setups lack. At
+[api.slack.com/apps](https://api.slack.com/apps), open the app, choose **App
+Manifest**, replace it with the output of `hi server slack manifest`, save,
+and reinstall if Slack asks.
 
 ### Live dashboard
 

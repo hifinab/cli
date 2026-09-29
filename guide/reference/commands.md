@@ -82,6 +82,7 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi connect <server> --agent <name> --owner <user>` | Enroll an agent that runs on its own                 |
 | `hi connect status`                                 | Server, user, group, and managed providers           |
 | `hi connect key`                                    | This device's public key, for an admin to pre-approve |
+| `hi connect slack <code>`                           | Link your Slack account, with the code from `/hi link` |
 | `hi disconnect`                                     | Forget the server and delete the device key          |
 | `hi server init [--listen <addr>]`                  | Create the server's state                            |
 | `hi server run`                                     | Serve clients                                        |

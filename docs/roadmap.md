@@ -317,16 +317,20 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   limit" no longer reads "time L.".
 - [x] The wall's tmux session hides the status bar.
 
-## Planned
-
 ### v0.14.0 — Managed compute: Slack App Home
 
-- [ ] Add an App Home dashboard with Now, Waiting, This month, and Devices,
-  plus a per-user view and direct messages for linked users.
+- [x] Add an App Home dashboard: approvers see Now (with Stop and Stop
+  all), Waiting (with Approve and Deny), This month, and Devices with their
+  `hi` version, flagged when outdated or silent.
+- [x] Let people link their Slack account with `/hi link <user>` and
+  `hi connect slack <code>` from their own device; linked users see their
+  own machines in App Home and can stop them.
+- [x] Send linked users direct messages when their requests are approved,
+  denied (with the reason), started, near their limit, or stopped.
+- [ ] Verify live after updating the Slack app's manifest.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
 
-Managed Hugging Face Jobs and the providers under "More compute providers"
-follow provider by provider.
+## Planned
 
 ### v0.15.0 — Authentication
 
@@ -376,6 +380,49 @@ rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 
 Dependency: needs uninstall steps for every tool `hi install` manages, and
 must respect the per-user or all-users choice from v0.18.0.
+
+### v0.20.0 — Learn from agent-machine services
+
+- [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
+  Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
+  `hi compute` and `hi server`. Candidates from boxd:
+  - Checkpoints before risky changes, and forking a running machine into an
+    identical copy.
+  - Suspending idle machines and resuming them quickly, which pairs with the
+    idle GPU flag deferred from v0.13.0.
+  - An HTTPS URL for every machine or `serve`, instead of an SSH tunnel.
+  - Environment variables and secrets set once and injected into every
+    machine the user owns, never on Community Cloud (v0.12.2).
+  - Sharing a running machine with a teammate, recorded in the audit log.
+  - A live desktop view that a person can watch and take over from an agent.
+- [ ] Turn the ideas worth building into draft specs in `specs/ideas/`.
+  Spec not yet written.
+
+### v0.21.0 — Containers
+
+- [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
+  - One image, anywhere: `hi compute run --image` starts the same container
+    on the local workstation (with the ROCm devices and render and video
+    groups that v0.1.0 sets up), RunPod, Shadeform, or Hugging Face Jobs.
+    Try it locally for free, then send it to a cloud GPU unchanged.
+  - Prebuilt project images: `hi init` templates include a Dockerfile, and a
+    pushed, digest-pinned image starts on a pod with everything installed,
+    instead of installing packages on every start. This is the nearest
+    thing to boxd's snapshots on providers that have none.
+  - Pinned serving images: `hi compute serve` recipes run a llama.cpp or
+    vLLM image pinned by digest, so a recipe that worked keeps working.
+  - Agent sandboxes on the workstation: run Claude Code or Codex in a
+    container per project, with only that project mounted, no keys, and
+    limited network, so an agent can work unattended safely.
+  - Image policy on the server: `policy.json` lists the registries or
+    digests a group may start, and requests show the image, so approvers
+    see what will run.
+  - `hi install` offers the container runtime and the ROCm container
+    tooling, as a checkbox in the v0.19.0 menu.
+  Spec not yet written.
+
+Dependency: local GPU containers need the v0.1.0 workstation setup; image
+policy extends v0.11.0; project images extend the v0.16.0 templates.
 
 ## Deferred until everything else is done
 

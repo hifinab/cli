@@ -21,6 +21,7 @@ type fakeSlack struct {
 	threads    []string
 	ephemerals []string
 	views      []slack.ModalViewRequest
+	homes      map[string]string
 	next       int
 }
 
@@ -68,6 +69,23 @@ func (f *fakeSlack) OpenView(trigger string, view slack.ModalViewRequest) (*slac
 	return &slack.ViewResponse{}, nil
 }
 
+func (f *fakeSlack) PublishView(user string, view slack.HomeTabViewRequest, hash string) (*slack.ViewResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.homes == nil {
+		f.homes = map[string]string{}
+	}
+	data, _ := json.Marshal(view.Blocks)
+	f.homes[user] = string(data)
+	return &slack.ViewResponse{}, nil
+}
+
+func (f *fakeSlack) home(user string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.homes[user]
+}
+
 func (f *fakeSlack) snapshot() (posts []string, updates map[string]string, threads, ephemerals []string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -82,9 +100,12 @@ func (f *fakeSlack) snapshot() (posts []string, updates map[string]string, threa
 func withSlack(t *testing.T, ts *testServer) *fakeSlack {
 	t.Helper()
 	fake := newFakeSlack()
-	ts.server.slack = newSlackBridge(ts.server, slackConfig{
-		Channel: "C1", Approvers: map[string]string{"UBOB": "bob", "UALICE": "alice"},
-	}, fake)
+	config := slackConfig{BotToken: "xoxb-test", AppToken: "xapp-test", Channel: "C1",
+		Approvers: map[string]string{"UBOB": "bob", "UALICE": "alice"}}
+	if err := saveSlackConfig(ts.dir, config); err != nil {
+		t.Fatal(err)
+	}
+	ts.server.slack = newSlackBridge(ts.server, config, fake)
 	return fake
 }
 
