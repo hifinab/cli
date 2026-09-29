@@ -180,15 +180,18 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Audit entries stay on one line, and stops read `ran 2m, started by
   iman`.
 
-## Planned
-
 ### v0.10.0 — Managed compute: Slack
 
-- [ ] Add a Slack app over Socket Mode, with a manifest printed by
-  `hi server slack setup`. It posts enrollment and compute approval buttons,
-  stop buttons, message states, and threaded alerts, and answers
-  `/hi status` and `/hi stop`.
+- [x] Add a Slack app over Socket Mode, with a manifest printed by
+  `hi server slack manifest` and tokens stored by `hi server slack setup`.
+  It posts enrollment and compute approval buttons, stop buttons, message
+  states, and threaded alerts, and answers `/hi status` and `/hi stop`.
+- [x] Add `hi server approvers`, which maps Slack members to `hi` users, so
+  nobody approves their own request from Slack either.
+- [ ] Verify with a live Slack workspace.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+## Planned
 
 ### v0.11.0 — Managed compute: policy, budgets, and reports
 

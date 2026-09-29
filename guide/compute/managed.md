@@ -19,8 +19,8 @@ and then use the same `hi compute` commands as before.
 > your own Google sign-in.
 {: .note}
 
-This release manages RunPod, and admins approve from the server box. Slack
-approvals, budgets, and a live dashboard come in later releases.
+This release manages RunPod. Admins approve from Slack or the server box.
+Budgets and a live dashboard come in later releases.
 
 ## For users
 
@@ -176,6 +176,57 @@ run `hi connect key` on the device, then:
 ```sh
 hi server user add alice --group staff --key <key>
 ```
+
+### Approve from Slack
+
+The server can post every request to a private Slack channel, with buttons
+to approve, deny, and stop. It connects to Slack over Socket Mode, which is
+an outbound connection, so the server needs no public address.
+
+1. At [api.slack.com/apps](https://api.slack.com/apps), choose **Create New
+   App → From a manifest** and paste the output of
+   `hi server slack manifest`. Install it to your workspace.
+2. Create a private channel, such as `#compute-approvals`, and invite the
+   app with `/invite @hi compute`.
+3. On the server box, run `hi server slack setup`. It asks for the **Bot User
+   OAuth Token** (`xoxb-…`), an **App-Level Token** with `connections:write`
+   (`xapp-…`, under Basic Information), and the channel's ID (at the bottom
+   of the channel's details). It posts a test message, then saves them.
+4. Add each approver by Slack member ID (profile → ⋮ → Copy member ID) and
+   the `hi` user name they request compute as:
+
+   ```sh
+   hi server approvers add U0123456789 --name bob
+   ```
+
+5. Restart the server: `sudo systemctl restart hi-server`.
+
+In the channel:
+
+- **Join requests** have *Approve as staff*, *Approve as student*, and
+  *Deny…* buttons.
+- **Compute requests** show the user, hardware, price, maximum cost, and
+  reason, with *Approve* and *Deny…*. *Deny…* asks for a reason, which the
+  requester sees.
+- The message changes as the request moves on: 🔵 starting, 🟢 running with a
+  **Stop** button, ⚪ stopped with its run time and cost, 🔴 denied, ❌ failed.
+- Its thread records the start, a replacement for sold-out hardware, a
+  warning at 80% of the time limit, and the stop.
+- A machine on the provider account that the server didn't start gets its
+  own alert.
+
+Only approvers can click or use `/hi`; anyone else is told so, and the
+attempt is logged. Nobody can approve their own request, so an approver's
+own requests need another approver.
+
+| Command                  | Does                                                  |
+|--------------------------|-------------------------------------------------------|
+| `/hi status`             | What is running, the rate right now, with Stop buttons |
+| `/hi stop <name>`        | A Stop button for one machine                         |
+| `/hi stop user <user>`   | A button to stop everything that user runs            |
+| `/hi stop all`           | A button to stop everything                           |
+
+Answers are visible only to you, and every stop needs a click to confirm.
 
 ### Watch and stop
 

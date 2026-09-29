@@ -107,6 +107,10 @@ type serverRequest struct {
 	Progress   string    `json:"progress,omitempty"`
 	Error      string    `json:"error,omitempty"`
 	StoppedBy  string    `json:"stopped_by,omitempty"`
+	Started    time.Time `json:"started,omitzero"`
+	Ended      time.Time `json:"ended,omitzero"`
+	// SlackTS is the request's message in the approvals channel.
+	SlackTS string `json:"slack_ts,omitempty"`
 }
 
 // serverLease is a running instance the server started, and the limits it
@@ -122,6 +126,8 @@ type serverLease struct {
 	Started  time.Time `json:"started"`
 	Deadline time.Time `json:"deadline"`
 	State    string    `json:"state,omitempty"`
+	// Warned is set once the thread has been told the limit is near.
+	Warned bool `json:"warned,omitempty"`
 }
 
 type hiServer struct {
@@ -135,6 +141,8 @@ type hiServer struct {
 	log       io.Writer
 	// fallbackFactor bounds replacements for sold-out hardware.
 	fallbackFactor float64
+	// slack is the Slack bridge, or nil when Slack isn't set up.
+	slack *slackBridge
 }
 
 func serverDirectory(flagValue string) (string, error) {
@@ -529,6 +537,7 @@ func (s *hiServer) handleEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(enroll.User, "requested enrollment", request.ID, fmt.Sprintf("%s from %s", fingerprint, enroll.Hostname))
+	s.notifyRequest(request.ID)
 	writeJSON(w, http.StatusAccepted, request)
 }
 
@@ -672,6 +681,7 @@ func (s *hiServer) handleCreateRequest(w http.ResponseWriter, _ *http.Request, d
 		return
 	}
 	s.audit(device.User, "requested compute", request.ID, describeServerRequest(request))
+	s.notifyRequest(request.ID)
 	writeJSON(w, http.StatusAccepted, request)
 }
 
@@ -820,6 +830,7 @@ func (s *hiServer) decide(id, actor string, approve bool, group, reason string) 
 		copy := *request
 		s.mu.Unlock()
 		s.audit(actor, "denied", id, reason)
+		s.notifyRequest(id)
 		return copy, err
 	}
 	if request.Kind == "enroll" {
@@ -837,6 +848,7 @@ func (s *hiServer) decide(id, actor string, approve bool, group, reason string) 
 		copy := *request
 		s.mu.Unlock()
 		s.audit(actor, "approved enrollment", id, fmt.Sprintf("%s (%s) on %s", request.User, user.Group, request.Hostname))
+		s.notifyRequest(id)
 		return copy, err
 	}
 	request.State = "starting"
@@ -844,6 +856,7 @@ func (s *hiServer) decide(id, actor string, approve bool, group, reason string) 
 	copy := *request
 	s.mu.Unlock()
 	s.audit(actor, "approved", id, describeServerRequest(&copy))
+	s.notifyRequest(id)
 	go s.start(copy)
 	return copy, err
 }
@@ -876,6 +889,7 @@ func (s *hiServer) start(request serverRequest) {
 		s.saveLocked()
 		s.mu.Unlock()
 		s.audit("server", "failed to start", request.ID, err.Error())
+		s.notifyRequest(request.ID)
 	}
 	provider, err := s.provider(request.Provider)
 	if err != nil {
@@ -915,6 +929,8 @@ func (s *hiServer) start(request serverRequest) {
 				fmt.Fprintf(progress, "%s is sold out; starting %s (%s) instead\n", hardware.name, alternative.name, alternative.rate)
 				s.audit("server", "replaced sold-out hardware", request.ID, fmt.Sprintf("%s (%s) with %s (%s), within %gx",
 					hardware.name, hardware.rate, alternative.name, alternative.rate, s.fallbackFactor))
+				s.notifyThread(request.ID, fmt.Sprintf("%s was sold out; starting %s (%s) instead, within %gx the approved price.",
+					hardware.name, alternative.name, alternative.rate, s.fallbackFactor))
 				if err = create(alternative); err == nil {
 					s.mu.Lock()
 					if current, ok := s.state.Requests[request.ID]; ok {
@@ -942,10 +958,13 @@ func (s *hiServer) start(request serverRequest) {
 		Started: started, Deadline: started.Add(lifetime), State: "running",
 	}
 	if current, ok := s.state.Requests[request.ID]; ok {
-		current.State, current.Progress = "running", ""
+		current.State, current.Progress, current.Started = "running", "", started
 	}
 	s.saveLocked()
 	s.mu.Unlock()
+	s.notifyRequest(request.ID)
+	s.notifyThread(request.ID, fmt.Sprintf("Started on %s (%s). It stops at %s.", request.Hardware, request.Rate,
+		started.Add(lifetime).Local().Format("15:04")))
 	s.audit("server", "started", request.Name, fmt.Sprintf("%s on %s for %s, stops at %s", request.ID, request.Hardware,
 		request.User, started.Add(lifetime).Local().Format("15:04")))
 }
@@ -960,8 +979,13 @@ func (s *hiServer) stopLease(lease serverLease, actor string) error {
 		return fmt.Errorf("stop %s: %w", lease.Name, err)
 	}
 	s.endLease(lease.Name, actor)
-	s.audit(actor, "stopped", lease.Name, fmt.Sprintf("ran %s, started by %s",
-		formatDuration(computeNow().Sub(lease.Started)), lease.User))
+	ran := formatDuration(computeNow().Sub(lease.Started))
+	s.audit(actor, "stopped", lease.Name, fmt.Sprintf("ran %s, started by %s", ran, lease.User))
+	if actor == "limit" {
+		s.notifyThread(lease.Request, fmt.Sprintf("Reached its time limit after %s and was stopped.", ran))
+	} else {
+		s.notifyThread(lease.Request, fmt.Sprintf("Stopped by %s after %s.", actor, ran))
+	}
 	return nil
 }
 
@@ -974,9 +998,13 @@ func (s *hiServer) endLease(name, stoppedBy string) {
 	}
 	delete(s.state.Leases, name)
 	if request, ok := s.state.Requests[lease.Request]; ok {
-		request.State, request.StoppedBy = "stopped", stoppedBy
+		request.State, request.StoppedBy, request.Ended = "stopped", stoppedBy, computeNow()
+		if request.Started.IsZero() {
+			request.Started = lease.Started
+		}
 	}
 	s.saveLocked()
+	s.notifyRequest(lease.Request)
 }
 
 // reconcile expires old requests, stops instances past their limit, ends
@@ -988,6 +1016,7 @@ func (s *hiServer) reconcile() {
 		if request.State == "pending" && now.Sub(request.Created) > serverRequestExpiry {
 			request.State = "expired"
 			s.audit("server", "expired", request.ID, "no decision within "+formatDuration(serverRequestExpiry))
+			s.notifyRequest(request.ID)
 		}
 	}
 	starting := map[string]bool{}
@@ -1029,7 +1058,17 @@ func (s *hiServer) reconcile() {
 			case !now.Before(lease.Deadline):
 				if err := s.stopLease(lease, "limit"); err != nil {
 					s.audit("server", "could not stop", lease.Name, err.Error())
+					s.notifyThread(lease.Request, "Could not stop it at its limit: "+err.Error())
 				}
+			case !lease.Warned && now.Sub(lease.Started) >= time.Duration(slackWarnAt*float64(lease.Deadline.Sub(lease.Started))):
+				s.mu.Lock()
+				if current, ok := s.state.Leases[lease.Name]; ok {
+					current.Warned = true
+					s.saveLocked()
+				}
+				s.mu.Unlock()
+				s.notifyThread(lease.Request, fmt.Sprintf("%s has used %d%% of its time; it stops at %s.",
+					lease.Name, int(slackWarnAt*100), lease.Deadline.Local().Format("15:04")))
 			}
 		}
 		for _, instance := range instances {
@@ -1039,6 +1078,8 @@ func (s *hiServer) reconcile() {
 			}
 			s.unleased[key] = true
 			s.audit("server", "unleased instance", key, "running on the organization's account without a request")
+			s.notifyChannel(fmt.Sprintf("⚠️ `%s` is running on the organization's %s account without a request. "+
+				"Stop it on the provider's website if nobody expects it.", instance.name, name))
 		}
 	}
 }
@@ -1267,6 +1308,7 @@ func (s *hiServer) adminHandler() http.Handler {
 		s.audit(r.URL.Query().Get("as"), "removed provider key", name, "")
 		writeJSON(w, http.StatusOK, map[string]string{"removed": name})
 	})
+	s.approversHandler(mux)
 	return mux
 }
 
@@ -1317,6 +1359,9 @@ func (s *hiServer) serve(ctx context.Context, listen string) error {
 	go client.Serve(clientListener)
 	go admin.Serve(adminListener)
 	fmt.Fprintf(s.log, "hi server %s listening on %s\n", version, listen)
+	if err := s.startSlack(ctx); err != nil {
+		fmt.Fprintf(s.log, "slack: %v\n", err)
+	}
 
 	ticker := time.NewTicker(serverReconcileEvery)
 	defer ticker.Stop()
@@ -1386,6 +1431,10 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(serverStopCommand(rest, stdout, stderr), stderr)
 	case "audit":
 		return exitCode(serverAuditCommand(rest, stdout, stderr), stderr)
+	case "slack":
+		return exitCode(serverSlackCommand(rest, stdin, stdout, stderr), stderr)
+	case "approvers":
+		return exitCode(serverApproversCommand(rest, stdout, stderr), stderr)
 	default:
 		fmt.Fprintf(stderr, "hi: unknown server command %q\n\n", command)
 		printServerUsage(stderr)
@@ -1413,6 +1462,10 @@ Usage:
   hi server stop <name> | --user U | --all
                                           Stop instances
   hi server audit [--since 7d]            Requests, approvals, starts, and stops
+  hi server slack setup                   Connect a Slack app (see: hi server slack manifest)
+  hi server approvers add <Slack ID> --name <user>
+                                          Let someone approve and stop from Slack
+  hi server approvers remove <Slack ID> | list
 
 Commands other than init and run talk to the running server through its
 admin socket, so they work only on the server box. Decisions are recorded

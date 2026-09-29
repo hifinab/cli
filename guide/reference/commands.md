@@ -91,6 +91,8 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server ls`                                      | Everything running, for every user                   |
 | `hi server stop <name> \| --user <u> \| --all`      | Stop instances                                       |
 | `hi server audit [--since <d>]`                     | The audit log                                        |
+| `hi server slack setup`, `slack manifest`           | Connect a Slack app; print its manifest              |
+| `hi server approvers add <id> --name <user>`        | Let a Slack member approve and stop; `remove`, `list` |
 
 ## hi login
 
