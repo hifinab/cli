@@ -307,8 +307,15 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   dashboard, with command and instance names only.
 - [ ] Provider GPU metrics, such as an idle GPU flag. Deferred with the
   providers work.
-- [ ] Verify the wall live on aiw12.
+- [x] Verify the wall live on aiw12 (2026-09-29): a screen attached over
+  SSH saw the dashboard; a shell command and a port forward were refused.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
+
+### v0.13.1 — A cleaner wall
+
+- [x] On a wall, only people's names become initials: "stopped at its time
+  limit" no longer reads "time L.".
+- [x] The wall's tmux session hides the status bar.
 
 ## Planned
 

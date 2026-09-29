@@ -133,7 +133,12 @@ func auditEvent(entry auditEntry) liveEvent {
 			text = "auto-approved " + entry.Subject
 		}
 	}
+	// Only people become initials on a wall, not the server's own actors.
 	user := entry.Actor
+	switch {
+	case user == "server", user == "limit", user == "gone", strings.HasPrefix(user, "policy"), strings.HasPrefix(user, "slack:"):
+		user = ""
+	}
 	return liveEvent{Time: entry.Time, Text: text, User: user}
 }
 

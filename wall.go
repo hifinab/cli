@@ -30,11 +30,12 @@ var wallSessionName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 // session has its own tmux server, so systemd can follow it.
 func wallUnit(session, size string) string {
 	create := fmt.Sprintf("/usr/bin/tmux -L wall-%s new-session -d -s %s", session, session)
-	post := ""
+	// A wall shows only the dashboard: no tmux status bar.
+	post := fmt.Sprintf("ExecStartPost=/usr/bin/tmux -L wall-%s set-option -t %s status off\n", session, session)
 	if size != "" {
 		width, height, _ := strings.Cut(size, "x")
 		create += fmt.Sprintf(" -x %s -y %s", width, height)
-		post = fmt.Sprintf("ExecStartPost=/usr/bin/tmux -L wall-%s set-option -t %s window-size manual\n", session, session)
+		post += fmt.Sprintf("ExecStartPost=/usr/bin/tmux -L wall-%s set-option -t %s window-size manual\n", session, session)
 	}
 	create += " " + wallBinary + " server live --wall"
 	return fmt.Sprintf(`[Unit]

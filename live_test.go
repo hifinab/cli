@@ -247,3 +247,21 @@ func TestWallUnitAndKeysLockScreensDown(t *testing.T) {
 		t.Fatalf("wall without root: %d %s", code, stderr)
 	}
 }
+
+func TestWallInitialsAreOnlyForPeople(t *testing.T) {
+	event := auditEvent(auditEntry{Time: time.Now(), Actor: "limit", Action: "stopped", Subject: "train"})
+	if event.User != "" || event.Text != "train stopped at its time limit" {
+		t.Fatalf("event %+v", event)
+	}
+	snapshot := liveSnapshot{Now: time.Now(), Activity: []liveEvent{event,
+		{Time: time.Now(), Text: "iman stopped train", User: "iman"},
+		{Time: time.Now(), Text: "started iman-job", User: ""}}}
+	out := renderLive(snapshot, liveOptions{wall: true}, liveState{width: 120, height: 40})
+	if !strings.Contains(out, "train stopped at its time limit") || !strings.Contains(out, "I. stopped train") ||
+		!strings.Contains(out, "started iman-job") {
+		t.Fatalf("activity:\n%s", out)
+	}
+	if !strings.Contains(wallUnit("live", ""), "status off") {
+		t.Fatal("the wall shows tmux's status bar")
+	}
+}

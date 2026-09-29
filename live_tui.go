@@ -269,8 +269,8 @@ func renderLive(snapshot liveSnapshot, options liveOptions, state liveState) str
 	var activity []string
 	for _, event := range snapshot.Activity {
 		text := event.Text
-		if options.wall && !options.fullNames && event.User != "" {
-			text = strings.Replace(text, event.User, options.displayName(event.User), 1)
+		if options.wall && !options.fullNames && event.User != "" && strings.HasPrefix(text, event.User+" ") {
+			text = options.displayName(event.User) + strings.TrimPrefix(text, event.User)
 		}
 		activity = append(activity, fmt.Sprintf("  %s  %s", liveDim.Render(event.Time.Local().Format("15:04")), text))
 	}
