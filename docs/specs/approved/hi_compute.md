@@ -124,6 +124,7 @@ between releases.
 | Hugging Face | Jobs REST API (`huggingface.co/api/jobs`, OpenAPI)  | `ssh <job>@ssh.hf.jobs`; public key registered on the Hub       | Max lifetime (timeout)   |
 | Colab        | `colab` CLI (`google-colab-cli`); no public API     | `colab ssh --proxy-mode` as `ProxyCommand`; Pro+ only          | Colab's session limits   |
 | RunPod       | REST API (`rest.runpod.io/v1`)                      | Direct SSH on exposed port 22                                    | None; `hi` watchdog      |
+| Shadeform    | REST API (`api.shadeform.ai/v1`, `X-API-KEY`)       | Direct SSH to the VM as `shadeform`; key registered via API      | `auto_delete` at `--max` |
 | Modal        | Official Go SDK, Sandboxes (beta)                   | No sshd; SDK exec with PTY, or sshd over a raw TCP tunnel       | Idle and max lifetime    |
 | Lambda       | REST API (`cloud.lambda.ai/api/v1`, OpenAPI)        | Direct SSH to the VM                                             | None; terminate via API  |
 | Vast.ai      | REST API (`console.vast.ai/api/v0`)                 | Direct or proxied SSH                                            | None; `hi` watchdog      |

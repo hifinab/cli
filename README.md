@@ -38,8 +38,8 @@ hi net             Securely enroll this machine with NetBird
 hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
-hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod)
-hi login <hf|colab|runpod>  Sign in to a compute provider
+hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
+hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute
 hi disconnect               Leave it; hi compute uses your own keys again
 hi server          Run the server that brokers compute for a team (hi server help)

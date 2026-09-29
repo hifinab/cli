@@ -316,7 +316,7 @@ func menuProvider(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) (compute
 
 // menuSignIn signs in to a provider from inside the menu.
 func menuSignIn(ui menuUI, provider computeProvider, stdin io.Reader, stdout, stderr io.Writer) error {
-	switch runpod := provider.(type) {
+	switch keyed := provider.(type) {
 	case *runpodProvider:
 		ui.note("RunPod needs an API key with read and write access. Create one at " + runpodKeysURL)
 		key, err := ui.secret("RunPod API key")
@@ -324,7 +324,20 @@ func menuSignIn(ui menuUI, provider computeProvider, stdin io.Reader, stdout, st
 			return errMenuBack
 		}
 		var path string
-		ui.busy("Checking the key with RunPod…", func() { path, err = runpod.signIn(key) })
+		ui.busy("Checking the key with RunPod…", func() { path, err = keyed.signIn(key) })
+		if err != nil {
+			return err
+		}
+		ui.note("Saved in " + path + ", readable only by you.")
+		return nil
+	case *shadeformProvider:
+		ui.note("Shadeform needs an API key. Create one at " + shadeformKeysURL)
+		key, err := ui.secret("Shadeform API key")
+		if err != nil || key == "" {
+			return errMenuBack
+		}
+		var path string
+		ui.busy("Checking the key with Shadeform…", func() { path, err = keyed.signIn(key) })
 		if err != nil {
 			return err
 		}
@@ -346,6 +359,8 @@ func providerLabel(name string) string {
 		return "hf     Hugging Face Jobs, billed per minute"
 	case "runpod":
 		return "runpod RunPod pods, pay as you go"
+	case "shadeform":
+		return "shadeform Shadeform: GPUs from many clouds, pay as you go"
 	}
 	return name
 }

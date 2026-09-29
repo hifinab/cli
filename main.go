@@ -78,7 +78,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runSkill(args[1:], stdout, stderr)
 	case "login":
 		if len(args) != 2 {
-			fmt.Fprintln(stderr, "usage: hi login <hf|colab|runpod>")
+			fmt.Fprintln(stderr, "usage: hi login <hf|colab|runpod|shadeform>")
 			return 2
 		}
 		return exitCode(login(args[1], stdin, stdout, stderr), stderr)
@@ -117,8 +117,9 @@ Usage:
   hi net status                 Show NetBird connection status
   hi net down                   Disconnect NetBird
   hi net reconnect              Reconnect an enrolled NetBird peer
-  hi compute                    Start and use remote GPU machines (Colab, Hugging Face, RunPod)
-  hi login <hf|colab|runpod>    Sign in to a compute provider
+  hi compute                    Start and use remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
+  hi login <hf|colab|runpod|shadeform>
+                                Sign in to a compute provider
   hi connect <server>           Join a hi server that approves and pays for compute
   hi disconnect                 Leave it; hi compute uses your own keys again
   hi server                     Run the server that brokers compute for a team

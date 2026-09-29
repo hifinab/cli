@@ -46,13 +46,15 @@ var (
 	// serverProviderFactories are the providers a server can manage. Colab is
 	// never managed: it runs under each user's own Google sign-in.
 	serverProviderFactories = map[string]func() computeProvider{
-		"runpod": func() computeProvider { return newRunpodProvider() },
+		"runpod":    func() computeProvider { return newRunpodProvider() },
+		"shadeform": func() computeProvider { return newShadeformProvider() },
 	}
 	// serverKeyEnv is where each managed driver reads its key.
-	serverKeyEnv = map[string]string{"runpod": "RUNPOD_API_KEY"}
+	serverKeyEnv = map[string]string{"runpod": "RUNPOD_API_KEY", "shadeform": "SHADEFORM_API_KEY"}
 	// serverKeyCheck validates a key before the server stores it.
 	serverKeyCheck = map[string]func(key string) error{
-		"runpod": func(key string) error { return runpodRequest(key, http.MethodGet, "/catalog/cpus", nil, nil) },
+		"runpod":    func(key string) error { return runpodRequest(key, http.MethodGet, "/catalog/cpus", nil, nil) },
+		"shadeform": func(key string) error { return shadeformRequest(key, http.MethodGet, "/sshkeys", nil, nil) },
 	}
 )
 

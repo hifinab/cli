@@ -152,7 +152,7 @@ type computeRecord struct {
 }
 
 var (
-	computeProviders = []computeProvider{colabProvider{}, newHFProvider(), newRunpodProvider()}
+	computeProviders = []computeProvider{colabProvider{}, newHFProvider(), newRunpodProvider(), newShadeformProvider()}
 	computeNow       = time.Now
 	// startComputeWatcher is replaced in tests so no background process starts.
 	startComputeWatcher = spawnComputeWatcher
@@ -281,7 +281,7 @@ Usage:
   hi compute extend <name> <duration> Ask the hi server for more time
 
 Options for up and run:
-  --on <provider>    colab, hf, or runpod (default: inferred from --gpu, or
+  --on <provider>    colab, hf, runpod, or shadeform (default: inferred from --gpu, or
                      $HI_COMPUTE_PROVIDER, or the only signed-in provider)
   --gpu <hardware>   Hardware name from hi compute hardware (default: CPU)
   --name <name>      Instance name (default: generated)
@@ -307,7 +307,8 @@ Options for serve (plus --on, --gpu, --name, --max, --yes, --dry-run):
   --port <port>      Local port for the API (default 8080)
   --args "<args>"    Extra llama-server arguments
 
-Providers: colab, hf, runpod
+Providers: colab, hf, runpod, shadeform (h100 picks the cheapest free H100;
+           h100@lambdalabs picks a cloud)
 Recipes:   qwen3.8-flash-next (Colab G4, Hugging Face rtx-pro-6000)`)
 }
 
@@ -457,6 +458,13 @@ func resolveHardware(provider computeProvider, name string) (computeHardware, er
 		}
 		names = append(names, hardware.name)
 	}
+	if lookup, ok := provider.(interface {
+		lookupHardware(string) (computeHardware, error)
+	}); ok {
+		if hardware, err := lookup.lookupHardware(name); err == nil {
+			return hardware, nil
+		}
+	}
 	return computeHardware{}, usageError{fmt.Sprintf(
 		"unknown %s hardware %q; choose one of: %s", provider.name(), name, strings.Join(names, ", "))}
 }
@@ -559,6 +567,8 @@ func startInstance(
 		}
 	}
 
+	// Billing starts when the machine is created, not when it is ready.
+	created := computeNow()
 	if err := provider.create(request, stdout, stderr); err != nil {
 		return err
 	}
@@ -572,7 +582,7 @@ func startInstance(
 		Name:      request.name,
 		Provider:  provider.name(),
 		Hardware:  request.hardware.name,
-		Created:   computeNow(),
+		Created:   created,
 		Deadline:  deadline,
 		Namespace: request.namespace,
 	}

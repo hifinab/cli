@@ -54,7 +54,10 @@ Hardware names are the provider's own: Colab uses `cpu`, `T4`, `L4`, `G4`
 `t4-small`, `a10g-small`, `l40sx1`, `a100-large`, `rtx-pro-6000` (96 GB);
 RunPod uses short GPU names such as `rtx-4090` and `a100-pcie` (see
 `hi compute hardware --on runpod`). RunPod supports `up`, `ssh`, `tunnel`,
-and `stop`, but not `run`.
+and `stop`, but not `run`. Shadeform rents virtual machines from many clouds:
+`h100` is the cheapest free H100 on any of them, `h100@lambdalabs` pins a
+cloud, and like RunPod it supports `up`, `ssh`, `tunnel`, and `stop` but not
+`run`. Its machines boot in 3-8 minutes.
 When both providers are signed in, the hardware name picks the provider;
 otherwise pass `--on colab`, `--on hf`, or `--on runpod`.
 

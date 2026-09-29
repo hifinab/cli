@@ -29,6 +29,8 @@
       url: /guide/compute/hugging-face/
     - title: RunPod
       url: /guide/compute/runpod/
+    - title: Shadeform
+      url: /guide/compute/shadeform/
 - section: Examples
   pages:
     - title: Try a 125B model on a 96 GB GPU

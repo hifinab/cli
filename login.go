@@ -21,6 +21,16 @@ func runpodForLogin() *runpodProvider {
 	return newRunpodProvider()
 }
 
+// shadeformForLogin is the registered Shadeform provider.
+func shadeformForLogin() *shadeformProvider {
+	for _, provider := range computeProviders {
+		if shadeform, ok := provider.(*shadeformProvider); ok {
+			return shadeform
+		}
+	}
+	return newShadeformProvider()
+}
+
 // login delegates to each provider's own sign-in; hi never handles the token.
 func login(provider string, stdin io.Reader, stdout, stderr io.Writer) error {
 	switch provider {
@@ -61,7 +71,28 @@ func login(provider string, stdin io.Reader, stdout, stderr io.Writer) error {
 			fmt.Fprintln(stdout, "Note: RUNPOD_API_KEY is set in this shell and takes precedence over the saved key.")
 		}
 		return nil
+	case "shadeform":
+		terminal, ok := stdin.(*os.File)
+		if !ok || !term.IsTerminal(int(terminal.Fd())) {
+			return fmt.Errorf("`hi login shadeform` asks for the key in a terminal; in scripts, set SHADEFORM_API_KEY instead")
+		}
+		fmt.Fprintf(stdout, "Create an API key at %s\n", shadeformKeysURL)
+		fmt.Fprint(stdout, "Shadeform API key (paste it; it shows as *): ")
+		key, err := readSecret(terminal, stdout)
+		fmt.Fprintln(stdout)
+		if err != nil {
+			return fmt.Errorf("read the API key: %w", err)
+		}
+		path, err := shadeformForLogin().signIn(string(key))
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Shadeform is ready. The key is saved in %s, readable only by you.\n", path)
+		if os.Getenv("SHADEFORM_API_KEY") != "" {
+			fmt.Fprintln(stdout, "Note: SHADEFORM_API_KEY is set in this shell and takes precedence over the saved key.")
+		}
+		return nil
 	default:
-		return usageError{fmt.Sprintf("unknown provider %q; use hf, colab, or runpod", provider)}
+		return usageError{fmt.Sprintf("unknown provider %q; use hf, colab, runpod, or shadeform", provider)}
 	}
 }

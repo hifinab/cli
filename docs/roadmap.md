@@ -257,9 +257,25 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Waiting on a request prints "Approved by …" once, then the start's
   progress, instead of repeating the approver on every line.
 
+### v0.12.0 — Shadeform
+
+- [x] Add a Shadeform driver through its REST API (`X-API-KEY`): one
+  integration reaches GPUs from many clouds (Hyperstack, Massed Compute,
+  Lambda, Scaleway, Paperspace, Vultr, and more). Each GPU type is listed
+  once at its cheapest free on-demand offer, with the cloud and region;
+  `h100@lambdalabs` picks a cloud.
+- [x] Register the user's SSH key with Shadeform once, set Shadeform's own
+  `auto_delete` at `--max` so machines stop even with the laptop off, and
+  delete on `stop`.
+- [x] Add `hi login shadeform`, and let `hi server provider add shadeform`
+  manage it, including replacements for sold-out offers from other clouds.
+- [x] Record an instance's start when it is created, not when it is ready.
+- [x] Verify live: an A4000 on Hyperstack in Oslo, booted in 3.5 minutes,
+  SSH as `shadeform`.
+
 ## Planned
 
-### v0.12.0 — Managed compute: live dashboard
+### v0.13.0 — Managed compute: live dashboard
 
 - [ ] Add `hi server live` for approvers and `--wall` for shared screens.
 - [ ] Run the wall in a tmux session that screens attach to read-only over
@@ -268,7 +284,7 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   GPU metrics where the provider has them.
   Approved spec: [hi_server.md](specs/approved/hi_server.md).
 
-### v0.13.0 — Managed compute: Slack App Home
+### v0.14.0 — Managed compute: Slack App Home
 
 - [ ] Add an App Home dashboard with Now, Waiting, This month, and Devices,
   plus a per-user view and direct messages for linked users.
@@ -277,14 +293,14 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 Managed Hugging Face Jobs and the providers under "More compute providers"
 follow provider by provider.
 
-### v0.14.0 — Authentication
+### v0.15.0 — Authentication
 
 - [ ] Delegate GitHub and OMP authentication to their native tools.
   Approved spec: [hi_login.md](specs/approved/hi_login.md).
 
 Dependency: login requires the corresponding installed CLI.
 
-### v0.15.0 — Project bootstrap
+### v0.16.0 — Project bootstrap
 
 - [ ] Add the interactive `hi init` helper and deterministic Python template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
@@ -292,17 +308,17 @@ Dependency: login requires the corresponding installed CLI.
 Dependency: the Python template requires `uv` and establishes the metadata and
 safe-generation contract used by later templates.
 
-### v0.16.0 — Specialized project templates
+### v0.17.0 — Specialized project templates
 
 - [ ] Add the quantitative-research template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 - [ ] Add the deterministic web-application template.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
-Dependency: both templates extend the v0.15.0 planner, conflict detection,
+Dependency: both templates extend the v0.16.0 planner, conflict detection,
 metadata, agent instructions, and documentation structure.
 
-### v0.17.0 — Focused machine operations
+### v0.18.0 — Focused machine operations
 
 - [ ] Read and change the machine hostname independently of installation.
   Approved spec: [hi_hostname.md](specs/approved/hi_hostname.md).
@@ -316,7 +332,7 @@ Dependency: shared tools no longer update themselves, so they rely on
 rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
-### v0.18.0 — Guided installer
+### v0.19.0 — Guided installer
 
 - [ ] Replace the fixed `hi install` run with a guided menu of checkboxes
   that selects which tools to install. Unchecking an installed tool
@@ -324,7 +340,7 @@ rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
   Spec not yet written.
 
 Dependency: needs uninstall steps for every tool `hi install` manages, and
-must respect the per-user or all-users choice from v0.17.0.
+must respect the per-user or all-users choice from v0.18.0.
 
 ### Deferred — More compute providers
 
@@ -337,12 +353,6 @@ not yet written.
 - [ ] RunPod Community Cloud as an opt-in on the existing driver: H100 SXM
   $2.69 against Secure's $3.49, and RTX 4090 $0.34 against $0.74. It is still
   on-demand, but it runs on third-party hosts, so Secure stays the default.
-- [ ] Shadeform. One REST driver reaches 19 datacenter clouds (Lambda, Verda,
-  Hyperstack, Scaleway, Latitude, Massed Compute, Crusoe, Nebius, and more)
-  in about 16 countries, mostly in the US. Its price and stock catalog needs
-  no key. Cheapest today: H100 $2.73, A100 80GB $1.35, L40S $0.88. Compare
-  its prices with going direct before relying on it, because one third-party
-  source claims a 7–12% markup.
 - [ ] Vast.ai. The cheapest option (H100 $1.87–2.66, A100 $0.74, RTX 4090
   $0.48) and the widest coverage, with hosts in 64 countries on six
   continents. REST with an API key, and search needs no account. Restrict it

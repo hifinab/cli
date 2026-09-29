@@ -8,7 +8,7 @@ description: Every hi command and option in one place.
 | Command                          | Does                                                   |
 |----------------------------------|--------------------------------------------------------|
 | `hi compute …`                   | Rent and use remote machines; see below                |
-| `hi login <hf\|colab\|runpod>`   | Sign in to a compute provider                          |
+| `hi login <hf\|colab\|runpod\|shadeform>` | Sign in to a compute provider               |
 | `hi connect <server>`            | Join a hi server; `status`, `key`                      |
 | `hi disconnect`                  | Leave it; use your own keys again                      |
 | `hi server …`                    | Run the server that brokers compute; see below         |
@@ -47,7 +47,7 @@ description: Every hi command and option in one place.
 
 | Option              | up | run | serve | Meaning                                              |
 |---------------------|----|-----|-------|------------------------------------------------------|
-| `--on <provider>`   | ✓  | ✓   | ✓     | `colab`, `hf`, or `runpod`                           |
+| `--on <provider>`   | ✓  | ✓   | ✓     | `colab`, `hf`, `runpod`, or `shadeform`              |
 | `--gpu <hardware>`  | ✓  | ✓   | ✓     | Hardware name from `hi compute hardware`             |
 | `--name <name>`     | ✓  | ✓   | ✓     | Name for later commands                              |
 | `--max <duration>`  | ✓  | ✓   | ✓     | Maximum lifetime: hours (`2`, `1.5`), `30m`, `2d`, or `none` (asks first) |
@@ -104,6 +104,7 @@ See [Managed compute for a team](/guide/compute/managed/).
 hi login hf       # hf auth login, then hf auth whoami
 hi login colab    # the Colab CLI's browser sign-in, then the balance
 hi login runpod   # asks for the API key, checks it, saves it in ~/.runpod/config.toml
+hi login shadeform # asks for the API key, checks it, saves it in ~/.config/hi/shadeform_key
 ```
 
 ## hi skill
