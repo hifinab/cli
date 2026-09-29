@@ -191,6 +191,83 @@ rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 Dependency: needs uninstall steps for every tool `hi install` manages, and
 must respect the per-user or all-users choice from v0.12.0.
 
+### Deferred — More compute providers
+
+On-demand providers to add to `hi compute`, in priority order. Ranked
+2026-09-29 on three criteria in order: an easy API, a low on-demand price,
+and coverage across many countries. Prices are USD per GPU-hour for a single
+GPU, checked 2026-09-28. Spot pricing played no part in the ranking. Specs
+not yet written.
+
+- [ ] RunPod Community Cloud as an opt-in on the existing driver: H100 SXM
+  $2.69 against Secure's $3.49, and RTX 4090 $0.34 against $0.74. It is still
+  on-demand, but it runs on third-party hosts, so Secure stays the default.
+- [ ] Shadeform. One REST driver reaches 19 datacenter clouds (Lambda, Verda,
+  Hyperstack, Scaleway, Latitude, Massed Compute, Crusoe, Nebius, and more)
+  in about 16 countries, mostly in the US. Its price and stock catalog needs
+  no key. Cheapest today: H100 $2.73, A100 80GB $1.35, L40S $0.88. Compare
+  its prices with going direct before relying on it, because one third-party
+  source claims a 7–12% markup.
+- [ ] Vast.ai. The cheapest option (H100 $1.87–2.66, A100 $0.74, RTX 4090
+  $0.48) and the widest coverage, with hosts in 64 countries on six
+  continents. REST with an API key, and search needs no account. Restrict it
+  to verified datacenter hosts with high reliability scores, because a host
+  going offline interrupts a job as surely as an eviction does. SSH goes
+  through a mapped port, not port 22.
+- [ ] Latitude.sh. REST with a Bearer key. Its plans endpoint returns price
+  and stock per location. It has 25 locations across North America, Latin
+  America, Europe, and Asia-Pacific. H100 is about $1.66 and L40S about $0.74
+  (both unverified). First confirm which locations actually have GPUs.
+- [ ] Prime Intellect. An aggregator with a REST API and a stock endpoint
+  that includes country. H100 costs $2.43.
+- [ ] TensorDock. REST v2, H100 from $2.25, and a claimed 100+ locations in
+  20+ countries. Its API docs were partly unreachable.
+- [ ] Novita AI. REST, with container pods reached over SSH like RunPod's.
+  About 12 countries on five continents, and its on-demand prices are
+  unverified.
+- [ ] Verda. Finland only, but the only self-serve single B200 in the EU
+  ($6.85). H100 $3.56. It has well-documented price and stock endpoints and
+  is also reachable through Shadeform.
+- [ ] Lambda. The simplest REST API, with 12 regions in the US, Japan, India,
+  Germany, and Israel. H100 costs $3.29 PCIe or $4.29 SXM, and single H100s
+  often sell out. It is also reachable through Shadeform.
+- [ ] Hyperstack. REST with an API key and a Go SDK, in Canada, Norway, and
+  the US. H100 PCIe is about $2.50, worked back from its spot price. It is
+  also reachable through Shadeform.
+- [ ] Scaleway. REST with a Go SDK and a catalog that needs no login, but EU
+  only. H100 costs €2.87 and L4 €0.79. It is also reachable through
+  Shadeform.
+
+Build a direct driver for any provider reachable through Shadeform only if
+going direct is clearly cheaper or more reliable. Left out:
+- Nebius. H100 rises to $4.50 on 2026-10-01, and its API is gRPC.
+- Spheron. Its on-demand price is high: H100 SXM costs $4.43.
+- AWS, Azure, and Google Cloud. They cost 2–5 times as much on demand, and
+  new accounts start with zero GPU quota.
+- DigitalOcean. H100 costs $4.41, and new accounts start with zero GPU quota.
+- Sales-led clouds: CoreWeave, Fluidstack, Nscale, TensorWave, and Cirrascale.
+- CUDO Compute, which closed its self-serve platform on 2026-03-31.
+- Container platforms without SSH: Salad, Koyeb, and Northflank.
+- Model-inference APIs, which don't rent general compute: Together,
+  Fireworks, Groq, and Replicate.
+
+Dependency: each driver implements the existing `computeProvider` interface.
+Supporting a host and port pair for SSH (Vast.ai, Novita) generalizes the
+RunPod code.
+
+### Deferred — Spot instances
+
+- [ ] Add `--spot` to `hi compute up` and `hi compute run` to rent
+  interruptible machines at a discount, keeping on-demand as the default.
+  Show how much notice the provider gives before eviction when confirming,
+  and show evicted instances as evicted, not stopped, in `hi compute ls` and
+  `status`. Spec not yet written.
+
+Dependency: needs a provider that sells spot. Colab, Hugging Face Jobs, and
+RunPod do not (RunPod stopped selling spot pods in September 2026), so this
+waits for a spot-capable driver such as Vast.ai, Verda, or Novita AI. Not
+scheduled to a version yet.
+
 ### Deferred — Modal compute
 
 - [ ] Add a Modal driver through Modal's official Go SDK.
