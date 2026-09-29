@@ -216,6 +216,12 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] `/hi status` lists instances that are still starting, and `/hi stop`
   explains when the one you asked for hasn't finished starting.
 
+### v0.10.4 — Say how long starting takes
+
+- [x] After an approval, the message says starting takes 1–3 minutes and
+  turns 🟢 when ready, shows the provider's progress, and the thread notes
+  the approval at once.
+
 ## Planned
 
 ### v0.11.0 — Managed compute: policy, budgets, and reports

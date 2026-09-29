@@ -857,6 +857,8 @@ func (s *hiServer) decide(id, actor string, approve bool, group, reason string) 
 	s.mu.Unlock()
 	s.audit(actor, "approved", id, describeServerRequest(&copy))
 	s.notifyRequest(id)
+	s.notifyThread(id, fmt.Sprintf("Approved by %s. Starting it on %s: this usually takes 1–3 minutes, "+
+		"and the main message turns 🟢 when it's ready.", actor, copy.Provider))
 	go s.start(copy)
 	return copy, err
 }
@@ -871,10 +873,14 @@ func (p progressWriter) Write(data []byte) (int, error) {
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	if last := strings.TrimSpace(lines[len(lines)-1]); last != "" {
 		p.server.mu.Lock()
-		if request, ok := p.server.state.Requests[p.id]; ok {
-			request.Progress = last
+		changed := false
+		if request, ok := p.server.state.Requests[p.id]; ok && request.Progress != last {
+			request.Progress, changed = last, true
 		}
 		p.server.mu.Unlock()
+		if changed {
+			p.server.notifyRequest(p.id)
+		}
 	}
 	return len(data), nil
 }

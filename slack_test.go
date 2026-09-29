@@ -400,3 +400,13 @@ func TestSlashCommandKnowsAboutStartingInstances(t *testing.T) {
 		t.Fatalf("/hi stop @iman: %s", out)
 	}
 }
+
+func TestSlackSaysHowLongStartingTakes(t *testing.T) {
+	request := serverRequest{ID: "r-1", Kind: "compute", State: "starting", User: "iman", Name: "x", Provider: "runpod",
+		Hardware: "a40", Rate: "$0.49/h", MaxSeconds: 600, DecidedBy: "hi", Progress: "Created pod abc"}
+	text, _ := renderSlackRequest(request, nil, "staff", true, time.Now())
+	if !strings.Contains(text, "starting on runpod") || !strings.Contains(text, "1–3 minutes") ||
+		!strings.Contains(text, "turns 🟢") || !strings.Contains(text, "Latest: Created pod abc") {
+		t.Fatalf("starting message: %s", text)
+	}
+}

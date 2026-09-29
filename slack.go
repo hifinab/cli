@@ -349,10 +349,13 @@ func renderSlackRequest(request serverRequest, lease *serverLease, group string,
 			slackButton("deny", request.ID, "Deny…", slack.StyleDanger),
 		}
 	case "starting":
-		status = fmt.Sprintf("🔵 %s · `%s` · approved by %s · starting", who, request.Name, request.DecidedBy)
+		status = fmt.Sprintf("🔵 %s · `%s` · approved by %s · starting on %s", who, request.Name, request.DecidedBy,
+			request.Provider)
+		note := "_Starting usually takes 1–3 minutes. The circle turns 🟢 when it's ready._"
 		if request.Progress != "" {
-			status += ": " + request.Progress
+			note += " Latest: " + request.Progress
 		}
+		status += "\n" + note
 	case "running":
 		status = fmt.Sprintf("🟢 %s · `%s` · approved by %s · running", who, request.Name, request.DecidedBy)
 		if lease != nil {
