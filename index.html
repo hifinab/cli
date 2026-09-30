@@ -261,7 +261,7 @@
             <code>curl -fsSL https://hifin.sh/install.sh | sh<span class="arg"> -s -- install</span></code>
             <button class="copy" type="button" data-copy="curl -fsSL https://hifin.sh/install.sh | sh -s -- install">copy</button>
           </div>
-          <p class="note">Installs <code>hi</code>, then the Hifin workstation software on Ubuntu 26.04. No GPU setup, no reboot.</p>
+          <p class="note">Installs <code>hi</code>, then opens a menu to pick the Hifin workstation software for Ubuntu 26.04. No GPU setup, no reboot.</p>
         </div>
         <div class="option">
           <p class="option-label">Strix Halo</p>
@@ -270,7 +270,7 @@
             <code>curl -fsSL https://hifin.sh/install.sh | sh<span class="arg"> -s -- install strix</span></code>
             <button class="copy" type="button" data-copy="curl -fsSL https://hifin.sh/install.sh | sh -s -- install strix">copy</button>
           </div>
-          <p class="note">Everything above plus AMD ROCm for Strix Halo. <b>Reboot once</b> when it finishes.</p>
+          <p class="note">The same menu with AMD ROCm for Strix Halo checked. <b>Reboot once</b> when it finishes.</p>
         </div>
       </div>
     </div>
@@ -324,7 +324,7 @@
   <section id="stack" class="wrap reveal">
     <div class="eyebrow">// Also installed</div>
     <h2>The rest of the stack.</h2>
-    <p class="sub">Ubuntu 26.04 packages and upstream repositories, all signed and upgraded in one pass.</p>
+    <p class="sub">Ubuntu 26.04 packages and signed upstream repositories. Check what you need in <code>hi install</code>; uncheck it later to remove it.</p>
     <div class="chips">
       <a class="chip" href="https://docs.astral.sh/uv/">uv <small>python</small></a>
       <a class="chip" href="https://pipx.pypa.io">pipx <small>python</small></a>

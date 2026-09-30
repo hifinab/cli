@@ -13,7 +13,8 @@ description: Every hi command and option in one place.
 | `hi disconnect`                  | Leave it; use your own keys again                      |
 | `hi server …`                    | Run the server that brokers compute; see below         |
 | `hi skill`                       | Write the agent skill                                  |
-| `hi install [strix]`             | Install the workstation software                       |
+| `hi install`                     | Choose workstation software from a menu                |
+| `hi uninstall <tool>…`           | Remove workstation software                            |
 | `hi verify strix`                | Check a Strix Halo workstation                         |
 | `hi net`                         | Enroll in NetBird; `status`, `down`, `reconnect`       |
 | `hi adduser <name>`              | Create a user with GPU access                          |
@@ -124,9 +125,13 @@ hi login shadeform # asks for the API key, checks it, saves it in ~/.config/hi/s
 ## hi install and hi verify
 
 ```sh
-hi install           # workstation software
-hi install strix     # plus AMD ROCm for Strix Halo
-hi verify strix      # the Strix report again, after a reboot
+hi install                     # menu: check to install, uncheck to remove
+hi install --list              # tool names, and which are installed
+hi install claude gh           # install or reinstall the named tools
+hi install --all [strix]       # every tool; Strix Halo support only when named
+hi install strix               # the menu with Strix Halo support checked
+hi uninstall docker            # remove the named tools
+hi verify strix                # the Strix report again, after a reboot
 ```
 
 ## hi net

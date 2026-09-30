@@ -83,5 +83,5 @@ fi
 if [ "$on_path" -eq 1 ]; then
   printf 'Run hi help to get started.\n'
 else
-  printf 'Run it now without opening a new shell:\n  %s install\n  %s install strix\n' "$hi_display" "$hi_display"
+  printf 'Run it now without opening a new shell:\n  %s install\n' "$hi_display"
 fi

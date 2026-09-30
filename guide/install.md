@@ -21,7 +21,6 @@ Installed hi to /home/you/.local/bin/hi
 Added /home/you/.local/bin to PATH in /home/you/.profile for new shells.
 Run it now without opening a new shell:
   ~/.local/bin/hi install
-  ~/.local/bin/hi install strix
 ```
 
 Check it:
@@ -33,16 +32,14 @@ hi version
 ## Set up a new workstation in one step
 
 On a fresh Ubuntu 26.04 machine, pass the `hi` command to run after
-installing with `sh -s --`. This installs `hi` and immediately runs
-`hi install strix` in the same terminal, so you can answer its prompts:
+installing with `sh -s --`. This installs `hi` and immediately opens the
+`hi install` menu in the same terminal, so you can pick the tools:
 
 ```sh
-curl -fsSL https://hifin.sh/install.sh | sh -s -- install strix
+curl -fsSL https://hifin.sh/install.sh | sh -s -- install
 ```
 
-Use `install` instead of `install strix` on machines without Strix Halo
-hardware. See [Set up a workstation](/guide/workstation/) for what gets
-installed.
+See [Set up a workstation](/guide/workstation/) for the tools on offer.
 
 ## Installer options
 
@@ -75,8 +72,8 @@ hf       ready
 - [Set up Google Colab](/guide/compute/colab/)
 - [Set up Hugging Face Jobs](/guide/compute/hugging-face/)
 
-`hi install` also installs both providers' command-line tools, the Colab CLI
-and the `hf` CLI. If you only installed `hi` itself, `hi login` tells you how
+`hi install` also offers both providers' command-line tools, the Colab CLI
+and the `hf` CLI (`hi install colab hf`). If you only installed `hi` itself, `hi login` tells you how
 to install the one it needs.
 
 ## Update

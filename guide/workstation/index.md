@@ -1,14 +1,15 @@
 ---
 title: Set up a workstation
-description: Turn a fresh Ubuntu 26.04 machine into a Hifin workstation with hi install, including Strix Halo GPU support and its verification report.
+description: Turn a fresh Ubuntu 26.04 machine into a Hifin workstation with hi install, choosing tools from a menu, including Strix Halo GPU support and its verification report.
 ---
 
-`hi install` installs the Hifin workstation software on Ubuntu 26.04 in one
-unattended pass. `hi install strix` adds AMD ROCm for Strix Halo machines.
+`hi install` opens a menu of the Hifin workstation software on Ubuntu 26.04.
+Check what the machine should have: missing tools get installed, and installed
+tools you uncheck get removed. Strix Halo machines also get AMD ROCm.
 
 ## Before you start
 
-- Ubuntu 26.04. The Strix profile also needs amd64.
+- Ubuntu 26.04. Strix Halo support also needs amd64.
 - A user with `sudo`. Run `hi` as that user, not as root.
 - About 20 minutes and a network connection.
 
@@ -17,31 +18,81 @@ unattended pass. `hi install strix` adds AMD ROCm for Strix Halo machines.
 On a new machine, install `hi` and run the setup in one command:
 
 ```sh
-curl -fsSL https://hifin.sh/install.sh | sh -s -- install strix   # Strix Halo
-curl -fsSL https://hifin.sh/install.sh | sh -s -- install         # any other machine
+curl -fsSL https://hifin.sh/install.sh | sh -s -- install
 ```
 
 If `hi` is already installed:
 
 ```sh
-hi install          # or: hi install strix
+hi install
 ```
 
-It first offers to change the machine's hostname; press Enter to keep it. It
-then asks for your `sudo` password once and installs everything without
-further questions.
+```text
+┃ What should this machine have?
+┃ Space toggles, enter continues. Unchecking an installed tool removes it.
+┃ > [x] Terminal tools      tmux sessions and the btop system monitor
+┃   [x] uv                  Python versions, projects, and tools
+┃   [x] GitHub CLI          gh, for repositories, pull requests, and sign-in
+┃   [ ] Node.js             node and npm from Ubuntu
+┃   [ ] Docker              Docker Engine, Buildx, and Compose
+┃   [x] Claude Code         Anthropic's coding agent (claude)                    installed
+┃   ...
+┃   [x] Strix Halo support  AMD ROCm, GPU groups, and amd-debug-tools
+┃   [ ] Update everything   upgrade Ubuntu packages and reinstall checked tools
+```
+
+Installed tools start checked, as do the terminal tools, uv, and the GitHub
+CLI. Strix Halo support starts checked when the machine has a Strix Halo GPU.
+The Colab CLI needs uv, and the menu says so if you check one without the
+other.
+
+If anything is being installed, it offers to change the machine's hostname;
+press Enter to keep it. It then shows what will be installed and removed, asks
+for your `sudo` password once, and runs without further questions.
+
+## Without the menu
+
+Scripts and machines without a terminal name the tools instead:
+
+```sh
+hi install --list              # tool names, and which are installed
+hi install claude codex gh     # install or reinstall just these
+hi install --all               # every tool except Strix Halo support
+hi install --all strix         # every tool, including Strix Halo support
+hi uninstall docker            # remove a tool
+```
+
+## Removing tools
+
+Unchecking an installed tool in the menu, or `hi uninstall <tool>`, removes
+the program but keeps your settings and sign-ins, such as `~/.claude`,
+`~/.codex`, and Docker's images in `/var/lib/docker`. The confirmation lists
+what stays. System packages are removed with apt; if other packages depend on
+one, apt lists them and asks before removing anything else. Removing NetBird
+disconnects the machine from the team network, including SSH sessions over it.
+Removing Strix Halo support keeps you in the `render` and `video` groups.
 
 ## What gets installed
 
-| Group             | Tools                                                                 |
-|-------------------|-----------------------------------------------------------------------|
-| AI coding tools   | Claude Code (`claude`), Codex CLI (`codex`), omp, herdr               |
-| Compute providers | Colab CLI (`colab`), Hugging Face CLI (`hf`)                          |
-| Python            | uv, pipx                                                              |
-| JavaScript        | Node.js, npm                                                          |
-| Development       | GitHub CLI, Docker Engine, Docker Compose                             |
-| System            | NetBird, btop, tmux, and all available Ubuntu upgrades                |
-| Strix only        | AMD ROCm 10 for `gfx1151`, amd-debug-tools, `render` and `video` group membership |
+| Menu item          | Name       | Installs                                                  |
+|--------------------|------------|-----------------------------------------------------------|
+| Terminal tools     | `terminal` | tmux, btop                                                |
+| uv                 | `uv`       | uv                                                        |
+| GitHub CLI         | `gh`       | `gh`                                                      |
+| Node.js            | `node`     | Node.js, npm                                              |
+| Docker             | `docker`   | Docker Engine, Buildx, Docker Compose                     |
+| Claude Code        | `claude`   | `claude`                                                  |
+| Codex CLI          | `codex`    | `codex`                                                   |
+| omp                | `omp`      | `omp`                                                     |
+| herdr              | `herdr`    | `herdr`                                                   |
+| NetBird            | `netbird`  | NetBird client and service                                |
+| Colab CLI          | `colab`    | `colab` (needs uv)                                        |
+| Hugging Face CLI   | `hf`       | `hf`                                                      |
+| Strix Halo support | `strix`    | AMD ROCm 10 for `gfx1151`, amd-debug-tools, `render` and `video` group membership |
+| Update everything  | `upgrade`  | All available Ubuntu upgrades; reinstalls checked tools   |
+
+Any install also sets up curl, wget, gnupg, pipx, and wtmpdb, which are never
+removed.
 
 The AI coding tools and compute CLIs are installed for your user in
 `~/.local/bin`; the rest are system packages. Open a new shell afterwards so
@@ -49,7 +100,7 @@ the new `PATH` applies.
 
 ## Strix Halo: reboot and verify
 
-`hi install strix` ends with a local report. Checks that need a new login
+Installing Strix Halo support ends with a local report. Checks that need a new login
 session are marked `PENDING`:
 
 ```text

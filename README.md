@@ -17,13 +17,13 @@ curl -fsSL https://hifin.sh/install.sh | sh
 To set up a new machine in one step, pass the `hi` command after `sh -s --`:
 
 ```sh
-curl -fsSL https://hifin.sh/install.sh | sh -s -- install strix
+curl -fsSL https://hifin.sh/install.sh | sh -s -- install
 ```
 
 The installer supports Linux on amd64 and arm64, verifies the release checksum,
 and adds `~/.local/bin` to `PATH` in `~/.profile` when needed. That change
 applies to new shells; until then the installer prints the full path to run, such
-as `~/.local/bin/hi install strix`. Set `HI_INSTALL_DIR` to override the
+as `~/.local/bin/hi install`. Set `HI_INSTALL_DIR` to override the
 destination.
 
 To update later, run `hi update` (v0.7.1 and newer).
@@ -32,8 +32,9 @@ To update later, run `hi update` (v0.7.1 and newer).
 
 ```text
 hi adduser <name>  Create a user with render and video access
-hi install         Install general workstation software
-hi install strix   Install software and Strix Halo hardware support
+hi install         Choose workstation software to install or remove
+hi install <tool>  Install the named tools (--all for every tool, --list to list them)
+hi uninstall <tool>  Remove the named tools
 hi net             Securely enroll this machine with NetBird
 hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
@@ -50,17 +51,32 @@ hi version         Print the installed version
 hi help            Show help
 ```
 
-`hi install` first offers to change the current hostname; pressing Enter keeps
-it unchanged. It then asks for `sudo` once before installing the general
-workstation software. Every installer runs unattended; Codex is installed with
-`CODEX_NON_INTERACTIVE=1` so its "Start Codex now?" prompt cannot stall setup.
-Open a new shell afterward to apply `PATH` changes.
+`hi install` opens a menu with a checkbox and a short description for every
+tool. Tools that are already installed start checked, as do the terminal tools,
+uv, and the GitHub CLI; Strix Halo support starts checked when the machine has a
+Strix Halo GPU. Checking a missing tool installs it, and unchecking an installed
+tool removes it, so the same menu is also the uninstaller. Removing a tool
+deletes the program but keeps its settings and sign-ins, such as `~/.claude`
+and `~/.codex`. Checked tools that are already installed are left alone unless
+"Update everything" is checked too, which reinstalls them and upgrades Ubuntu
+packages.
 
-`hi install strix` installs the same software plus the Strix Halo hardware
-support. It ends with a local report covering packages, commands, services,
-group membership, GPU devices, and ROCm detection. No report data is uploaded.
-Checks that require the new login session are marked pending; after reboot, run
-`hi verify strix` for the final hardware report.
+When anything is being installed, the menu offers to change the hostname
+(Enter keeps it), shows what will change, and asks for `sudo` once. Every
+installer runs unattended; Codex is installed with `CODEX_NON_INTERACTIVE=1` so
+its "Start Codex now?" prompt cannot stall setup. Open a new shell afterward to
+apply `PATH` changes.
+
+Without a terminal, name the tools instead: `hi install claude codex gh`,
+`hi install --all` (every tool except Strix Halo support), or
+`hi uninstall docker`. `hi install --list` shows the names and what is
+installed. `hi install strix` still works; in a terminal it opens the menu with
+Strix Halo support checked.
+
+Installing Strix Halo support ends with a local report covering packages,
+commands, services, group membership, GPU devices, and ROCm detection. No report
+data is uploaded. Checks that require the new login session are marked pending;
+after reboot, run `hi verify strix` for the final hardware report.
 
 `hi adduser <name>` runs Ubuntu's interactive `adduser`, then adds the new user
 to the `render` and `video` groups. Usernames must follow Ubuntu's conventional
@@ -214,34 +230,34 @@ get it, and rerun `hi skill` after updating `hi` to refresh it.
 
 ## Workstation setup
 
-Both installation profiles currently require Ubuntu 26.04. `hi install`
-installs:
+`hi install` currently requires Ubuntu 26.04. It offers these tools, each
+under the name in brackets for `hi install <tool>` and `hi uninstall <tool>`:
 
 - AI coding tools, installed per user in `~/.local/bin`:
-  - [Claude Code](https://code.claude.com/docs) (`claude`)
-  - [Codex CLI](https://developers.openai.com/codex/cli) (`codex`)
-  - [omp](https://omp.sh) (`omp`)
-  - [herdr](https://herdr.dev) (`herdr`)
-  - [Colab CLI](https://github.com/googlecolab/google-colab-cli) (`colab`) and
+  - [Claude Code](https://code.claude.com/docs) [`claude`]
+  - [Codex CLI](https://developers.openai.com/codex/cli) [`codex`]
+  - [omp](https://omp.sh) [`omp`]
+  - [herdr](https://herdr.dev) [`herdr`]
+  - [Colab CLI](https://github.com/googlecolab/google-colab-cli) [`colab`] and
     [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/guides/cli)
-    (`hf`), used by `hi compute` and `hi login`
-- [uv](https://docs.astral.sh/uv/) and [pipx](https://pipx.pypa.io)
-- [Node.js](https://nodejs.org) and npm
-- [GitHub CLI](https://cli.github.com)
-- [Docker Engine](https://docs.docker.com/engine/) and Docker Compose
-- [NetBird](https://netbird.io), [btop](https://github.com/aristocratos/btop),
-  and [tmux](https://github.com/tmux/tmux)
-- Available Ubuntu package upgrades
+    [`hf`], used by `hi compute` and `hi login`. The Colab CLI needs uv.
+- [uv](https://docs.astral.sh/uv/) [`uv`]
+- [Node.js](https://nodejs.org) and npm [`node`]
+- [GitHub CLI](https://cli.github.com) [`gh`]
+- [Docker Engine](https://docs.docker.com/engine/) and Docker Compose [`docker`]
+- [NetBird](https://netbird.io) [`netbird`]
+- [btop](https://github.com/aristocratos/btop) and
+  [tmux](https://github.com/tmux/tmux) [`terminal`]
+- Strix Halo support [`strix`]: [AMD ROCm](https://rocm.docs.amd.com) 10 for
+  `gfx1151`, [amd-debug-tools](https://pypi.org/project/amd-debug-tools/), and
+  `render` and `video` group membership. It requires amd64 and a reboot.
+- Available Ubuntu package upgrades [`upgrade`]
 
-`hi install strix` installs everything above and adds:
+Any install also sets up a few base packages that are never removed: `curl`,
+`wget`, `gnupg`, [pipx](https://pipx.pypa.io), and `wtmpdb`.
 
-- [AMD ROCm](https://rocm.docs.amd.com) 10 for `gfx1151`
-- [amd-debug-tools](https://pypi.org/project/amd-debug-tools/)
-- `render` and `video` group membership
-
-The Strix profile requires amd64 and a reboot.
-It has been exercised on a physical AMD Ryzen AI Max+ 395 machine with Radeon
-8060S graphics; the final report detected the GPU through both `amd-smi` and
+Strix Halo support has been exercised on a physical AMD Ryzen AI Max+ 395
+machine with Radeon 8060S graphics; the final report detected the GPU through both `amd-smi` and
 `rocminfo`.
 
 ## Development and releases

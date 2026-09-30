@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Usage: install.sh <hostname> <install ids> <remove ids> <upgrade: 0|1>
+# Ids are space-separated and match the menu in install.go. An empty hostname
+# keeps the current one.
+
 log() {
   printf '\n==> %s\n' "$*"
 }
@@ -10,12 +14,10 @@ fail() {
   exit 1
 }
 
-profile="${1:-standard}"
-requested_hostname="${2:-}"
-case "$profile" in
-  standard | strix) ;;
-  *) fail "unknown installation profile: $profile" ;;
-esac
+requested_hostname="${1:-}"
+read -r -a install_ids <<<"${2:-}"
+read -r -a remove_ids <<<"${3:-}"
+upgrade="${4:-0}"
 
 valid_hostname() {
   local hostname="$1"
@@ -31,6 +33,19 @@ valid_hostname() {
   done
 }
 
+selected() {
+  local wanted="$1"
+  shift
+  local id
+  for id in "$@"; do
+    [[ "$id" == "$wanted" ]] && return 0
+  done
+  return 1
+}
+
+installing() { selected "$1" "${install_ids[@]}"; }
+removing() { selected "$1" "${remove_ids[@]}"; }
+
 [[ "$EUID" -ne 0 ]] || fail "run this setup as your regular user, not root"
 [[ -r /etc/os-release ]] || fail "cannot identify this operating system"
 
@@ -38,7 +53,7 @@ valid_hostname() {
 source /etc/os-release
 [[ "${ID:-}" == "ubuntu" ]] || fail "the installer supports Ubuntu only"
 [[ "${VERSION_ID:-}" == "26.04" ]] || fail "the installer currently requires Ubuntu 26.04"
-if [[ "$profile" == "strix" ]]; then
+if installing strix; then
   [[ "$(dpkg --print-architecture)" == "amd64" ]] || fail "the Strix setup requires amd64"
 fi
 command -v sudo >/dev/null || fail "sudo is required"
@@ -55,6 +70,31 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 apt_install() {
   sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+}
+
+# apt_remove removes the named packages that are installed. It answers yes
+# only when apt would remove exactly those packages; when others depend on
+# them, apt lists what else goes and asks first.
+apt_remove() {
+  local package
+  local present=()
+  for package in "$@"; do
+    if [[ "$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null)" == "installed" ]]; then
+      present+=("$package")
+    fi
+  done
+  ((${#present[@]} > 0)) || return 0
+
+  local planned
+  local requested
+  planned="$(apt-get -s remove "${present[@]}" | awk '/^Remv / { print $2 }' | sort)"
+  requested="$(printf '%s\n' "${present[@]}" | sort)"
+  if [[ "$planned" == "$requested" ]]; then
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get remove -y "${present[@]}"
+  else
+    printf 'Removing %s also removes packages that depend on it.\n' "${present[*]}"
+    sudo apt-get remove "${present[@]}"
+  fi
 }
 
 update_hosts() {
@@ -83,24 +123,32 @@ update_hosts() {
   sudo install -m 0644 "$tmp_dir/hosts" /etc/hosts
 }
 
-log "Requesting administrator access"
-sudo -v
+# Repositories ------------------------------------------------------------
 
-if [[ -n "$requested_hostname" ]]; then
-  log "Changing hostname from $current_hostname to $requested_hostname"
-  sudo hostnamectl set-hostname "$requested_hostname"
-  update_hosts
-fi
+add_github_repo() {
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    -o "$tmp_dir/githubcli-archive-keyring.gpg"
+  sudo install -m 0644 "$tmp_dir/githubcli-archive-keyring.gpg" \
+    /etc/apt/keyrings/githubcli-archive-keyring.gpg
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
+    "$(dpkg --print-architecture)" |
+    sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+}
 
-log "Installing base packages"
-sudo apt-get update
-apt_install ca-certificates curl wget gnupg
-sudo install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d
+add_docker_repo() {
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$tmp_dir/docker.asc"
+  sudo install -m 0644 "$tmp_dir/docker.asc" /etc/apt/keyrings/docker.asc
+  sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: ${UBUNTU_CODENAME:-$VERSION_CODENAME}
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+}
 
-if [[ "$profile" == "strix" ]]; then
-  log "Configuring AMD ROCm"
-  sudo usermod -a -G render,video "$target_user"
-  apt_install libatomic1 libquadmath0
+add_rocm_repo() {
   curl -fsSL https://stable.repo.amd.com/rocm/gpg/packages.gpg -o "$tmp_dir/amdrocm.gpg"
   gpg --batch --yes --dearmor --output "$tmp_dir/amdrocm-keyring.gpg" "$tmp_dir/amdrocm.gpg"
   sudo install -m 0644 "$tmp_dir/amdrocm-keyring.gpg" /etc/apt/keyrings/amdrocm.gpg
@@ -114,55 +162,172 @@ Architectures: amd64
 Signed-By: /etc/apt/keyrings/amdrocm.gpg
 Enabled: yes
 EOF
-  sudo apt-get update
-  apt_install amdrocm10.0-gfx1151
+}
+
+# Removal -----------------------------------------------------------------
+
+remove_tool() {
+  log "Removing $1"
+  case "$1" in
+    terminal) apt_remove tmux btop ;;
+    node) apt_remove nodejs npm ;;
+    uv)
+      if [[ -x "$HOME/.local/bin/uv" ]]; then
+        "$HOME/.local/bin/uv" cache clean || true
+      fi
+      rm -f "$HOME/.local/bin/uv" "$HOME/.local/bin/uvx"
+      ;;
+    gh)
+      apt_remove gh
+      sudo rm -f /etc/apt/sources.list.d/github-cli.list /etc/apt/keyrings/githubcli-archive-keyring.gpg
+      ;;
+    docker)
+      apt_remove docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      sudo rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc
+      ;;
+    claude)
+      rm -f "$HOME/.local/bin/claude"
+      rm -rf "$HOME/.local/share/claude"
+      ;;
+    codex)
+      rm -f "$HOME/.local/bin/codex" "$HOME/.local/bin/codex-code-mode-host"
+      rm -rf "${CODEX_HOME:-$HOME/.codex}/packages/standalone" \
+        "${CODEX_HOME:-$HOME/.codex}/packages/app-server-daemon"
+      ;;
+    omp) rm -f "$HOME/.local/bin/omp" ;;
+    herdr) rm -f "$HOME/.local/bin/herdr" ;;
+    netbird)
+      if command -v netbird >/dev/null; then
+        sudo netbird service stop || true
+        sudo netbird service uninstall || true
+      fi
+      apt_remove netbird
+      sudo rm -f /etc/apt/sources.list.d/netbird.list /usr/share/keyrings/netbird-archive-keyring.gpg
+      ;;
+    colab)
+      if [[ -x "$HOME/.local/bin/uv" ]]; then
+        "$HOME/.local/bin/uv" tool uninstall google-colab-cli || true
+      fi
+      rm -rf "$HOME/.local/share/uv/tools/google-colab-cli"
+      rm -f "$HOME/.local/bin/colab"
+      ;;
+    hf)
+      local hf_dir="${HF_HOME:+$HF_HOME/cli}"
+      hf_dir="${hf_dir:-$HOME/.hf-cli}"
+      rm -f "$HOME/.local/bin/hf"
+      if [[ -e "$hf_dir/venv/.hf_installer_marker" ]]; then
+        rm -rf "$hf_dir"
+      fi
+      ;;
+    strix)
+      if command -v pipx >/dev/null; then
+        pipx uninstall amd-debug-tools || true
+      fi
+      apt_remove amdrocm10.0-gfx1151
+      sudo rm -f /etc/apt/sources.list.d/amdrocm-stable.sources /etc/apt/keyrings/amdrocm.gpg
+      ;;
+    *) fail "unknown tool: $1" ;;
+  esac
+}
+
+# Installation ------------------------------------------------------------
+
+log "Requesting administrator access"
+sudo -v
+
+if [[ -n "$requested_hostname" ]]; then
+  log "Changing hostname from $current_hostname to $requested_hostname"
+  sudo hostnamectl set-hostname "$requested_hostname"
+  update_hosts
 fi
 
-log "Installing workstation tools"
-apt_install python3-setuptools python3-wheel pipx btop wtmpdb tmux nodejs npm
-pipx ensurepath
-if [[ "$profile" == "strix" ]]; then
+# Remove in reverse menu order, so a tool goes before what it was installed
+# with (the Colab CLI before uv).
+for ((i = ${#remove_ids[@]} - 1; i >= 0; i--)); do
+  remove_tool "${remove_ids[i]}"
+done
+
+if ((${#install_ids[@]} > 0)) || [[ "$upgrade" == "1" ]]; then
+  log "Installing base packages"
+  sudo apt-get update
+  apt_install ca-certificates curl wget gnupg python3-setuptools python3-wheel pipx wtmpdb
+  sudo install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d
+  pipx ensurepath
+fi
+
+packages=()
+installing terminal && packages+=(tmux btop)
+installing node && packages+=(nodejs npm)
+if installing gh; then
+  log "Configuring the GitHub CLI repository"
+  add_github_repo
+  packages+=(gh)
+fi
+if installing docker; then
+  log "Configuring the Docker repository"
+  add_docker_repo
+  packages+=(docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin)
+fi
+if installing strix; then
+  log "Configuring the AMD ROCm repository"
+  sudo usermod -a -G render,video "$target_user"
+  add_rocm_repo
+  packages+=(libatomic1 libquadmath0 amdrocm10.0-gfx1151)
+fi
+if ((${#packages[@]} > 0)); then
+  log "Installing ${packages[*]}"
+  if installing gh || installing docker || installing strix; then
+    sudo apt-get update
+  fi
+  apt_install "${packages[@]}"
+fi
+
+if installing strix; then
+  log "Installing amd-debug-tools"
   pipx install --force amd-debug-tools
 fi
-curl -LsSf https://astral.sh/uv/install.sh | sh
-"$HOME/.local/bin/uv" tool install --upgrade google-colab-cli
-curl -fsSL https://pkgs.netbird.io/install.sh | sh
-curl -fsSL https://omp.sh/install | sh
-curl -fsSL https://claude.ai/install.sh | bash
-curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh
-curl -fsSL https://herdr.dev/install.sh | sh
-curl -LsSf https://hf.co/cli/install.sh | bash
+if installing uv; then
+  log "Installing uv"
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+if installing colab; then
+  log "Installing the Colab CLI"
+  "$HOME/.local/bin/uv" tool install --upgrade google-colab-cli
+fi
+if installing netbird; then
+  log "Installing NetBird"
+  curl -fsSL https://pkgs.netbird.io/install.sh | sh
+fi
+if installing omp; then
+  log "Installing omp"
+  curl -fsSL https://omp.sh/install | sh
+fi
+if installing claude; then
+  log "Installing Claude Code"
+  curl -fsSL https://claude.ai/install.sh | bash
+fi
+if installing codex; then
+  log "Installing Codex CLI"
+  curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh
+fi
+if installing herdr; then
+  log "Installing herdr"
+  curl -fsSL https://herdr.dev/install.sh | sh
+fi
+if installing hf; then
+  log "Installing the Hugging Face CLI"
+  curl -LsSf https://hf.co/cli/install.sh | bash
+fi
 
-log "Configuring GitHub CLI"
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-  -o "$tmp_dir/githubcli-archive-keyring.gpg"
-sudo install -m 0644 "$tmp_dir/githubcli-archive-keyring.gpg" \
-  /etc/apt/keyrings/githubcli-archive-keyring.gpg
-printf 'deb [arch=%s signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main\n' \
-  "$(dpkg --print-architecture)" |
-  sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+if [[ "$upgrade" == "1" ]]; then
+  log "Upgrading Ubuntu packages"
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
+fi
 
-log "Configuring Docker"
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$tmp_dir/docker.asc"
-sudo install -m 0644 "$tmp_dir/docker.asc" /etc/apt/keyrings/docker.asc
-sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: ${UBUNTU_CODENAME:-$VERSION_CODENAME}
-Components: stable
-Architectures: $(dpkg --print-architecture)
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-
-log "Installing GitHub CLI and Docker"
-sudo apt-get update
-apt_install gh docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-log "Upgrading Ubuntu packages"
-sudo env DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
-
-if [[ "$profile" == "strix" ]]; then
-  printf '\nStrix setup complete. Log out and back in to apply render/video group membership and PATH changes.\n'
+if installing strix; then
+  printf '\nDone. Log out and back in to apply render/video group membership and PATH changes.\n'
+elif ((${#install_ids[@]} > 0)); then
+  printf '\nDone. Open a new shell to apply PATH changes.\n'
 else
-  printf '\nWorkstation software installation complete. Open a new shell to apply PATH changes.\n'
+  printf '\nDone.\n'
 fi

@@ -192,8 +192,11 @@ which needs a terminal. `ls` also stops instances past their limit. Names can be
 
 These change the machine and need sudo; run them only when asked.
 
-- `hi install` / `hi install strix`: install the Hifin workstation software
-  (and AMD ROCm for Strix Halo). `hi verify strix` checks it afterwards.
+- `hi install`: a checkbox menu of the Hifin workstation software (and AMD
+  ROCm for Strix Halo); unchecking an installed tool removes it. Without a
+  terminal, use `hi install <tool>...` or `hi install --all`, and
+  `hi uninstall <tool>...`; `hi install --list` is read-only and safe to run.
+  `hi verify strix` checks a Strix Halo machine afterwards.
 - `hi net`: enroll the machine in NetBird (it prompts for the setup key).
   `hi net status` is read-only and safe to run.
 - `hi version`: the installed version. `hi update --check` says whether a

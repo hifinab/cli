@@ -1,20 +1,13 @@
 package main
 
 import (
-	_ "embed"
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 )
 
 var version = "dev"
-
-//go:embed scripts/install.sh
-var setupScript []byte
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -44,16 +37,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return 0
 	case "install":
-		strix := len(args) == 2 && args[1] == "strix"
-		if len(args) > 2 || (len(args) == 2 && !strix) {
-			fmt.Fprintln(stderr, "usage: hi install [strix]")
-			return 2
-		}
-		if err := installWorkstation(stdin, stdout, stderr, strix); err != nil {
-			fmt.Fprintf(stderr, "hi: %v\n", err)
-			return 1
-		}
-		return 0
+		return runInstall(args[1:], stdin, stdout, stderr)
+	case "uninstall":
+		return runUninstall(args[1:], stdin, stdout, stderr)
 	case "net":
 		var err error
 		switch {
@@ -111,8 +97,10 @@ func printUsage(w io.Writer) {
 
 Usage:
   hi adduser <name>             Create a user with render and video access
-  hi install                    Install general workstation software
-  hi install strix              Install software and Strix Halo hardware support
+  hi install                    Choose workstation software to install or remove
+  hi install <tool>... | --all  Install the named tools, or all of them
+  hi install --list             List the tools and whether they are installed
+  hi uninstall <tool>...        Remove the named tools
   hi net                        Securely enroll this machine with NetBird
   hi net status                 Show NetBird connection status
   hi net down                   Disconnect NetBird
@@ -137,90 +125,6 @@ func printNetUsage(w io.Writer) {
   hi net status
   hi net down
   hi net reconnect`)
-}
-
-func installWorkstation(stdin io.Reader, stdout, stderr io.Writer, strix bool) error {
-	if runtime.GOOS != "linux" {
-		return errors.New("the installer supports Linux only")
-	}
-	if os.Geteuid() == 0 {
-		return errors.New("run this command as your regular user; it uses sudo when needed")
-	}
-	currentHostname, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("read current hostname: %w", err)
-	}
-	requestedHostname, err := promptHostname(stdin, stdout, currentHostname)
-	if err != nil {
-		return err
-	}
-
-	bash, err := exec.LookPath("bash")
-	if err != nil {
-		return errors.New("bash is required")
-	}
-
-	script, err := os.CreateTemp("", "hi-install-*.sh")
-	if err != nil {
-		return fmt.Errorf("create temporary setup script: %w", err)
-	}
-	path := script.Name()
-	defer os.Remove(path)
-
-	if err := script.Chmod(0o700); err != nil {
-		script.Close()
-		return fmt.Errorf("secure temporary setup script: %w", err)
-	}
-	if _, err := script.Write(setupScript); err != nil {
-		script.Close()
-		return fmt.Errorf("write temporary setup script: %w", err)
-	}
-	if err := script.Close(); err != nil {
-		return fmt.Errorf("close temporary setup script: %w", err)
-	}
-
-	profile := "standard"
-	if strix {
-		profile = "strix"
-	}
-	cmd := exec.Command(bash, path, profile, requestedHostname)
-	cmd.Stdin = stdin
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			return fmt.Errorf("%s setup failed with exit code %d", profile, exitErr.ExitCode())
-		}
-		return fmt.Errorf("start %s setup: %w", profile, err)
-	}
-	if strix {
-		result := verifyStrix(stdout)
-		if result.failures > 0 {
-			return fmt.Errorf("installation completed with %d failed report check(s)", result.failures)
-		}
-	}
-	return nil
-}
-
-func promptHostname(r io.Reader, w io.Writer, current string) (string, error) {
-	fmt.Fprintf(w, "Current hostname: %s\nNew hostname (press Enter to keep it): ", current)
-	line, err := readLine(r)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return "", fmt.Errorf("read hostname: %w", err)
-	}
-
-	hostname := strings.TrimSpace(line)
-	if hostname == "" || hostname == current {
-		return "", nil
-	}
-	if !validHostname(hostname) {
-		return "", fmt.Errorf(
-			"invalid hostname %q; use dot-separated letters, digits, or hyphens (maximum 64 characters)",
-			hostname,
-		)
-	}
-	return hostname, nil
 }
 
 func readLine(r io.Reader) (string, error) {

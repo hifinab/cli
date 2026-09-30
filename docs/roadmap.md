@@ -336,32 +336,45 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] The Home tab shows an approved request that is still starting as
   "approved, starting", not as waiting.
 
+### v0.15.0 — Guided installer
+
+- [x] Replace the fixed `hi install` run with a menu of checkboxes, each with
+  a short description, that selects which tools to install. Unchecking an
+  installed tool uninstalls it, so the same menu serves as both installer and
+  uninstaller.
+- [x] Install and remove named tools without a terminal with
+  `hi install <tool>...`, `hi install --all`, and `hi uninstall <tool>...`.
+
 ## Planned
-
-### v0.15.0 — Authentication
-
-- [ ] Delegate GitHub and OMP authentication to their native tools.
-  Approved spec: [hi_login.md](specs/approved/hi_login.md).
-
-Dependency: login requires the corresponding installed CLI.
 
 ### v0.16.0 — Project bootstrap
 
-- [ ] Add the interactive `hi init` helper and deterministic Python template.
-  Approved spec: [hi_init.md](specs/approved/hi_init.md).
+- [ ] Create the private `hifinab/templates` and `hifinab/skills`
+  repositories: a shared base layer, and CI that generates every template and
+  runs its `make check`.
+- [ ] Add `hi init`, guided and direct, which fetches a pinned templates
+  release with the `gh` token, caches it, and records the release and file
+  hashes in `.hifin/template.json`.
+- [ ] Add the `python` and `research` templates; the research template ships
+  lookahead, cost, and holdout guard tests.
+- [ ] Rewrite the first firm skills (`time-series-validity`,
+  `backtest-evaluation`, `firm-data`) and install them with each template.
+  Draft spec revision: [hi_init.md](specs/approved/hi_init.md); its decisions
+  must be settled first.
 
-Dependency: the Python template requires `uv` and establishes the metadata and
-safe-generation contract used by later templates.
+Dependency: `uv` and a signed-in `gh` with access to the private repositories.
 
-### v0.17.0 — Specialized project templates
+### v0.17.0 — Templates that keep up
 
-- [ ] Add the quantitative-research template.
-  Approved spec: [hi_init.md](specs/approved/hi_init.md).
-- [ ] Add the deterministic web-application template.
-  Approved spec: [hi_init.md](specs/approved/hi_init.md).
+- [ ] Update a repository to a newer templates release with
+  `hi init --update`, and check it in CI with `--check`.
+- [ ] Bring existing repositories under a template with `hi init --adopt`.
+- [ ] Add the `ml`, `pipeline`, and `service` templates.
+  Draft spec revision: [hi_init.md](specs/approved/hi_init.md).
 
-Dependency: both templates extend the v0.16.0 planner, conflict detection,
-metadata, agent instructions, and documentation structure.
+Dependency: the v0.16.0 templates repository, metadata, and file ownership.
+The `web`, `mobile`, and `cli` templates are built when the first real project
+of each type starts.
 
 ### v0.18.0 — Focused machine operations
 
@@ -372,22 +385,13 @@ metadata, agent instructions, and documentation structure.
 - [ ] Install `hi` and the AI and developer tools for all users, including
   accounts created later. Review the caveats before starting.
   Approved spec: [hi_install_shared.md](specs/approved/hi_install_shared.md).
+- [ ] Offer the per-user or all-users choice in the v0.15.0 install menu.
 
 Dependency: shared tools no longer update themselves, so they rely on
 rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
-### v0.19.0 — Guided installer
-
-- [ ] Replace the fixed `hi install` run with a guided menu of checkboxes
-  that selects which tools to install. Unchecking an installed tool
-  uninstalls it, so the same menu serves as both installer and uninstaller.
-  Spec not yet written.
-
-Dependency: needs uninstall steps for every tool `hi install` manages, and
-must respect the per-user or all-users choice from v0.18.0.
-
-### v0.20.0 — Learn from agent-machine services
+### v0.19.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -404,7 +408,7 @@ must respect the per-user or all-users choice from v0.18.0.
 - [ ] Turn the ideas worth building into draft specs in `specs/ideas/`.
   Spec not yet written.
 
-### v0.21.0 — Containers
+### v0.20.0 — Containers
 
 - [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
   - One image, anywhere: `hi compute run --image` starts the same container
@@ -424,7 +428,7 @@ must respect the per-user or all-users choice from v0.18.0.
     digests a group may start, and requests show the image, so approvers
     see what will run.
   - `hi install` offers the container runtime and the ROCm container
-    tooling, as a checkbox in the v0.19.0 menu.
+    tooling, as a checkbox in the v0.15.0 menu.
   Spec not yet written.
 
 Dependency: local GPU containers need the v0.1.0 workstation setup; image
