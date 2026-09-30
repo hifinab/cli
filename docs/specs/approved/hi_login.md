@@ -2,8 +2,7 @@
 
 Status: Approved
 
-Dependencies: GitHub CLI for GitHub login; OMP for provider login; the `hf`
-CLI for Hugging Face; the Colab CLI for Colab.
+Dependencies: the `hf` CLI for Hugging Face; the Colab CLI for Colab.
 
 ## Goal
 
@@ -14,12 +13,10 @@ provider tools.
 ## Commands
 
 ```text
-hi login
-hi login github
-hi login omp
-hi login omp <provider>
 hi login hf
 hi login colab
+hi login runpod
+hi login shadeform
 ```
 
 `hi login runpod` has no native tool to delegate to, since runpodctl only
@@ -30,18 +27,16 @@ guided menu offers the same prompt when RunPod is chosen while signed out.
 
 `hi login hf` runs `hf auth login` and then `hf auth whoami`. `hi login colab`
 runs `colab usage`, which starts Colab's browser sign-in and then shows the
-compute-unit balance. Both are implemented (v0.7.0); GitHub and OMP login are
-planned for v0.15.0.
+compute-unit balance. Both are implemented (v0.7.0).
 
-Bare `hi login` starts GitHub authentication. `hi login github` is the explicit
-equivalent. `hi login omp` delegates interactive provider selection, while the
-provider form selects one OMP provider directly.
+GitHub and OMP login are out of scope (dropped 2026-09-29). Nothing in `hi`
+uses those sign-ins, and `gh auth login` and `omp auth-broker login` already
+do the job, so a wrapper would only add an interface to keep in step with
+tools `hi` doesn't own.
 
 ## Delegation
 
-GitHub runs `gh auth login` with the terminal attached and then reports
-`gh auth status`. OMP discovers providers through `omp auth-broker list` and
-runs `omp auth-broker login [provider]`.
+Hugging Face and Colab run their native sign-in with the terminal attached.
 
 `hi` must not copy, print, persist, migrate, or refresh provider tokens. It may
 report dependency absence and the native command needed to install or retry the
@@ -64,8 +59,7 @@ the provider and command but never include credentials or environment values.
 
 ## Acceptance criteria
 
-1. Bare and explicit GitHub login delegate to `gh auth login`.
-2. OMP login uses the auth-broker provider list and login command.
-3. Native browser and device-code flows remain usable.
-4. Successful GitHub login ends with authenticated status.
-5. No credential value is captured in `hi` logs, files, or output.
+1. `hi login hf` and `hi login colab` delegate to the native sign-in.
+2. Native browser and device-code flows remain usable.
+3. `hi login hf` ends by reporting the signed-in account.
+4. No credential value is captured in `hi` logs, files, or output.
