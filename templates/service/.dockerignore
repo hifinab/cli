@@ -1,0 +1,6 @@
+.venv
+.git
+data
+results
+.env
+.env.*

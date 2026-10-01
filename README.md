@@ -222,11 +222,21 @@ that keep it out of `.env` and `secrets/`, the `hi` skill, and CI.
 hi init                         # choose a template, name, and directory
 hi init python pricing-tools    # Python: uv, ruff, pyrefly, pytest
 hi init web dashboard           # React and TypeScript on Vite: npm, Biome, Vitest
+hi init service orders-api      # FastAPI, SQLAlchemy and Alembic, Dockerfile
+hi init pipeline prices-feed    # an idempotent run --date: land raw, parse, load
+hi init ml forecaster           # PyTorch for CPU, CUDA, or ROCm (Strix Halo)
 hi init --list                  # every template and where it comes from
 ```
 
 It shows every file and command first, never overwrites a file with other
 content, and records what it generated in `.hifin/template.json`.
+
+Later, `hi init --update` brings a project up to the current templates: it
+replaces what `hi` owns, reports hand edits as conflicts, and writes changes
+to the project's own files to `docs/upgrades/` for an agent to apply.
+`hi init --update --check` does the same comparison for CI.
+`hi init --adopt <template>` brings an existing repository under a template
+without touching its code.
 
 The built-in templates are public and generic; they live in `templates/` and
 are embedded in the binary. Private templates, such as quant `research`,

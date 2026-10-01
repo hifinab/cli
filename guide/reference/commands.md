@@ -12,7 +12,7 @@ description: Every hi command and option in one place.
 | `hi connect <server>`            | Join a hi server; `status`, `key`                      |
 | `hi disconnect`                  | Leave it; use your own keys again                      |
 | `hi server …`                    | Run the server that brokers compute; see below         |
-| `hi init [<template> <dir>]`     | Start a project from a template                        |
+| `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
@@ -124,6 +124,9 @@ hi init                          # choose a template, name, and directory
 hi init python pricing-tools     # create ./pricing-tools from the python template
 hi init web . --name dashboard   # apply the web template to this directory
 hi init --list                   # the templates
+hi init --update                 # bring this repository up to the current templates
+hi init --update --check         # change nothing; fail when it is behind (for CI)
+hi init --adopt python           # bring this existing repository under a template
 ```
 
 | Option                  | Meaning                                              |
@@ -133,6 +136,11 @@ hi init --list                   # the templates
 | `--yes`                 | Do not ask for confirmation                          |
 | `--no-setup`            | Write the files; run no setup command                |
 | `--github <owner/repo>` | Also create a private GitHub repository and push     |
+| `--force`               | With `--update` or `--adopt`: overwrite files hi owns even when edited by hand |
+| `--strict`              | With `--check`: fail when private layers can't be checked |
+
+Templates: `python`, `web`, `service`, `pipeline`, `ml`, and on a connected
+device the team's private ones.
 
 ## hi skill
 

@@ -1,0 +1,10 @@
+
+## Service
+
+- Settings come from `APP_*` environment variables (see `settings.py`);
+  add each new one to `.env.example`. Never hard-code URLs or secrets.
+- After changing `models.py`, add a migration with
+  `uv run alembic revision --autogenerate -m "..."` and read it before
+  committing; `tests/test_migrations.py` fails until you do.
+- `/healthz` says the process is up; `/readyz` that it can serve. Keep both
+  cheap.

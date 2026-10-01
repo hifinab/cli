@@ -224,7 +224,13 @@ func composeTemplate(layers map[string]*templateLayer, name string, params map[s
 		sentinels = append(sentinels, sentinel)
 	}
 	sort.Slice(sentinels, func(i, j int) bool { return len(sentinels[i]) > len(sentinels[j]) })
-	pairs := make([]string, 0, 2*len(sentinels))
+	pairs := make([]string, 0, 4*len(sentinels))
+	for _, sentinel := range sentinels {
+		// uv's lockfiles name dependency groups and extras with the
+		// project name's length first, such as group-19-hifin-template-name-cpu.
+		value := substitute[sentinel]
+		pairs = append(pairs, fmt.Sprintf("-%d-%s-", len(sentinel), sentinel), fmt.Sprintf("-%d-%s-", len(value), value))
+	}
 	for _, sentinel := range sentinels {
 		pairs = append(pairs, sentinel, substitute[sentinel])
 	}

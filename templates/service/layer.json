@@ -1,0 +1,8 @@
+{
+  "name": "service",
+  "summary": "Backend service or API (FastAPI, SQLAlchemy, Alembic)",
+  "extends": "python",
+  "schema": 1,
+  "requires_hi": ">=0.18.0",
+  "remove": ["tests/test_greet.py"]
+}

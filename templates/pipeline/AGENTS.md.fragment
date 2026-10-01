@@ -1,0 +1,8 @@
+
+## Pipeline
+
+- `run --date` must stay idempotent: land the raw response first, never
+  refetch a landed file, and load with keys that skip existing rows.
+- Parser changes need a recorded response in `tests/fixtures/`; tests never
+  call the network.
+- Raw files in `data/raw/` are the source of truth; never edit them.

@@ -1,8 +1,9 @@
 # `hi init` specification
 
 Status: Approved (2026-10-01). Built-in templates and `hi init` shipped in
-v0.16.0, server templates in v0.17.0; `--update`, `--check`, and `--adopt`
-are planned for v0.18.0.
+v0.16.0, private templates through `hi server` in v0.17.0, and `--update`,
+`--check`, `--adopt`, and the `service`, `pipeline`, and `ml` templates in
+v0.18.0.
 
 Dependencies: `uv` for Python templates and Node.js with npm for the `web`
 template, both on `PATH`; for private templates, a device connected to
@@ -337,16 +338,29 @@ far as the user's group may see them.
    source is unreachable keeps its recorded commit, and the output says so.
 3. Apply migrations between the recorded and target schema: declarative
    renames, moves, and deletions of owned paths only, from
-   `<layer>/migrations/<from>-to-<to>.json`.
+   `<layer>/migrations/<from>-to-<to>.json`. No template has needed one yet,
+   so v0.18.0 refuses a schema change with a clear message instead.
 4. Replace owned files whose hash still matches the record; replace managed
    blocks.
 5. An owned file or managed block that was edited by hand is a conflict:
    print the difference, change nothing else in it, and suggest making the
    change in the template's source instead. `--force` overwrites.
 6. Never write seeded files. Instead, write the template's changes to them as
-   `docs/upgrades/<version>.md`: the diff and plain instructions an agent can
-   apply in a pull request.
-7. Record the new versions and hashes.
+   `docs/upgrades/hi-<version>[-<source>-<commit>].md`: for each file, a
+   diff from the project's file to the template's (made with `diff -u`) and
+   plain instructions an agent can apply in a pull request. Owned files the
+   template no longer has are deleted when unedited.
+7. Record the new versions and hashes. A file left in conflict keeps its
+   old record, so it stays a conflict until resolved.
+
+A conflict leaves that file alone, updates the rest, and exits non-zero.
+`hi init --update` refuses to run when the repository was made with a newer
+`hi` than the one running, and when the private layers it was made from
+can't be reached.
+
+Each file's record also names its source, so a check without the server
+compares only files that came from built-in layers and whose last layer was
+built in.
 
 `hi init --update --check` changes nothing and exits non-zero when the
 repository is behind or has conflicts, for CI. In CI, which has no server
@@ -358,11 +372,16 @@ records.
 
 ## Adopting an existing repository: `hi init --adopt <type>`
 
-Most of the team's repositories predate `hi init`. Adoption adds the base
-layer's owned and managed files, the chosen type's skills and check targets,
-and `.hifin/template.json`. It never moves or rewrites existing source, and an
-existing file that an owned file would replace is a conflict listed before
-any change. The plan says which checks the repository does not yet pass.
+Most of the team's repositories predate `hi init`. Adoption adds the
+template's owned and managed files, its skills and check targets, and
+`.hifin/template.json`. Managed blocks go at the top of existing `AGENTS.md`,
+`.gitignore`, and `Makefile` files, keeping their content. It never moves or
+rewrites existing source and never adds seeded files; it lists the seeded
+files the repository lacks, which explains what `make check` may not pass
+yet. An existing file that an owned file would replace, and a `Makefile`
+that already defines `help`, `check`, `fix`, `lint`, or `test`, are
+conflicts listed before any change. Skill files written by `hi skill` are
+replaced.
 
 ## Testing templates
 

@@ -23,7 +23,7 @@ func composeBuiltin(t *testing.T, name, project string) *composedTemplate {
 }
 
 func TestBuiltinTemplatesReplaceEverySentinel(t *testing.T) {
-	for _, name := range []string{"python", "web"} {
+	for _, name := range []string{"python", "web", "service", "pipeline", "ml"} {
 		composed := composeBuiltin(t, name, "pricing-tools")
 		for path, data := range composed.Files {
 			if strings.Contains(strings.ToLower(path), "hifin") || strings.Contains(strings.ToLower(string(data)), "hifin") {
@@ -126,7 +126,7 @@ func TestBuiltinTemplatesPassTheirCheck(t *testing.T) {
 	if os.Getenv("HI_TEMPLATE_CHECK") != "1" {
 		t.Skip("set HI_TEMPLATE_CHECK=1 to generate the templates and run make check")
 	}
-	for _, name := range []string{"python", "web"} {
+	for _, name := range []string{"python", "web", "service", "pipeline", "ml"} {
 		t.Run(name, func(t *testing.T) {
 			parent := t.TempDir()
 			code, stdout, stderr := runInitIn(t, parent, "", name, "check-"+name, "--yes")
@@ -139,5 +139,12 @@ func TestBuiltinTemplatesPassTheirCheck(t *testing.T) {
 				t.Fatalf("make check: %v\n%s", err, output)
 			}
 		})
+	}
+}
+
+func TestLockfileGroupMarkersFollowTheName(t *testing.T) {
+	lock := string(composeBuiltin(t, "ml", "m").Files["uv.lock"])
+	if !strings.Contains(lock, "group-1-m-cpu") || strings.Contains(lock, "group-19-") {
+		t.Fatal("uv.lock group markers do not match the project name")
 	}
 }

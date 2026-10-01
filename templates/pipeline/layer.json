@@ -1,0 +1,8 @@
+{
+  "name": "pipeline",
+  "summary": "Data pipeline: fetch, land raw, parse, load (idempotent per date)",
+  "extends": "python",
+  "schema": 1,
+  "requires_hi": ">=0.18.0",
+  "remove": ["tests/test_greet.py"]
+}

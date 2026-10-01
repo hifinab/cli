@@ -1,0 +1,10 @@
+
+## Training
+
+- `make check` trains for two steps on the CPU; keep it that fast. Real runs
+  go through `uv run python -m hifin_template_name.train`, and on a rented
+  GPU through `hi compute` (see the hi skill).
+- Every run writes its config next to its results in `results/`; never
+  change a config without changing where its results go.
+- PyTorch comes from one dependency group per machine: `cpu` (default),
+  `cuda`, or `rocm`. Never add `torch` to the project's main dependencies.

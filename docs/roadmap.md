@@ -409,20 +409,26 @@ Dependency: the v0.16.0 layers and metadata; the open decisions
   offers, so a renamed source isn't listed twice when the server is
   unreachable.
 
-## Planned
-
 ### v0.18.0 — Templates that keep up
 
-- [ ] Update a repository to the current templates with `hi init --update`,
-  and check it in CI with `--check`, which skips server layers there unless
+- [x] Update a repository to the current templates with `hi init --update`:
+  unedited owned files and managed blocks are replaced, hand edits are
+  conflicts, and changes to the project's own files go to `docs/upgrades/`
+  for an agent.
+- [x] Check it in CI with `--check`, which skips private layers there unless
   `--strict`.
-- [ ] Bring existing repositories under a template with `hi init --adopt`.
-- [ ] Add the built-in `service`, `ml`, and `pipeline` templates.
+- [x] Bring existing repositories under a template with `hi init --adopt`.
+- [x] Add the built-in `service`, `ml`, and `pipeline` templates. `ml`
+  takes PyTorch from a `cpu`, `cuda`, or `rocm` dependency group; `rocm` is
+  AMD's gfx1151 build for Strix Halo.
+- [x] `hi init` says when a newer `hi` brings newer built-in templates.
+- [ ] Train with the `rocm` group on a Strix Halo machine.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
-Dependency: the v0.16.0 metadata and file ownership, and the v0.17.0 commit
-history on the server. The `mobile` and `cli` templates are built when the
-first real project of each type starts.
+The `mobile` and `cli` templates are built when the first real project of
+each type starts.
+
+## Planned
 
 ### v0.19.0 — Focused machine operations
 

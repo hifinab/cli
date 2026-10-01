@@ -200,8 +200,16 @@ hi init python pricing-tools --dry-run       # every file and command, nothing w
 hi init python pricing-tools --yes           # after the user agreed to the plan
 ```
 
-Only create a project when the user asks for one, and show them the
-`--dry-run` plan first. `hi init` never overwrites a file with other content;
+Other templates: `web`, `service`, `pipeline`, `ml`, and the team's private
+ones on a connected device. `hi init --update --dry-run` shows how a project
+differs from the current templates, and `hi init --update` applies it; if it
+writes `docs/upgrades/<version>.md`, apply what fits from it, run
+`make check`, and delete the file. `hi init --adopt <template>` brings an
+existing repository under a template without touching its code.
+
+Only create, update, or adopt a project when the user asks for it, and show
+them the `--dry-run` plan first. Never use `--force` unless they ask: it
+overwrites their hand edits. `hi init` never overwrites a file with other content;
 if it lists conflicts, tell the user instead of moving their files. In a
 project made by `hi init`, run `make check` before saying a change is done,
 and follow its `AGENTS.md`.

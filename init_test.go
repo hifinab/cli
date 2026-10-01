@@ -103,8 +103,8 @@ func TestInitListsConflictsBeforeWritingAnything(t *testing.T) {
 func TestGuidedAndDirectInitPlanTheSame(t *testing.T) {
 	parent := t.TempDir()
 	_, direct, _ := runInitIn(t, parent, "", "web", "dash", "--dry-run")
-	// web is the second template; the name is asked; the directory defaults to it.
-	_, guided, stderr := runInitIn(t, parent, "2\ndash\n\n", "--dry-run")
+	// web is the last of the five templates; the name is asked; the directory defaults to it.
+	_, guided, stderr := runInitIn(t, parent, "5\ndash\n\n", "--dry-run")
 	plan := guided[strings.Index(guided, "Template  "):]
 	if plan != direct {
 		t.Fatalf("plans differ:\nguided:\n%s\ndirect:\n%s\n%s", plan, direct, stderr)
