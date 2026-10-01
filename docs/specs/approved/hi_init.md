@@ -248,7 +248,7 @@ pinned in the template's own manifests and lockfiles, not here.
 | `python` | Libraries and scripts | Python, uv, ruff, pyrefly, pytest | — | v0.16.0 |
 | `web` | Internal web apps and dashboards | React and TypeScript on Vite, npm, Biome, Vitest | type check, production build | v0.16.0 |
 | `service` | Backend services and APIs | `python` + FastAPI, pydantic-settings, SQLAlchemy and Alembic, `/healthz` and `/readyz`, Dockerfile, compose | migrations match models; health endpoints answer | v0.18.0 |
-| `ml` | Model training, fine-tuning, benchmarks | `python` + PyTorch (ROCm and CUDA extras), typed config, training image for `hi compute` | a two-step CPU training smoke test | v0.18.0 |
+| `ml` | Model training, fine-tuning, benchmarks | `python` + PyTorch from one dependency group per machine (`cpu`, `cuda`, or `rocm` with AMD's gfx1151 build for Strix Halo), which the `Makefile` picks from the hardware; typed config | a two-step CPU training smoke test | v0.18.0 |
 | `pipeline` | Data sources, scrapers, ingestion | `python` + one idempotent `run --date` entry point, raw landing before parsing | offline parser tests against recorded responses; a rerun loads nothing new | v0.18.0 |
 | `cli` | Command-line tools | `python` + Typer, installed with `uv tool install` | exit codes and `--json` output | with the first project |
 | `mobile` | Mobile apps | Expo (expo-router, EAS), Biome, Jest | `expo-doctor` | with the first project |

@@ -224,7 +224,7 @@ hi init python pricing-tools    # Python: uv, ruff, pyrefly, pytest
 hi init web dashboard           # React and TypeScript on Vite: npm, Biome, Vitest
 hi init service orders-api      # FastAPI, SQLAlchemy and Alembic, Dockerfile
 hi init pipeline prices-feed    # an idempotent run --date: land raw, parse, load
-hi init ml forecaster           # PyTorch for CPU, CUDA, or ROCm (Strix Halo)
+hi init ml forecaster           # PyTorch; ROCm on Strix Halo, CUDA on NVIDIA, else CPU
 hi init --list                  # every template and where it comes from
 ```
 

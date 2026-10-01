@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Hifin Template Name"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "numpy>=2.3",
+]
 
 [dependency-groups]
 dev = [
@@ -12,9 +14,8 @@ dev = [
     "pytest>=9.1",
     "ruff>=0.16",
 ]
-# One PyTorch build per machine. `uv sync` installs the CPU build; on a GPU
-# machine use `uv sync --no-group cpu --group cuda` (NVIDIA) or `--group rocm`
-# (AMD Strix Halo: AMD's gfx1151 build, which brings its own ROCm libraries).
+# One PyTorch build per machine: `make sync` picks it (see the Makefile).
+# rocm is AMD's build for Strix Halo (gfx1151), with its own ROCm libraries.
 cpu = ["torch>=2.14"]
 cuda = ["torch>=2.14"]
 rocm = [

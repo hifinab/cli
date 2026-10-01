@@ -44,10 +44,11 @@ Node.js with npm; `hi install` sets up both.
 
 Each adds its own checks to `make check`: `service` checks that the health
 endpoints answer and that migrations match the models, `pipeline` that a
-rerun loads nothing new, and `ml` trains for two steps on the CPU. `ml`
-installs the CPU build of PyTorch by default; on a GPU machine run
-`uv sync --no-group cpu --group rocm` (AMD, such as Strix Halo) or
-`--group cuda` (NVIDIA).
+rerun loads nothing new, and `ml` trains for two steps on the CPU. In `ml`,
+`make` picks the PyTorch build for the machine: `rocm` on a Strix Halo
+(AMD's build for gfx1151), `cuda` with an NVIDIA GPU, `cpu` otherwise.
+`make sync` installs it and `make train` trains on the GPU; `make help`
+shows which build it chose, and `TORCH = cpu` in `local.mk` overrides it.
 
 `hi init` checks in the background whether a newer `hi` is out, and says so:
 the built-in templates are part of `hi`, so `hi update` is how you get their

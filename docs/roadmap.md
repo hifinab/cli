@@ -422,7 +422,10 @@ Dependency: the v0.16.0 layers and metadata; the open decisions
   takes PyTorch from a `cpu`, `cuda`, or `rocm` dependency group; `rocm` is
   AMD's gfx1151 build for Strix Halo.
 - [x] `hi init` says when a newer `hi` brings newer built-in templates.
-- [ ] Train with the `rocm` group on a Strix Halo machine.
+- [x] Train with the `rocm` group on a Strix Halo machine (v0.18.2,
+  aiw11, 2026-10-01): `hi init ml` installed AMD's PyTorch 2.11 for gfx1151
+  through `make sync`, `make check` passed, and `make train` ran on the
+  Radeon 8060S.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
 The `mobile` and `cli` templates are built when the first real project of
@@ -434,6 +437,13 @@ each type starts.
   `hi server templates rename`: when the recorded source is gone and one
   current source has the same layers, it uses that one and records the new
   name.
+
+### v0.18.2 — ml picks the PyTorch build
+
+- [x] The `ml` template's `Makefile` picks `rocm` on a Strix Halo, `cuda`
+  with an NVIDIA GPU, and `cpu` otherwise, and runs everything with that
+  build; before, any `uv run` swapped the ROCm build back to the CPU one.
+  `hi init ml` sets it up with `make sync`.
 
 ## Planned
 

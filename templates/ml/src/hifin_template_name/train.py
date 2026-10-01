@@ -56,7 +56,9 @@ def main() -> None:
     (arguments.out / "config.json").write_text(json.dumps(config.as_dict(), indent=2) + "\n")
     (arguments.out / "losses.json").write_text(json.dumps(losses) + "\n")
     device = pick_device(config.device)
-    print(f"{config.steps} steps on {device}: loss {losses[0]:.3f} -> {losses[-1]:.3f}")
+    # ROCm builds report AMD GPUs as "cuda" devices too, so name the GPU.
+    where = torch.cuda.get_device_name(device) if device.type == "cuda" else "the CPU"
+    print(f"{config.steps} steps on {where}: loss {losses[0]:.3f} -> {losses[-1]:.3f}")
 
 
 if __name__ == "__main__":
