@@ -405,6 +405,9 @@ Dependency: the v0.16.0 layers and metadata; the open decisions
   history; the firm's source is now called `private`.
 - [x] Docs speak of private templates and the team, and the planned
   `firm-data` skill is now `data-access`.
+- [x] v0.17.3: `hi init` forgets cached sources the server no longer
+  offers, so a renamed source isn't listed twice when the server is
+  unreachable.
 
 ## Planned
 

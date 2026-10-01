@@ -129,7 +129,23 @@ func fetchServerTemplateSources(connection *serverConnection) ([]serverTemplateS
 		os.WriteFile(filepath.Join(templateCacheDirectory(), info.Name, "current"), []byte(info.Commit+"\n"), 0o644)
 		sources = append(sources, serverTemplateSource{name: info.Name, commit: info.Commit, files: os.DirFS(directory)})
 	}
+	pruneTemplateCache(catalog)
 	return sources, nil
+}
+
+// pruneTemplateCache forgets sources the server no longer offers, such as a
+// renamed or removed one, so they don't come back when it is unreachable.
+func pruneTemplateCache(catalog apiTemplateCatalog) {
+	offered := map[string]bool{}
+	for _, info := range catalog.Sources {
+		offered[info.Name] = true
+	}
+	entries, _ := os.ReadDir(templateCacheDirectory())
+	for _, entry := range entries {
+		if entry.IsDir() && !offered[entry.Name()] {
+			os.RemoveAll(filepath.Join(templateCacheDirectory(), entry.Name()))
+		}
+	}
 }
 
 func validCommit(commit string) bool {
