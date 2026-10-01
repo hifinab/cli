@@ -1,0 +1,9 @@
+# hi:begin: written by hi init; change it in the template, not here
+.env
+.env.*
+!.env.example
+secrets/
+data/
+results/
+.DS_Store
+# hi:end

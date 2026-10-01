@@ -1,0 +1,10 @@
+{
+  "name": "web",
+  "summary": "Web app (React and TypeScript on Vite, Biome, Vitest)",
+  "extends": "base",
+  "schema": 1,
+  "commands": {
+    "setup": [["npm", "ci"]],
+    "check": [["make", "check"]]
+  }
+}

@@ -1,0 +1,7 @@
+
+## Python
+
+- Use `uv`: `uv add <package>` for dependencies (`--dev` for tools),
+  `uv run <command>` to run anything. Never `pip install`.
+- Code lives in `src/hifin_template_name/`, tests in `tests/`. Type every
+  function; `pyrefly` checks them.

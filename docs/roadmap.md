@@ -349,34 +349,57 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 
 ### v0.16.0 — Project bootstrap
 
-- [ ] Create the private `hifinab/templates` and `hifinab/skills`
-  repositories: a shared base layer, and CI that generates every template and
-  runs its `make check`.
-- [ ] Add `hi init`, guided and direct, which fetches a pinned templates
-  release with the `gh` token, caches it, and records the release and file
-  hashes in `.hifin/template.json`.
-- [ ] Add the `python` and `research` templates; the research template ships
-  lookahead, cost, and holdout guard tests.
-- [ ] Rewrite the first firm skills (`time-series-validity`,
-  `backtest-evaluation`, `firm-data`) and install them with each template.
-  Draft spec revision: [hi_init.md](specs/approved/hi_init.md); its decisions
-  must be settled first.
-
-Dependency: `uv` and a signed-in `gh` with access to the private repositories.
-
-### v0.17.0 — Templates that keep up
-
-- [ ] Update a repository to a newer templates release with
-  `hi init --update`, and check it in CI with `--check`.
-- [ ] Bring existing repositories under a template with `hi init --adopt`.
-- [ ] Add the `ml`, `pipeline`, and `service` templates.
+- [ ] Add built-in templates under `templates/`, embedded in `hi`: a hidden
+  `base` layer (agent instructions, `make check`, CI, secret scanning), and
+  the well-known `python` (uv, ruff, pyrefly, pytest) and `web` (React and
+  TypeScript on Vite, npm, Biome, Vitest) templates.
+- [ ] Add `hi init`, guided and direct, with `--list`, `--dry-run`, `--yes`,
+  `--no-setup`, and `--github`, recording what it generated in
+  `.hifin/template.json`.
+- [ ] Read a local source from `HI_TEMPLATES_DIR` for template authors.
+- [ ] CI generates every built-in template, runs its `make check`, and
+  rejects internal names under `templates/`.
   Draft spec revision: [hi_init.md](specs/approved/hi_init.md).
 
-Dependency: the v0.16.0 templates repository, metadata, and file ownership.
-The `web`, `mobile`, and `cli` templates are built when the first real project
-of each type starts.
+Dependency: `uv` for `python`, Node.js with npm for `web`. Nothing
+firm-specific or quant-related goes in the built-in templates.
 
-### v0.18.0 — Focused machine operations
+### v0.17.0 — Firm templates through `hi server`
+
+- [ ] Give the server an ed25519 key, store it on devices at `hi connect`,
+  and sign template bundles with it.
+- [ ] Add `hi server templates add|remove|list|sync`: mirror a private
+  repository with a read-only token, check every commit, fetch every 15
+  minutes, and log and alert on changes.
+- [ ] Serve the catalog and signed bundles to enrolled devices, limited per
+  group by `template_sources` in policy.
+- [ ] List and generate server templates in `hi init`, cached per commit,
+  with server layers extending built-in ones.
+- [ ] Move the quant work into the private `hifinab/templates`: the
+  `research` template with its backtest guards, and the firm skills
+  (`time-series-validity`, `backtest-evaluation`, `firm-data`).
+- [ ] Verify live on the firm's server with `hifinab/templates`.
+  Approved spec: [hi_server.md](specs/approved/hi_server.md#template-sources);
+  draft spec revision: [hi_init.md](specs/approved/hi_init.md).
+
+Dependency: the v0.16.0 layers and metadata; the firm's open decisions
+(backtest engine, data access, scheduling) are tracked in
+`hifinab/templates`.
+
+### v0.18.0 — Templates that keep up
+
+- [ ] Update a repository to the current templates with `hi init --update`,
+  and check it in CI with `--check`, which skips server layers there unless
+  `--strict`.
+- [ ] Bring existing repositories under a template with `hi init --adopt`.
+- [ ] Add the built-in `service`, `ml`, and `pipeline` templates.
+  Draft spec revision: [hi_init.md](specs/approved/hi_init.md).
+
+Dependency: the v0.16.0 metadata and file ownership, and the v0.17.0 commit
+history on the server. The `mobile` and `cli` templates are built when the
+first real project of each type starts.
+
+### v0.19.0 — Focused machine operations
 
 - [ ] Read and change the machine hostname independently of installation.
   Approved spec: [hi_hostname.md](specs/approved/hi_hostname.md).
@@ -391,7 +414,7 @@ Dependency: shared tools no longer update themselves, so they rely on
 rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 `hi` also changes how `hi update` replaces the binary.
 
-### v0.19.0 — Learn from agent-machine services
+### v0.20.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -408,7 +431,7 @@ rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 - [ ] Turn the ideas worth building into draft specs in `specs/ideas/`.
   Spec not yet written.
 
-### v0.20.0 — Containers
+### v0.21.0 — Containers
 
 - [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
   - One image, anywhere: `hi compute run --image` starts the same container
