@@ -380,9 +380,10 @@ firm-specific or quant-related goes in the built-in templates.
 - [ ] The `firm-data` skill, once the firm's data access is decided.
 - [x] Verify live on vmhiserver (2026-10-01): the server signed and served
   `hifinab/templates` at 7362a3e, a laptop stored its key, and
-  `hi init research` passed `make check`. The source is a copy on the server
-  until the server gets read access to GitHub: the `hifinab` org has deploy
-  keys turned off.
+  `hi init research` passed `make check`. The server reads GitHub through
+  its account's `gh` login (`gh auth setup-git`), since the `hifinab` org
+  has deploy keys turned off, and a new commit reached the laptop after
+  `hi server templates sync`.
   Approved spec: [hi_server.md](specs/approved/hi_server.md#template-sources);
   draft spec revision: [hi_init.md](specs/approved/hi_init.md).
 
