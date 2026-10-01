@@ -468,7 +468,10 @@ each type starts.
     see what will run.
   - `hi install` offers the container runtime and the ROCm container
     tooling, as a checkbox in the v0.15.0 menu.
-  Spec not yet written.
+  Drafts: [hi_sandbox.md](specs/ideas/hi_sandbox.md) grows the agent
+  sandbox into a general `hi sandbox` (agents, untrusted code, previews, and
+  remote GPUs); [hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)
+  pins `serve` recipes and covers `--image` on Shadeform.
 
 Dependency: local GPU containers need the v0.1.0 workstation setup; image
 policy extends v0.11.0; project images extend the v0.16.0 templates.
@@ -491,8 +494,8 @@ policy extends v0.11.0; project images extend the v0.16.0 templates.
   Started: [hi_compute_idle.md](specs/ideas/hi_compute_idle.md) has the
   idle GPU flag and why suspend and resume doesn't fit the current
   providers; [hi_compute_ssh_run.md](specs/ideas/hi_compute_ssh_run.md)
-  covers runs on RunPod, Shadeform, and managed providers.
-  Spec not yet written.
+  covers runs on RunPod, Shadeform, and managed providers. The services
+  were compared on 2026-10-01 in [hi_sandbox.md](specs/ideas/hi_sandbox.md#services).
 
 ## Deferred until everything else is done
 
