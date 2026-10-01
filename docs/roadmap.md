@@ -462,6 +462,10 @@ each type starts.
   - Sharing a running machine with a teammate, recorded in the audit log.
   - A live desktop view that a person can watch and take over from an agent.
 - [ ] Turn the ideas worth building into draft specs in `specs/ideas/`.
+  Started: [hi_compute_idle.md](specs/ideas/hi_compute_idle.md) has the
+  idle GPU flag and why suspend and resume doesn't fit the current
+  providers; [hi_compute_ssh_run.md](specs/ideas/hi_compute_ssh_run.md)
+  covers runs on RunPod, Shadeform, and managed providers.
   Spec not yet written.
 
 ### v0.20.0 — Containers
