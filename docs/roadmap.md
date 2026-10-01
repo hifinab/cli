@@ -391,6 +391,12 @@ Dependency: the v0.16.0 layers and metadata; the firm's open decisions
 (backtest engine, data access, scheduling) are tracked in
 `hifinab/templates`.
 
+### v0.17.1 — Template syncs that can't hang
+
+- [x] Every git command for template sources gives up after 2 minutes, or
+  after 30 seconds below 1 KB/s, so a stuck fetch no longer blocks
+  `hi server templates` behind it.
+
 ## Planned
 
 ### v0.18.0 — Templates that keep up

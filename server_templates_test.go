@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // templateRepo is a git repository of templates for a test.
@@ -241,5 +242,29 @@ func TestServerTemplatesCommandWorksWithoutARunningServer(t *testing.T) {
 	}
 	if code, stdout, _ := runHi("server", "templates", "list", "--dir", ts.dir); code != 0 || !strings.Contains(stdout, "No template sources") {
 		t.Fatalf("after remove: %s", stdout)
+	}
+}
+
+func TestAStuckGitDoesNotBlockTheTemplateCommands(t *testing.T) {
+	ts := newTestServer(t)
+	ts.addTemplates(t, newTemplateRepo(t), "")
+	// A git that never answers, in front of the real one.
+	bin := t.TempDir()
+	writeTestFile(t, filepath.Join(bin, "git"), "#!/bin/sh\nexec sleep 60\n", 0o755)
+	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
+	previous := templateGitTimeout
+	templateGitTimeout = 200 * time.Millisecond
+	defer func() { templateGitTimeout = previous }()
+
+	started := time.Now()
+	results, err := ts.server.syncTemplateSources("firm", "admin")
+	if err != nil || !strings.Contains(results[0].Problem, "no answer") {
+		t.Fatalf("sync: %+v %v", results, err)
+	}
+	if elapsed := time.Since(started); elapsed > 10*time.Second {
+		t.Fatalf("sync took %s", elapsed)
+	}
+	if err := ts.server.removeTemplateSource("firm", "admin"); err != nil {
+		t.Fatal(err)
 	}
 }

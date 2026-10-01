@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -29,6 +30,11 @@ import (
 // (docs/specs/approved/hi_server.md#template-sources).
 
 var templateSyncEvery = 15 * time.Minute
+
+// templateGitTimeout bounds every git command, so a stuck connection or
+// credential helper can't hold the template lock and block the admin
+// commands behind it.
+var templateGitTimeout = 2 * time.Minute
 
 const (
 	// templateBundleLimit bounds a source's archive; templates are text.
@@ -128,8 +134,14 @@ func (s *hiServer) templateMirror(name string) string {
 // git runs git without prompts. A token goes in through the environment,
 // never in arguments or the stored remote URL, and is removed from errors.
 func runTemplateGit(token string, args ...string) ([]byte, error) {
-	command := exec.Command("git", args...)
-	command.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=true", "SSH_ASKPASS=true")
+	ctx, cancel := context.WithTimeout(context.Background(), templateGitTimeout)
+	defer cancel()
+	command := exec.CommandContext(ctx, "git", args...)
+	command.WaitDelay = 5 * time.Second
+	// A transfer slower than 1 KB/s for 30 seconds is given up on, well
+	// before the overall timeout.
+	command.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=true", "SSH_ASKPASS=true",
+		"GIT_HTTP_LOW_SPEED_LIMIT=1000", "GIT_HTTP_LOW_SPEED_TIME=30")
 	if token != "" {
 		basic := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + token))
 		command.Env = append(command.Env, "GIT_CONFIG_COUNT=1",
@@ -138,6 +150,9 @@ func runTemplateGit(token string, args ...string) ([]byte, error) {
 	var stderr bytes.Buffer
 	command.Stderr = &stderr
 	output, err := command.Output()
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("git %s: no answer within %s", args[0], templateGitTimeout)
+	}
 	if err != nil {
 		message := strings.TrimSpace(stderr.String())
 		if token != "" {
