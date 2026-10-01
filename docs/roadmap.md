@@ -378,7 +378,11 @@ firm-specific or quant-related goes in the built-in templates.
   `time-series-validity` and `backtest-evaluation`. Layers can `remove`
   files they inherit.
 - [ ] The `firm-data` skill, once the firm's data access is decided.
-- [ ] Verify live on the firm's server with `hifinab/templates`.
+- [x] Verify live on vmhiserver (2026-10-01): the server signed and served
+  `hifinab/templates` at 7362a3e, a laptop stored its key, and
+  `hi init research` passed `make check`. The source is a copy on the server
+  until the server gets read access to GitHub: the `hifinab` org has deploy
+  keys turned off.
   Approved spec: [hi_server.md](specs/approved/hi_server.md#template-sources);
   draft spec revision: [hi_init.md](specs/approved/hi_init.md).
 
