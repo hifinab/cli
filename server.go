@@ -1833,6 +1833,7 @@ Usage:
   hi server templates add <name> <git-url> [--ref R]
                                           Serve a private repository's templates and skills
   hi server templates list|sync|remove    Show, fetch now, or stop serving template sources
+  hi server templates rename <name> <new> Rename a source; keeps its token and history
 
 Commands other than init and run talk to the running server through its
 admin socket, so they work only on the server box. Decisions are recorded

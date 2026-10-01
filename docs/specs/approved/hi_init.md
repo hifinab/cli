@@ -5,14 +5,14 @@ v0.16.0, server templates in v0.17.0; `--update`, `--check`, and `--adopt`
 are planned for v0.18.0.
 
 Dependencies: `uv` for Python templates and Node.js with npm for the `web`
-template, both on `PATH`; for the firm's own templates, a device connected to
+template, both on `PATH`; for private templates, a device connected to
 a `hi server` ([hi_server.md](hi_server.md#template-sources)).
 
 ## Goal
 
 Every new repository starts in a shape that coding agents work well in, and
-stays in that shape as the firm's conventions improve. One command creates a
-repository for any kind of project the firm builds: quant research, model
+stays in that shape as the team's conventions improve. One command creates a
+repository for any kind of project the team builds: quant research, model
 training, data pipelines, services, web and mobile apps, and CLI tools.
 
 The value is not the folders. It is three things no folder template gives:
@@ -24,7 +24,7 @@ The value is not the folders. It is three things no folder template gives:
    credentials in the repository, no committed data, and for research no
    lookahead in a backtest) are tests, hooks, and deny rules that ship with
    the template, not paragraphs in `AGENTS.md`.
-3. **Firm knowledge where agents find it.** Firm skills (data sources,
+3. **Team knowledge where agents find it.** Private skills (data sources,
    validation methodology, compute) are installed from one maintained source,
    pinned, and updated in every repository by `hi`, instead of copied by hand
    and left to drift.
@@ -42,9 +42,9 @@ The value is not the folders. It is three things no folder template gives:
   at generation, not a templating language spread across files.
 - **One default per type.** A template never asks which framework to use. The
   stack is decided once, in the template, and changed for everyone at once.
-- **Public patterns are public; firm knowledge is not.** Well-known project
-  shapes ship inside `hi`. Anything quant-related or specific to the firm
-  lives only in the firm's private source and reaches devices through
+- **Public patterns are public; private knowledge is not.** Well-known project
+  shapes ship inside `hi`. Anything quant-related or specific to the team
+  lives only in a private repo and reaches devices through
   `hi server`.
 
 ## Where templates and skills live
@@ -60,18 +60,18 @@ connection, so `hi init python` works on any machine with `hi`.
 
 - The built-in templates' version is the `hi` version. A template fix ships
   in a `hi` release, and `hi update` brings it to a device.
-- Nothing firm-specific may be added: no internal hostnames, data sources,
+- Nothing private or team-specific may be added: no internal hostnames, data sources,
   vendors, schemas, or research methods. The repository's CI rejects known
   internal names (such as `.hi.fin` addresses) under `templates/`.
 - A never-connected `hi` sees only the built-in templates.
 
 ### Server sources: private repositories behind `hi server`
 
-The firm's own templates and skills live in private git repositories that an
-admin registers on the firm's `hi server`:
+Private templates and skills live in private git repositories that an admin
+registers on the team's `hi server`:
 
 ```text
-hi server templates add firm https://github.com/hifinab/templates
+hi server templates add private https://github.com/hifinab/templates
 ```
 
 The server holds the read access, mirrors the repository, and serves its
@@ -81,16 +81,16 @@ need access to the repository on GitHub, and agents enrolled with
 syncs, signs, and limits sources is in
 [hi_server.md](hi_server.md#template-sources).
 
-`hifinab/templates` is the firm's source. Everything quant-related is there
-and only there: the `research` template and its backtest guards, firm skills
-such as `time-series-validity`, `backtest-evaluation`, and `firm-data`, the
-firm's data-access helper, and the decisions behind them. This specification
+`hifinab/templates` is Hifin's private repo, registered as `private`. Everything quant-related is there
+and only there: the `research` template and its backtest guards, private skills
+such as `time-series-validity`, `backtest-evaluation`, and `data-access`, the
+data-access helper, and the decisions behind them. This specification
 covers the mechanism; that repository documents its own templates.
 
 | Belongs in | Examples |
 |---|---|
 | Built-in (`hifinab/cli/templates/`) | Python library layout, React web app, CI, `make check`, agent configuration, secret scanning |
-| Server source (`hifinab/templates`) | `research`, backtest harness and guard tests, firm skills, data access, the firm's orchestrator and infrastructure |
+| Server source (`hifinab/templates`) | `research`, backtest harness and guard tests, private skills, data access, the team's orchestrator and infrastructure |
 
 The GitHub "template repository" feature is not used: it has no parameters
 and no way to update a repository later.
@@ -123,7 +123,7 @@ is how each layer adds its own ignore rules and `AGENTS.md` rules.
   layer; a server layer with a built-in name is listed as an error by
   `hi server templates sync` and not served.
 - Names from different server sources may clash; a clashing name must be
-  written `<source>/<name>`, such as `firm/research`. A unique name needs no
+  written `<source>/<name>`, such as `private/research`. A unique name needs no
   prefix.
 
 ### Layer manifest
@@ -145,7 +145,7 @@ needs no extra parser.
     "owned": ["CLAUDE.md", ".claude/settings.json"],
     "managed": ["AGENTS.md", ".gitignore", "Makefile"]
   },
-  "skills": ["time-series-validity", "firm-data", "hi"],
+  "skills": ["time-series-validity", "data-access", "hi"],
   "commands": {
     "setup": [["uv", "sync"]],
     "check": [["make", "check"]]
@@ -198,7 +198,7 @@ write, and every command it will run, and asks for confirmation.
 ## Every repository (the `base` layer)
 
 ```text
-AGENTS.md                   managed block (firm rules) + the project's own text
+AGENTS.md                   managed block (team rules) + the project's own text
 CLAUDE.md                   "@AGENTS.md"
 .agents/skills/<name>/      skills, pinned; owned by hi
 .claude/skills/<name> -> ../../.agents/skills/<name>
@@ -231,7 +231,7 @@ README.md
   costs context on every turn.
 - **`make check`** runs, in order: lockfile check, format check, lint, type
   check, tests. It is offline and deterministic once setup has installed the
-  dependencies. Make is used because the firm already uses Makefiles and
+  dependencies. Make is used because the team already uses Makefiles and
   every machine has it.
 - **Secrets** stay in `.env` (ignored) and the environment. `.claude/settings.json`
   denies reading `.env*` and `secrets/`; this is a guard for Claude's own
@@ -283,11 +283,11 @@ worth testing end to end.
   "layers": [
     {"name": "base", "source": "builtin", "version": "hi 0.17.0"},
     {"name": "python", "source": "builtin", "version": "hi 0.17.0"},
-    {"name": "research", "source": "firm", "commit": "<commit>"}
+    {"name": "research", "source": "private", "commit": "<commit>"}
   ],
   "params": {"name": "alpha-momentum"},
   "skills": {
-    "time-series-validity": {"source": "firm", "commit": "<commit>"},
+    "time-series-validity": {"source": "private", "commit": "<commit>"},
     "hi": {"source": "builtin", "version": "hi 0.17.0"}
   },
   "files": {
@@ -358,7 +358,7 @@ records.
 
 ## Adopting an existing repository: `hi init --adopt <type>`
 
-Most of the firm's repositories predate `hi init`. Adoption adds the base
+Most of the team's repositories predate `hi init`. Adoption adds the base
 layer's owned and managed files, the chosen type's skills and check targets,
 and `.hifin/template.json`. It never moves or rewrites existing source, and an
 existing file that an owned file would replace is a conflict listed before
@@ -430,11 +430,11 @@ run, the files written, and the next commands: enter the directory,
 
 ## Decisions required
 
-1. **Template visibility per group.** Whether students see the firm source
+1. **Template visibility per group.** Whether students see the private source
    at all. The server spec lets policy limit sources per group; the default
    chosen there is that every group sees every source.
 
-Decisions about the firm's own templates (backtest engine, data access,
+Decisions about the private templates (backtest engine, data access,
 pipeline scheduling) are tracked in `hifinab/templates`.
 
 ## Evidence

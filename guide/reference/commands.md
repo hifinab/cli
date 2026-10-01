@@ -106,6 +106,7 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server viewer add <name> --key <k>`             | A device that may only watch                         |
 | `hi server templates add <name> <git-url> [--ref <r>]` | Serve a private repository's templates and skills |
 | `hi server templates list\|sync\|remove [<name>]`    | Show, fetch now, or stop serving template sources  |
+| `hi server templates rename <name> <new-name>`      | Rename a source; keeps its token and history         |
 
 ## hi login
 

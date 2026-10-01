@@ -360,9 +360,9 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
   Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: `uv` for `python`, Node.js with npm for `web`. Nothing
-firm-specific or quant-related goes in the built-in templates.
+private or quant-related goes in the built-in templates.
 
-### v0.17.0 — Firm templates through `hi server`
+### v0.17.0 — Private templates through `hi server`
 
 - [x] Give the server an ed25519 key, store it on devices at `hi connect`,
   and sign template bundles with it.
@@ -374,10 +374,10 @@ firm-specific or quant-related goes in the built-in templates.
 - [x] List and generate server templates in `hi init`, cached per commit,
   with server layers extending built-in ones.
 - [x] Move the quant work into the private `hifinab/templates`: the
-  `research` template with its backtest guards, and the firm skills
+  `research` template with its backtest guards, and the private skills
   `time-series-validity` and `backtest-evaluation`. Layers can `remove`
   files they inherit.
-- [ ] The `firm-data` skill, once the firm's data access is decided.
+- [ ] The `data-access` skill, once data access is decided.
 - [x] Verify live on vmhiserver (2026-10-01): the server signed and served
   `hifinab/templates` at 7362a3e, a laptop stored its key, and
   `hi init research` passed `make check`. The server reads GitHub with a
@@ -387,7 +387,7 @@ firm-specific or quant-related goes in the built-in templates.
   Approved spec: [hi_server.md](specs/approved/hi_server.md#template-sources);
   approved spec: [hi_init.md](specs/approved/hi_init.md).
 
-Dependency: the v0.16.0 layers and metadata; the firm's open decisions
+Dependency: the v0.16.0 layers and metadata; the open decisions
 (backtest engine, data access, scheduling) are tracked in
 `hifinab/templates`.
 
@@ -396,6 +396,15 @@ Dependency: the v0.16.0 layers and metadata; the firm's open decisions
 - [x] Every git command for template sources gives up after 2 minutes, or
   after 30 seconds below 1 KB/s, so a stuck fetch no longer blocks
   `hi server templates` behind it.
+
+### v0.17.2 — Call it the private repo
+
+- [x] `hi init`'s menu marks server templates `(private repo)` instead of
+  the source's name.
+- [x] Add `hi server templates rename`, which keeps a source's token and
+  history; the firm's source is now called `private`.
+- [x] Docs speak of private templates and the team, and the planned
+  `firm-data` skill is now `data-access`.
 
 ## Planned
 

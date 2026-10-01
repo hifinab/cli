@@ -25,8 +25,8 @@ and stop anything that runs amok, all from Slack.
 - Management is opt-in. A `hi` that has never run `hi connect` works exactly
   as it does today, with the user's own keys on their own machines. Colab is
   never managed.
-- The server is also where connected devices get the firm's private project
-  templates and agent skills, so firm knowledge never has to be public or
+- The server is also where connected devices get private project templates
+  and agent skills, so the team's own knowledge never has to be public or
   handed out as repository access (see [Template sources](#template-sources)).
 
 ## Design choice: broker, don't distribute
@@ -371,8 +371,8 @@ screen limited to their own instances, requests, and budget.
 ## Template sources
 
 `hi` ships generic project templates (`python`, `web`) built in
-([hi_init.md](hi_init.md)). The firm's own templates and skills, such as
-quant research layouts, backtest guards, and the `firm-data` skill, must not
+([hi_init.md](hi_init.md)). Private templates and skills, such as
+quant research layouts, backtest guards, and the `data-access` skill, must not
 be public. The server distributes them, in the same way it brokers provider
 keys: it holds the repository access, and enrolled devices ask it for what
 they need.
@@ -380,7 +380,7 @@ they need.
 ### Adding a source
 
 ```text
-hi server templates add firm https://github.com/hifinab/templates [--ref main]
+hi server templates add private https://github.com/hifinab/templates [--ref main]
 ```
 
 - `<name>` is how devices and `.hifin/template.json` refer to the source. It
@@ -409,6 +409,8 @@ hi server templates add firm https://github.com/hifinab/templates [--ref main]
 - The mirror keeps history, so the server can serve any commit it has served
   before. That lets `hi init --update` compare a repository's recorded commit
   with the current one.
+- `hi server templates rename <name> <new-name>` keeps the mirror, token,
+  and commits; devices fetch the source again under its new name.
 - `hi server templates list` shows each source, its URL, ref, current commit,
   last fetch, and layers and skills. `hi server templates remove <name>`
   stops serving it and deletes the mirror and its token.
@@ -459,8 +461,8 @@ hi server slack setup               # prints the app manifest to install,
                                     # asks for the bot and app tokens,
                                     # picks #compute-approvals and approvers
 hi server policy edit               # groups, limits, auto-approve rules
-hi server templates add firm https://github.com/hifinab/templates
-                                    # optional: the firm's private templates
+hi server templates add private https://github.com/hifinab/templates
+                                    # optional: private templates
 sudo systemctl enable --now hi-server
 ```
 
@@ -678,6 +680,7 @@ hi server wall setup [--session s] [--size WxH]
 hi server wall add|remove|list <screen> [<ssh-pubkey>] [--session s]
 hi server templates add <name> <git-url> [--ref <ref>]
 hi server templates remove|list|sync [<name>]
+hi server templates rename <name> <new-name>
 ```
 
 Approver devices and wall displays:

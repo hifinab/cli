@@ -229,8 +229,8 @@ It shows every file and command first, never overwrites a file with other
 content, and records what it generated in `.hifin/template.json`.
 
 The built-in templates are public and generic; they live in `templates/` and
-are embedded in the binary. The firm's own templates, such as quant
-`research`, live in a private repository that a `hi server` mirrors
+are embedded in the binary. Private templates, such as quant `research`,
+live in a private repository that a `hi server` mirrors
 (`hi server templates add`) and serves, signed, to connected devices. Template
 authors can try a folder of layers with `HI_TEMPLATES_DIR=<path> hi init …`.
 

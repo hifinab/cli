@@ -539,8 +539,11 @@ func guidedInit(ui menuUI, catalog *templateCatalog, request *initRequest) error
 	labels := make([]string, len(templates))
 	for i, layer := range templates {
 		labels[i] = fmt.Sprintf("%-*s  %s", width, layer.key, layer.Summary)
-		if layer.source != "builtin" {
-			labels[i] += "  (" + layer.source + ")"
+		switch {
+		case layer.source == "local":
+			labels[i] += "  (local folder)"
+		case layer.source != "builtin":
+			labels[i] += "  (private repo)"
 		}
 	}
 	choice, err := ui.choose("Template", labels, false)

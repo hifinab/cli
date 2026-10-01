@@ -268,3 +268,31 @@ func TestAStuckGitDoesNotBlockTheTemplateCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRenamingASourceKeepsItsTokenAndCommits(t *testing.T) {
+	ts := newTestServer(t)
+	commit := ts.addTemplates(t, newTemplateRepo(t), "secret-token-123").Commit
+	if err := ts.server.renameTemplateSource("firm", "private", "admin"); err != nil {
+		t.Fatal(err)
+	}
+	if ts.server.keys["template:private"] != "secret-token-123" || ts.server.keys["template:firm"] != "" {
+		t.Fatal("the token did not move with the source")
+	}
+	results, err := ts.server.syncTemplateSources("private", "admin")
+	if err != nil || results[0].Commit != commit || results[0].Problem != "" {
+		t.Fatalf("sync after rename: %+v %v", results, err)
+	}
+	if err := ts.server.renameTemplateSource("private", "builtin", "admin"); err == nil {
+		t.Error("renamed to a reserved name")
+	}
+	ts.connectAs(t, "alice", "staff")
+	code, stdout, _ := runInitConnected(t, t.TempDir(), "", "--list")
+	if code != 0 || !strings.Contains(stdout, "private "+shortCommit(commit)) {
+		t.Fatalf("list after rename:\n%s", stdout)
+	}
+	// The guided menu calls it a private repo, whatever the source's name.
+	_, stdout, _ = runInitConnected(t, t.TempDir(), "")
+	if !strings.Contains(stdout, "quant") || !strings.Contains(stdout, "(private repo)") {
+		t.Fatalf("menu:\n%s", stdout)
+	}
+}

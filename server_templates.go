@@ -342,6 +342,40 @@ func resolveTemplateRef(mirror, ref string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+// renameTemplateSource changes a source's name and keeps its mirror, token,
+// and commits. Devices fetch it again under the new name.
+func (s *hiServer) renameTemplateSource(name, to, actor string) error {
+	s.templateMu.Lock()
+	defer s.templateMu.Unlock()
+	if !validServerName(to) || to == "builtin" || to == "local" {
+		return serverUsageError{fmt.Sprintf("invalid source name %q; use lowercase letters, digits, and dashes, not builtin or local", to)}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	source, ok := s.state.TemplateSources[name]
+	if !ok {
+		return serverUsageError{fmt.Sprintf("no template source named %q", name)}
+	}
+	if _, taken := s.state.TemplateSources[to]; taken {
+		return serverUsageError{fmt.Sprintf("there is already a source named %s", to)}
+	}
+	if err := os.Rename(s.templateMirror(name), s.templateMirror(to)); err != nil {
+		return err
+	}
+	delete(s.state.TemplateSources, name)
+	source.Name = to
+	s.state.TemplateSources[to] = source
+	if token, ok := s.keys[templateTokenPrefix+name]; ok {
+		delete(s.keys, templateTokenPrefix+name)
+		s.keys[templateTokenPrefix+to] = token
+	}
+	if err := errors.Join(s.saveLocked(), s.saveKeysLocked()); err != nil {
+		return err
+	}
+	s.audit(actor, "renamed template source", name, "to "+to)
+	return nil
+}
+
 func (s *hiServer) removeTemplateSource(name, actor string) error {
 	s.templateMu.Lock()
 	defer s.templateMu.Unlock()
@@ -570,6 +604,15 @@ func (s *hiServer) templateAdminRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /admin/templates/{name}/rename", func(w http.ResponseWriter, r *http.Request) {
+		var input struct{ As, To string }
+		json.NewDecoder(io.LimitReader(r.Body, serverMaxBody)).Decode(&input)
+		if err := s.renameTemplateSource(r.PathValue("name"), input.To, input.As); err != nil {
+			writeAPIError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	})
 	mux.HandleFunc("POST /admin/templates/sync", func(w http.ResponseWriter, r *http.Request) {
 		var input struct{ As, Name string }
 		json.NewDecoder(io.LimitReader(r.Body, serverMaxBody)).Decode(&input)
@@ -601,7 +644,7 @@ func serverTemplatesCommand(args []string, stdin io.Reader, stdout, stderr io.Wr
 	if err != nil {
 		return err
 	}
-	usage := usageError{"usage: hi server templates add <name> <git-url> [--ref <ref>] | remove <name> | list | sync [<name>]"}
+	usage := usageError{"usage: hi server templates add <name> <git-url> [--ref <ref>] | rename <name> <new-name> | remove <name> | list | sync [<name>]"}
 	if len(positional) == 0 {
 		return usage
 	}
@@ -661,6 +704,21 @@ func serverTemplatesCommand(args []string, stdin io.Reader, stdout, stderr io.Wr
 		}
 		printTemplateSources([]templateSource{source}, stdout)
 		fmt.Fprintf(stdout, "Connected devices now see these in `hi init --list`.\n")
+		return nil
+
+	case positional[0] == "rename" && len(positional) == 3:
+		if running {
+			err = adminCall(*dirFlag, http.MethodPost, "/admin/templates/"+positional[1]+"/rename", map[string]string{"as": *as, "to": positional[2]}, nil)
+		} else {
+			var server *hiServer
+			if server, err = direct(); err == nil {
+				err = server.renameTemplateSource(positional[1], positional[2], *as)
+			}
+		}
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Renamed %s to %s. Devices see the new name the next time they run hi init.\n", positional[1], positional[2])
 		return nil
 
 	case positional[0] == "remove" && len(positional) == 2:

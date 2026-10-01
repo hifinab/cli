@@ -14,7 +14,7 @@ import (
 )
 
 // The built-in templates are public, generic project layouts. Anything
-// firm-specific comes from a server source instead (docs/specs/approved/hi_init.md).
+// private comes from a server source instead (docs/specs/approved/hi_init.md).
 //
 //go:embed all:templates
 var builtinTemplateFiles embed.FS

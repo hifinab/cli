@@ -98,7 +98,7 @@ func TestComposeRefusesHiddenLayersAndBadNames(t *testing.T) {
 
 // The built-in templates are public. Firm names belong in a server source.
 func TestBuiltinTemplatesContainNoInternalNames(t *testing.T) {
-	internal := []string{".hi.fin", "vmhiserver", "firm-data"}
+	internal := []string{".hi.fin", "vmhiserver", "hifinab/templates"}
 	err := fs.WalkDir(builtinTemplateFiles, "templates", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return err

@@ -423,18 +423,18 @@ Then on the screen: `ssh -t hi-wall@<server box>`.
 A device elsewhere can also run `hi server live --wall` itself, if an admin
 makes it a viewer with `hi server viewer add <name> --key <key from hi connect key>`.
 
-### Serve the firm's project templates
+### Serve private project templates
 
-The server can also hand connected devices the firm's private project
-templates and agent skills, which `hi init` then offers next to the built-in
+The server can also hand connected devices private project templates and agent skills, which `hi init` then offers next to the built-in
 ones. Users never need access to the repository on GitHub.
 
 ```sh
-hi server templates add firm https://github.com/<org>/<private-repo>
+hi server templates add private https://github.com/<org>/<private-repo>
                                   # asks for a read-only token, shown as *
 hi server templates list          # each source, its commit, layers, and skills
 hi server templates sync          # fetch now instead of within 15 minutes
-hi server templates remove firm
+hi server templates rename private team   # keeps the token and history
+hi server templates remove private
 ```
 
 - Use a fine-grained GitHub token limited to that one repository with
@@ -454,7 +454,7 @@ hi server templates remove firm
 - Devices check that each bundle is signed with the server's key, which they
   stored the first time they connected.
 - To keep a group from seeing a source, list the ones it may use in
-  `policy.json`: `"template_sources": ["firm"]`, or `[]` for none.
+  `policy.json`: `"template_sources": ["private"]`, or `[]` for none.
 
 ### Watch and stop
 
