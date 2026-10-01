@@ -15,6 +15,7 @@ description: The environment variables hi reads and the files it writes.
 | `HF_ENDPOINT`           | Another Hugging Face API endpoint                                 |
 | `RUNPOD_API_KEY`        | RunPod API key; otherwise read from `~/.runpod/config.toml`       |
 | `HI_NETBIRD_SETUP_KEY`  | Setup key for `hi net` in scripts                                 |
+| `HI_TEMPLATES_DIR`      | `hi init`: a folder of extra template layers, for template authors |
 | `HI_INSTALL_DIR`        | Installer: where to put `hi`                                      |
 | `HI_VERSION`            | Installer: which release to install                               |
 | `XDG_CONFIG_HOME`       | Base of `hi`'s config folder; default `~/.config`                 |

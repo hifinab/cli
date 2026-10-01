@@ -43,6 +43,10 @@
       url: /guide/examples/jupyter/
     - title: Let your coding agent use a GPU
       url: /guide/examples/agent/
+- section: Projects
+  pages:
+    - title: Start a project
+      url: /guide/projects/
 - section: Workstation
   pages:
     - title: Set up a workstation

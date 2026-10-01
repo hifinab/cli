@@ -128,24 +128,15 @@ func TestBuiltinTemplatesPassTheirCheck(t *testing.T) {
 	}
 	for _, name := range []string{"python", "web"} {
 		t.Run(name, func(t *testing.T) {
-			composed := composeBuiltin(t, name, "check-"+name)
-			dir := t.TempDir()
-			for path, data := range composed.Files {
-				target := filepath.Join(dir, filepath.FromSlash(path))
-				if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(target, data, 0o644); err != nil {
-					t.Fatal(err)
-				}
+			parent := t.TempDir()
+			code, stdout, stderr := runInitIn(t, parent, "", name, "check-"+name, "--yes")
+			if code != 0 {
+				t.Fatalf("hi init %s: exit %d\n%s%s", name, code, stdout, stderr)
 			}
-			commands := append([][]string{{"git", "init", "-q"}}, composed.Commands["setup"]...)
-			for _, args := range append(commands, composed.Commands["check"]...) {
-				command := exec.Command(args[0], args[1:]...)
-				command.Dir = dir
-				if output, err := command.CombinedOutput(); err != nil {
-					t.Fatalf("%s: %v\n%s", strings.Join(args, " "), err, output)
-				}
+			command := exec.Command("make", "check")
+			command.Dir = filepath.Join(parent, "check-"+name)
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("make check: %v\n%s", err, output)
 			}
 		})
 	}

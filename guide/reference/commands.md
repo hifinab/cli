@@ -12,6 +12,7 @@ description: Every hi command and option in one place.
 | `hi connect <server>`            | Join a hi server; `status`, `key`                      |
 | `hi disconnect`                  | Leave it; use your own keys again                      |
 | `hi server …`                    | Run the server that brokers compute; see below         |
+| `hi init [<template> <dir>]`     | Start a project from a template                        |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
@@ -112,6 +113,23 @@ hi login colab    # the Colab CLI's browser sign-in, then the balance
 hi login runpod   # asks for the API key, checks it, saves it in ~/.runpod/config.toml
 hi login shadeform # asks for the API key, checks it, saves it in ~/.config/hi/shadeform_key
 ```
+
+## hi init
+
+```sh
+hi init                          # choose a template, name, and directory
+hi init python pricing-tools     # create ./pricing-tools from the python template
+hi init web . --name dashboard   # apply the web template to this directory
+hi init --list                   # the templates
+```
+
+| Option                  | Meaning                                              |
+|-------------------------|------------------------------------------------------|
+| `--name <name>`         | Project name; by default the directory's name        |
+| `--dry-run`             | Print the plan; write nothing                        |
+| `--yes`                 | Do not ask for confirmation                          |
+| `--no-setup`            | Write the files; run no setup command                |
+| `--github <owner/repo>` | Also create a private GitHub repository and push     |
 
 ## hi skill
 

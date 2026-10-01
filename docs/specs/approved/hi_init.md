@@ -198,7 +198,7 @@ write, and every command it will run, and asks for confirmation.
 AGENTS.md                   managed block (firm rules) + the project's own text
 CLAUDE.md                   "@AGENTS.md"
 .agents/skills/<name>/      skills, pinned; owned by hi
-.claude/skills -> ../.agents/skills
+.claude/skills/<name> -> ../../.agents/skills/<name>
 .claude/settings.json       deny reading .env and secrets; allow make check
 Makefile                    help, check, fix, test (managed block + project targets)
 .pre-commit-config.yaml     format, lint, secret scan (run by prek)
@@ -218,8 +218,9 @@ README.md
   mistakes. Claude Code reads it through `CLAUDE.md`'s `@AGENTS.md` import,
   which works on every version and surface; other agents read `AGENTS.md`
   directly. Each layer adds its own rules to the block.
-- **Skills** are copied into `.agents/skills`, with a symlink for Claude Code,
-  which reads only `.claude/skills`. Copies, rather than a Claude plugin
+- **Skills** are copied into `.agents/skills`, with a symlink per skill for
+  Claude Code, which reads only `.claude/skills`. One link per skill, as
+  `hi skill` writes them, so the two never fight over the folder. Copies, rather than a Claude plugin
   marketplace, because they work for every agent and in cloud sessions, where
   marketplace plugins do not load. Each copy carries the `hi` marker used by
   `hi skill`, its source and version are recorded in `.hifin/template.json`,
