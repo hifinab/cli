@@ -1,13 +1,14 @@
 ---
 name: hi
-description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs) - run a Python script or container to completion on a GPU, start an SSH-able GPU box, forward its ports to localhost, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers Hifin workstation setup (hi install, hi verify strix) and NetBird (hi net). Use when the user wants to train, evaluate, or test something on a GPU they do not have locally, try or serve an LLM remotely, see or stop running remote compute, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
+description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform) - run a Python script or container to completion on a GPU, start an SSH-able GPU box, forward its ports to localhost, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers starting a new project from a template (hi init), Hifin workstation setup (hi install, hi verify strix), and NetBird (hi net). Use when the user wants to train, evaluate, or test something on a GPU they do not have locally, try or serve an LLM remotely, see or stop running remote compute, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
 ---
 
 # hi
 
 `hi` is the Hifin command-line tool. Its `hi compute` commands rent remote
-machines from Colab, Hugging Face, or RunPod with the same commands on all of
-them, and give them back. Run `hi compute help` for the full reference; the user-facing guide
+machines from Colab, Hugging Face, RunPod, or Shadeform with the same commands
+on all of them, and give them back. `hi init` starts new projects from
+templates. Run `hi compute help` for the full reference; the user-facing guide
 is at https://hifin.sh/guide/ if the user needs step-by-step instructions.
 
 ## Rules
@@ -187,6 +188,23 @@ which needs a terminal. `ls` also stops instances past their limit. Names can be
 | `... is waiting for approval` (exit 3)        | Tell the user; check with `hi compute requests <id> --wait`.       |
 | `... was denied by ...` (exit 4)              | Tell the user the reason; do not retry around it.                  |
 | `can't reach the hi server`                   | Managed providers are unavailable; tell the user. Do not use another key. |
+
+## Start a project
+
+`hi init` creates a repository from a template: `make check`, `AGENTS.md`
+rules, Claude Code settings, this skill, and CI.
+
+```sh
+hi init --list                               # templates and where they come from
+hi init python pricing-tools --dry-run       # every file and command, nothing written
+hi init python pricing-tools --yes           # after the user agreed to the plan
+```
+
+Only create a project when the user asks for one, and show them the
+`--dry-run` plan first. `hi init` never overwrites a file with other content;
+if it lists conflicts, tell the user instead of moving their files. In a
+project made by `hi init`, run `make check` before saying a change is done,
+and follow its `AGENTS.md`.
 
 ## Workstation and network
 

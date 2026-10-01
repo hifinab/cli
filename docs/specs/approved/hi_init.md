@@ -1,7 +1,8 @@
 # `hi init` specification
 
-Status: Draft revision (2026-10-01). Replaces the approved version once
-reviewed.
+Status: Approved (2026-10-01). Built-in templates and `hi init` shipped in
+v0.16.0, server templates in v0.17.0; `--update`, `--check`, and `--adopt`
+are planned for v0.18.0.
 
 Dependencies: `uv` for Python templates and Node.js with npm for the `web`
 template, both on `PATH`; for the firm's own templates, a device connected to

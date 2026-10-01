@@ -357,7 +357,7 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Read a local source from `HI_TEMPLATES_DIR` for template authors.
 - [x] CI generates every built-in template, runs its `make check`, and
   rejects internal names under `templates/`.
-  Draft spec revision: [hi_init.md](specs/approved/hi_init.md).
+  Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: `uv` for `python`, Node.js with npm for `web`. Nothing
 firm-specific or quant-related goes in the built-in templates.
@@ -385,7 +385,7 @@ firm-specific or quant-related goes in the built-in templates.
   has deploy keys turned off), and a new commit reached the laptop after
   `hi server templates sync`.
   Approved spec: [hi_server.md](specs/approved/hi_server.md#template-sources);
-  draft spec revision: [hi_init.md](specs/approved/hi_init.md).
+  approved spec: [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: the v0.16.0 layers and metadata; the firm's open decisions
 (backtest engine, data access, scheduling) are tracked in
@@ -406,7 +406,7 @@ Dependency: the v0.16.0 layers and metadata; the firm's open decisions
   `--strict`.
 - [ ] Bring existing repositories under a template with `hi init --adopt`.
 - [ ] Add the built-in `service`, `ml`, and `pipeline` templates.
-  Draft spec revision: [hi_init.md](specs/approved/hi_init.md).
+  Approved spec: [hi_init.md](specs/approved/hi_init.md).
 
 Dependency: the v0.16.0 metadata and file ownership, and the v0.17.0 commit
 history on the server. The `mobile` and `cli` templates are built when the

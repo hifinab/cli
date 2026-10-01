@@ -438,9 +438,16 @@ hi server templates remove firm
 ```
 
 - Use a fine-grained GitHub token limited to that one repository with
-  read access to contents. It stays in the server's `keys.json`. An `ssh://`
-  or `git@` URL uses the server account's SSH key instead, such as a deploy
-  key.
+  read access to contents: on GitHub, Settings → Developer settings →
+  Personal access tokens → Fine-grained tokens, with the organization as
+  resource owner. It stays in the server's `keys.json`. An `ssh://` or
+  `git@` URL uses the server account's SSH key instead, such as a deploy key,
+  where the organization allows them.
+- When the token expires, fetching fails and the channel gets an alert, but
+  devices keep the last good commit. Run `remove` and `add` again with a new
+  token; the commits stay the same, so nothing devices cached changes.
+- Every git command gives up after 2 minutes, so a slow GitHub shows up as a
+  problem in `hi server templates list` instead of blocking the commands.
 - Every new commit is checked before devices get it: valid `layer.json`
   files, no built-in template names, and skills with a `SKILL.md`. A commit
   that fails keeps the previous one in service and posts an alert.

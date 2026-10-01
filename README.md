@@ -39,11 +39,12 @@ hi net             Securely enroll this machine with NetBird
 hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
+hi init            Start a project from a template (python, web, and your server's own)
 hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
 hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute
 hi disconnect               Leave it; hi compute uses your own keys again
-hi server          Run the server that brokers compute for a team (hi server help)
+hi server          Run the server that brokers compute and serves templates for a team (hi server help)
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
 hi update          Update hi to the latest release (--check, --version)
@@ -118,7 +119,7 @@ required.
 
 `hi compute` rents a remote machine, lets you use it as if it were local, and
 gives it back, with the same commands on every provider: Colab (through its
-CLI), Hugging Face Jobs, and RunPod (through their APIs). Run `hi compute`
+CLI), Hugging Face Jobs, RunPod, and Shadeform (through their APIs). Run `hi compute`
 in a terminal for a guided menu that prints the equivalent command for every
 step.
 
@@ -210,6 +211,29 @@ Colab's terms allow SSH on paid plans but forbid public web services, so
 tunnels bind to localhost only. Stop machines when you are done; a G4 uses
 about 9 compute units per hour.
 
+## Projects
+
+`hi init` creates a repository that coding agents work well in: a
+`make check` that runs format, lint, types, and tests, an `AGENTS.md` with
+short rules (read by Claude Code through `CLAUDE.md`), Claude Code settings
+that keep it out of `.env` and `secrets/`, the `hi` skill, and CI.
+
+```sh
+hi init                         # choose a template, name, and directory
+hi init python pricing-tools    # Python: uv, ruff, pyrefly, pytest
+hi init web dashboard           # React and TypeScript on Vite: npm, Biome, Vitest
+hi init --list                  # every template and where it comes from
+```
+
+It shows every file and command first, never overwrites a file with other
+content, and records what it generated in `.hifin/template.json`.
+
+The built-in templates are public and generic; they live in `templates/` and
+are embedded in the binary. The firm's own templates, such as quant
+`research`, live in a private repository that a `hi server` mirrors
+(`hi server templates add`) and serves, signed, to connected devices. Template
+authors can try a folder of layers with `HI_TEMPLATES_DIR=<path> hi init …`.
+
 ## Agent skill
 
 `hi skill` teaches coding agents such as Claude Code and Codex how to use
@@ -266,6 +290,8 @@ Build with Go 1.24 or newer:
 
 ```sh
 go build -o hi .
+go test ./...
+HI_TEMPLATE_CHECK=1 go test -run Template .   # generate each template and run its make check
 ```
 
 Pushing a `v*` tag builds amd64 and arm64 Linux binaries, writes SHA-256

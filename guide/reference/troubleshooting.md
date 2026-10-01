@@ -68,6 +68,25 @@ what to do next.
 | `serving needs a GPU`                                       | Choose GPU hardware with `--gpu`.                            |
 | An empty answer from a reasoning model                      | Raise `max_tokens`; the thinking uses tokens first.          |
 
+## Projects
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `file(s) already exist with other content; nothing was written` | `hi init` never overwrites. Move those files, or choose another directory. |
+| `give a directory or --name`                                | `hi init python pricing-tools`, or `--name` with `.`.        |
+| `the … template needs hi v… or newer`                       | `hi update`, then run `hi init` again.                       |
+| The firm's templates are missing from `hi init --list`      | Run `hi connect status`: the device must be connected, and the server's policy may hide them from your group. |
+| `warning: no server templates from …`, then `cached`        | The server is unreachable; the last templates this device fetched still work. |
+| `… are not signed by this server's key`                     | Nothing from that bundle was used. Tell an admin; if the server was replaced on purpose, `hi disconnect` and `hi connect` again. |
+| `the server … has a different key than when this device connected` | Same as above.                                       |
+| `make check` fails right after `hi init`                    | Run the setup first: `uv sync` or `npm ci`. `hi init --no-setup` skips it. |
+
+For admins, `hi server templates list` shows each source's commit, last fetch,
+and any problem. `git fetch: no answer within 2m0s` means GitHub was slow or
+unreachable; devices keep the last good commit, and the next sync retries.
+`Authentication failed` usually means the source's token expired: run
+`hi server templates remove <name>`, then `add` with a new token.
+
 ## Installing and signing in
 
 | Message                                                     | What to do                                                   |

@@ -28,6 +28,7 @@ Hugging Face.
 | Know what I am paying and who pays                 | [Costs, limits, and billing]({{ '/guide/compute/billing/' | relative_url }}) |
 | Set up Colab or Hugging Face for the first time    | [Google Colab]({{ '/guide/compute/colab/' | relative_url }}), [Hugging Face Jobs]({{ '/guide/compute/hugging-face/' | relative_url }}) |
 | Let Claude Code or Codex use a GPU safely          | [Let your coding agent use a GPU]({{ '/guide/examples/agent/' | relative_url }}) |
+| Start a new repository that agents work well in   | [Start a project]({{ '/guide/projects/' | relative_url }})          |
 | Set up a new Hifin machine                         | [Set up a workstation]({{ '/guide/workstation/' | relative_url }}) |
 | Fix an error message                               | [Troubleshooting]({{ '/guide/reference/troubleshooting/' | relative_url }}) |
 

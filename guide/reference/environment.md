@@ -20,6 +20,7 @@ description: The environment variables hi reads and the files it writes.
 | `HI_VERSION`            | Installer: which release to install                               |
 | `XDG_CONFIG_HOME`       | Base of `hi`'s config folder; default `~/.config`                 |
 | `XDG_STATE_HOME`        | Base of `hi`'s state folder; default `~/.local/state`             |
+| `XDG_CACHE_HOME`        | Base of `hi`'s cache folder; default `~/.cache`                   |
 
 ## Files hi writes
 
@@ -31,6 +32,10 @@ description: The environment variables hi reads and the files it writes.
 | `~/.local/state/hi/compute/instances.json`  | Instances `hi` started: name, provider, start, limit |
 | `~/.local/state/hi/compute/<name>.watch.log` | Log of the Colab lifetime watcher                   |
 | `.agents/skills/hi/SKILL.md`, `.claude/skills/hi` | The agent skill, from `hi skill`               |
+| `~/.config/hi/shadeform_key`                | The Shadeform API key from `hi login shadeform` (mode 0600) |
+| `~/.config/hi/server.json`, `~/.config/hi/device_key` | The hi server this device joined, its stored key, and this device's private key (`hi connect`) |
+| `~/.cache/hi/templates/<source>/<commit>/`  | Server templates, cached after their signature was checked; deleted by `hi disconnect` |
+| `.hifin/template.json` (in a project)       | What `hi init` generated: template, versions or commits, and file hashes; no paths or names |
 
 ## Files hi reads from other tools
 
@@ -41,8 +46,24 @@ description: The environment variables hi reads and the files it writes.
 | `~/.runpod/config.toml`                     | runpodctl's `apiKey`                                 |
 | `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa`      | Your SSH key, for shells and tunnels                 |
 
-`hi` never prints provider tokens. It stores one only for RunPod, which has
-no sign-in tool of its own, and then only in RunPod's standard file.
+`hi` never prints provider tokens. It stores them only for providers without
+a sign-in tool of their own: RunPod, in RunPod's standard file, and
+Shadeform, in `~/.config/hi/shadeform_key`.
+
+## On a hi server
+
+The server keeps everything in its state folder (`hi server --dir`, default
+`~/.local/state/hi/server`), readable only by its account:
+
+| File                       | Contents                                                       |
+|----------------------------|----------------------------------------------------------------|
+| `config.json`              | The listen address and server settings                         |
+| `state.json`               | Users, devices, requests, leases, and template sources         |
+| `keys.json`                | Provider keys and template source tokens                       |
+| `server_key`               | The key the server signs template bundles with                 |
+| `policy.json`              | Groups, limits, budgets, and template access                   |
+| `audit.jsonl`              | Every request, decision, start, stop, and template change      |
+| `templates/<source>.git`   | Mirrors of the template sources                                |
 
 ## On remote machines
 
