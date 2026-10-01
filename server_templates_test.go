@@ -302,3 +302,29 @@ func TestRenamingASourceKeepsItsTokenAndCommits(t *testing.T) {
 		t.Fatalf("menu:\n%s", stdout)
 	}
 }
+
+func TestUpdateFollowsARenamedSource(t *testing.T) {
+	ts := newTestServer(t)
+	ts.addTemplates(t, newTemplateRepo(t), "")
+	ts.connectAs(t, "alice", "staff")
+	parent := t.TempDir()
+	if code, stdout, stderr := runInitConnected(t, parent, "", "quant", "alpha", "--yes", "--no-setup"); code != 0 {
+		t.Fatalf("init: %s%s", stdout, stderr)
+	}
+	if err := ts.server.renameTemplateSource("firm", "private", "admin"); err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(parent, "alpha")
+	code, stdout, stderr := runInitConnected(t, project, "", "--update", "--yes")
+	if code != 0 || !strings.Contains(stdout, "firm is now called private") {
+		t.Fatalf("update after rename: %d\n%s%s", code, stdout, stderr)
+	}
+	var metadata templateMetadataFile
+	json.Unmarshal([]byte(readTestFile(t, filepath.Join(project, templateMetadataPath))), &metadata)
+	if metadata.Layers[len(metadata.Layers)-1].Source != "private" || metadata.Skills["validity"].Source != "private" {
+		t.Fatalf("the new name was not recorded: %+v", metadata)
+	}
+	if code, stdout, _ := runInitConnected(t, project, "", "--update", "--check"); code != 0 || strings.Contains(stdout, "Not checked") {
+		t.Fatalf("check after rename: %d\n%s", code, stdout)
+	}
+}

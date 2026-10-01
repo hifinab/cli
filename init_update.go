@@ -42,8 +42,9 @@ type templateChange struct {
 	target    string
 	metadata  templateMetadataFile // what the repository recorded
 	actions   []fileAction
-	unchecked []string // sources a check without them could not cover
-	notes     []byte   // docs/upgrades content, if any
+	unchecked []string          // sources a check without them could not cover
+	renamed   map[string]string // a recorded source → its name now
+	notes     []byte            // docs/upgrades content, if any
 	notesPath string
 	record    []byte // the new .hifin/template.json
 	commands  [][]string
@@ -82,6 +83,59 @@ func readTemplateMetadata(target string) (templateMetadataFile, error) {
 		return metadata, fmt.Errorf("%s is not valid; restore it from Git", templateMetadataPath)
 	}
 	return metadata, nil
+}
+
+// followRenamedSources maps sources the repository recorded but the catalog
+// no longer has to the one current source with the same layers, as after
+// `hi server templates rename`, and rewrites the metadata to the new names.
+func followRenamedSources(catalog *templateCatalog, metadata *templateMetadataFile) map[string]string {
+	current := map[string]bool{}
+	for _, layer := range catalog.layers {
+		current[layer.source] = true
+	}
+	renamed := map[string]string{}
+	for _, recorded := range metadata.Layers {
+		if recorded.Source == "builtin" || current[recorded.Source] {
+			continue
+		}
+		candidates := map[string]bool{}
+		for _, layer := range catalog.layers {
+			if layer.Name == recorded.Name && layer.source != "builtin" && layer.source != "local" {
+				candidates[layer.source] = true
+			}
+		}
+		if len(candidates) == 1 {
+			for source := range candidates {
+				renamed[recorded.Source] = source
+			}
+		}
+	}
+	if len(renamed) == 0 {
+		return nil
+	}
+	rename := func(source string) string {
+		if to, ok := renamed[source]; ok {
+			return to
+		}
+		return source
+	}
+	for i := range metadata.Layers {
+		metadata.Layers[i].Source = rename(metadata.Layers[i].Source)
+	}
+	for name, skill := range metadata.Skills {
+		skill.Source = rename(skill.Source)
+		metadata.Skills[name] = skill
+	}
+	for path, file := range metadata.Files {
+		file.Source = rename(file.Source)
+		metadata.Files[path] = file
+	}
+	for from, to := range renamed {
+		if rest, ok := strings.CutPrefix(metadata.Template, from+"/"); ok {
+			metadata.Template = to + "/" + rest
+		}
+	}
+	return renamed
 }
 
 // availableLayers reports whether the catalog has every non-built-in layer
@@ -123,7 +177,7 @@ func planUpdate(catalog *templateCatalog, target string, check, strict, force bo
 			return nil, fmt.Errorf("this repository was made with hi %s, newer than this hi %s; run `hi update`", recorded, version)
 		}
 	}
-	change := &templateChange{target: target, metadata: metadata}
+	change := &templateChange{target: target, metadata: metadata, renamed: followRenamedSources(catalog, &metadata)}
 	templateName := metadata.Template
 	missing := availableLayers(catalog, metadata)
 	if len(missing) > 0 {
@@ -477,6 +531,9 @@ func printTemplateChange(change *templateChange, verb string, stdout io.Writer) 
 		fmt.Fprintf(stdout, "Template  %s: %s\n", change.template.Name, strings.Join(layers, ", "))
 	}
 	fmt.Fprintf(stdout, "Target    %s\n", change.target)
+	for from, to := range change.renamed {
+		fmt.Fprintf(stdout, "Source    %s is now called %s\n", from, to)
+	}
 	labels := map[string]string{actionWrite: "write", actionBlock: "block", actionDelete: "delete",
 		actionNote: "note", actionConflict: "CONFLICT", actionSkip: "missing"}
 	shown := false
@@ -568,7 +625,7 @@ func executeUpdate(catalog *templateCatalog, directory string, check, strict, fo
 		return nil
 	}
 	if len(pending) == 0 && change.notesPath == "" {
-		// Record the new versions even when no file changed.
+		// Record the new versions and names even when no file changed.
 		current, _ := os.ReadFile(filepath.Join(target, templateMetadataPath))
 		if !bytes.Equal(current, change.record) && !dryRun {
 			return writeInitFiles(target, []initEntry{{path: templateMetadataPath, data: change.record}})

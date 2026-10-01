@@ -428,6 +428,13 @@ Dependency: the v0.16.0 layers and metadata; the open decisions
 The `mobile` and `cli` templates are built when the first real project of
 each type starts.
 
+### v0.18.1 — Follow renamed sources
+
+- [x] `hi init --update` follows a private source renamed with
+  `hi server templates rename`: when the recorded source is gone and one
+  current source has the same layers, it uses that one and records the new
+  name.
+
 ## Planned
 
 ### v0.19.0 — Focused machine operations
