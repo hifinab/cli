@@ -447,28 +447,7 @@ each type starts.
 
 ## Planned
 
-### v0.19.0 — Learn from agent-machine services
-
-- [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
-  Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
-  `hi compute` and `hi server`. Candidates from boxd:
-  - Checkpoints before risky changes, and forking a running machine into an
-    identical copy.
-  - Suspending idle machines and resuming them quickly, which pairs with the
-    idle GPU flag deferred from v0.13.0.
-  - An HTTPS URL for every machine or `serve`, instead of an SSH tunnel.
-  - Environment variables and secrets set once and injected into every
-    machine the user owns, never on Community Cloud (v0.12.2).
-  - Sharing a running machine with a teammate, recorded in the audit log.
-  - A live desktop view that a person can watch and take over from an agent.
-- [ ] Turn the ideas worth building into draft specs in `specs/ideas/`.
-  Started: [hi_compute_idle.md](specs/ideas/hi_compute_idle.md) has the
-  idle GPU flag and why suspend and resume doesn't fit the current
-  providers; [hi_compute_ssh_run.md](specs/ideas/hi_compute_ssh_run.md)
-  covers runs on RunPod, Shadeform, and managed providers.
-  Spec not yet written.
-
-### v0.20.0 — Containers
+### v0.19.0 — Containers
 
 - [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
   - One image, anywhere: `hi compute run --image` starts the same container
@@ -493,6 +472,27 @@ each type starts.
 
 Dependency: local GPU containers need the v0.1.0 workstation setup; image
 policy extends v0.11.0; project images extend the v0.16.0 templates.
+
+### v0.20.0 — Learn from agent-machine services
+
+- [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
+  Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
+  `hi compute` and `hi server`. Candidates from boxd:
+  - Checkpoints before risky changes, and forking a running machine into an
+    identical copy.
+  - Suspending idle machines and resuming them quickly, which pairs with the
+    idle GPU flag deferred from v0.13.0.
+  - An HTTPS URL for every machine or `serve`, instead of an SSH tunnel.
+  - Environment variables and secrets set once and injected into every
+    machine the user owns, never on Community Cloud (v0.12.2).
+  - Sharing a running machine with a teammate, recorded in the audit log.
+  - A live desktop view that a person can watch and take over from an agent.
+- [ ] Turn the ideas worth building into draft specs in `specs/ideas/`.
+  Started: [hi_compute_idle.md](specs/ideas/hi_compute_idle.md) has the
+  idle GPU flag and why suspend and resume doesn't fit the current
+  providers; [hi_compute_ssh_run.md](specs/ideas/hi_compute_ssh_run.md)
+  covers runs on RunPod, Shadeform, and managed providers.
+  Spec not yet written.
 
 ## Deferred until everything else is done
 
