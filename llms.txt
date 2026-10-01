@@ -1,0 +1,39 @@
+# hi
+
+> hi is a single-binary CLI for Hifin machines and projects: it rents remote GPUs
+> (Google Colab, Hugging Face Jobs, RunPod, Shadeform) with `hi compute`, starts
+> projects from templates with `hi init`, and sets up Ubuntu workstations with
+> `hi install`. These notes are for coding agents such as Codex and Claude Code.
+
+## Instructions for agents
+
+1. Check whether hi is installed: `hi version`. If it is not, install the CLI
+   only (no sudo, no system changes) with
+   `curl -fsSL https://hifin.sh/install.sh | sh`; the binary lands in
+   `~/.local/bin/hi`.
+2. Load the hi skill, which matches the installed version and holds the rules
+   you must follow. Print it with `hi skill --print`. To keep it for later
+   sessions, ask the user before running `hi skill --global` (every project)
+   or `hi skill` (this folder only).
+3. Follow the skill rather than this page. The short version of its rules:
+   ask before starting paid hardware and show the `--dry-run` plan first;
+   always set `--max`; stop what you start and check `hi compute ls`; pass
+   credentials with `--secret`, never `--env`; never approve your own requests
+   on a hi server; and ask before `hi install`, `hi adduser`, `hi net`, or
+   `hi update`, which change the machine.
+4. Run `hi help`, `hi compute help`, or `hi init --help` for the exact options.
+
+## Guide
+
+- [Your first remote GPU](https://hifin.sh/guide/quickstart/): sign in, run a script, stop it
+- [Let your coding agent use a GPU](https://hifin.sh/guide/examples/agent/): what to ask an agent, and what it does
+- [Agent skill](https://hifin.sh/guide/reference/skill/): what `hi skill` writes and where
+- [All commands](https://hifin.sh/guide/reference/commands/): every command and option
+- [Start a project](https://hifin.sh/guide/projects/): `hi init` templates, `--update`, and `--adopt`
+- [Troubleshooting](https://hifin.sh/guide/reference/troubleshooting/): messages and what to do
+
+## Optional
+
+- [Install hi](https://hifin.sh/guide/install/): installer options and updating
+- [Managed compute for a team](https://hifin.sh/guide/compute/managed/): requests and approvals through a hi server
+- [Source](https://github.com/hifinab/cli)

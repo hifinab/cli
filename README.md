@@ -262,6 +262,10 @@ read. Claude Code reads only `.claude/skills`, so `hi skill` makes that a
 relative symlink to the same folder. Commit both so the whole team's agents
 get it, and rerun `hi skill` after updating `hi` to refresh it.
 
+Using Codex or another agent? Run `hi skill --global` once per machine. An
+agent that doesn't have `hi` yet can start from <https://hifin.sh/llms.txt>,
+which tells it to install `hi` and follow the skill.
+
 ## Workstation setup
 
 `hi install` currently requires Ubuntu 26.04. It offers these tools, each
@@ -311,5 +315,6 @@ in each binary, so script changes ship with the next release.
 ## Website
 
 GitHub Pages serves the repository root at <https://hifin.sh>. `index.html` is
-the landing page and `install.sh` is the CLI installer; both go live when
+the landing page, `install.sh` is the CLI installer, and `llms.txt` points
+coding agents to the skill; all go live when
 pushed to `main`, without a release.

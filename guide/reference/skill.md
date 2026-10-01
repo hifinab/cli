@@ -16,6 +16,11 @@ hi skill --print    # show it without writing anything
 hi skill --force    # replace a hi skill that hi did not write
 ```
 
+Using Codex or another agent on a new machine? Run `hi skill --global` once,
+and every session there can load the skill. An agent that doesn't have `hi`
+yet can start from [hifin.sh/llms.txt](/llms.txt), which tells it to install
+`hi` and follow this skill.
+
 ## Where the files go
 
 | Path                          | What                                    | Read by                              |
