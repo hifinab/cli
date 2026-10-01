@@ -345,19 +345,17 @@ Dependency: extends the v0.6.0 and v0.7.0 driver interface.
 - [x] Install and remove named tools without a terminal with
   `hi install <tool>...`, `hi install --all`, and `hi uninstall <tool>...`.
 
-## Planned
-
 ### v0.16.0 — Project bootstrap
 
-- [ ] Add built-in templates under `templates/`, embedded in `hi`: a hidden
+- [x] Add built-in templates under `templates/`, embedded in `hi`: a hidden
   `base` layer (agent instructions, `make check`, CI, secret scanning), and
   the well-known `python` (uv, ruff, pyrefly, pytest) and `web` (React and
   TypeScript on Vite, npm, Biome, Vitest) templates.
-- [ ] Add `hi init`, guided and direct, with `--list`, `--dry-run`, `--yes`,
+- [x] Add `hi init`, guided and direct, with `--list`, `--dry-run`, `--yes`,
   `--no-setup`, and `--github`, recording what it generated in
   `.hifin/template.json`.
-- [ ] Read a local source from `HI_TEMPLATES_DIR` for template authors.
-- [ ] CI generates every built-in template, runs its `make check`, and
+- [x] Read a local source from `HI_TEMPLATES_DIR` for template authors.
+- [x] CI generates every built-in template, runs its `make check`, and
   rejects internal names under `templates/`.
   Draft spec revision: [hi_init.md](specs/approved/hi_init.md).
 
@@ -366,18 +364,20 @@ firm-specific or quant-related goes in the built-in templates.
 
 ### v0.17.0 — Firm templates through `hi server`
 
-- [ ] Give the server an ed25519 key, store it on devices at `hi connect`,
+- [x] Give the server an ed25519 key, store it on devices at `hi connect`,
   and sign template bundles with it.
-- [ ] Add `hi server templates add|remove|list|sync`: mirror a private
+- [x] Add `hi server templates add|remove|list|sync`: mirror a private
   repository with a read-only token, check every commit, fetch every 15
   minutes, and log and alert on changes.
-- [ ] Serve the catalog and signed bundles to enrolled devices, limited per
+- [x] Serve the catalog and signed bundles to enrolled devices, limited per
   group by `template_sources` in policy.
-- [ ] List and generate server templates in `hi init`, cached per commit,
+- [x] List and generate server templates in `hi init`, cached per commit,
   with server layers extending built-in ones.
-- [ ] Move the quant work into the private `hifinab/templates`: the
+- [x] Move the quant work into the private `hifinab/templates`: the
   `research` template with its backtest guards, and the firm skills
-  (`time-series-validity`, `backtest-evaluation`, `firm-data`).
+  `time-series-validity` and `backtest-evaluation`. Layers can `remove`
+  files they inherit.
+- [ ] The `firm-data` skill, once the firm's data access is decided.
 - [ ] Verify live on the firm's server with `hifinab/templates`.
   Approved spec: [hi_server.md](specs/approved/hi_server.md#template-sources);
   draft spec revision: [hi_init.md](specs/approved/hi_init.md).
@@ -385,6 +385,8 @@ firm-specific or quant-related goes in the built-in templates.
 Dependency: the v0.16.0 layers and metadata; the firm's open decisions
 (backtest engine, data access, scheduling) are tracked in
 `hifinab/templates`.
+
+## Planned
 
 ### v0.18.0 — Templates that keep up
 
