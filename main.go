@@ -112,8 +112,8 @@ Usage:
                                 Sign in to a compute provider
   hi connect <server>           Join a hi server that approves and pays for compute
   hi disconnect                 Leave it; hi compute uses your own keys again
-  hi server                     Run the server that brokers compute for a team
-  hi init [<template> <dir>]    Start a project from a template (python, web)
+  hi server                     Run the server that brokers compute and serves templates for a team
+  hi init [<template> <dir>]    Start a project from a template (python, web, service, pipeline, ml)
   hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
   hi update [--check]           Update hi to the latest release

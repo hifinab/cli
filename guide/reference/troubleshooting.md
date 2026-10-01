@@ -79,7 +79,12 @@ what to do next.
 | `warning: no server templates from …`, then `cached`        | The server is unreachable; the last templates this device fetched still work. |
 | `… are not signed by this server's key`                     | Nothing from that bundle was used. Tell an admin; if the server was replaced on purpose, `hi disconnect` and `hi connect` again. |
 | `the server … has a different key than when this device connected` | Same as above.                                       |
-| `make check` fails right after `hi init`                    | Run the setup first: `uv sync` or `npm ci`. `hi init --no-setup` skips it. |
+| `make check` fails right after `hi init`                    | Run the setup first: `uv sync`, `npm ci`, or `make sync` in `ml`. `hi init --no-setup` skips it. |
+| `… has no .hifin/template.json`                             | `hi init --update` works only on projects `hi init` made. Use `hi init --adopt <template>` first. |
+| `… were edited by hand and left alone`                      | Make the change in the template, or rerun `hi init --update --force` to overwrite them. |
+| `… conflict with the template; nothing was written`         | `--adopt` found files `hi` would own, or `Makefile` targets it would add. Move them aside, or pass `--force`. |
+| `… uses layers from …, which this device can't reach`       | Run `hi connect status`: private layers need the server. In CI, `--check` without `--strict` skips them. |
+| `… made with hi …, newer than this hi`                      | `hi update`, then run it again.                              |
 
 For admins, `hi server templates list` shows each source's commit, last fetch,
 and any problem. `git fetch: no answer within 2m0s` means GitHub was slow or

@@ -36,6 +36,7 @@ description: The environment variables hi reads and the files it writes.
 | `~/.config/hi/server.json`, `~/.config/hi/device_key` | The hi server this device joined, its stored key, and this device's private key (`hi connect`) |
 | `~/.cache/hi/templates/<source>/<commit>/`  | Server templates, cached after their signature was checked; deleted by `hi disconnect` |
 | `.hifin/template.json` (in a project)       | What `hi init` generated: template, versions or commits, and file hashes; no paths or names |
+| `docs/upgrades/<version>.md` (in a project) | From `hi init --update`: template changes to the project's own files, for an agent to apply; delete it afterward |
 
 ## Files hi reads from other tools
 

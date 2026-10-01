@@ -1802,7 +1802,8 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 func printServerUsage(w io.Writer) {
 	fmt.Fprintln(w, `hi server brokers compute for connected devices: it holds the provider keys,
-and nothing starts without an approval.
+and nothing starts without an approval. It also serves the team's private
+project templates to hi init.
 
 Usage:
   hi server init [--listen ADDR]          Create the server's state here

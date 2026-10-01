@@ -39,7 +39,7 @@ hi net             Securely enroll this machine with NetBird
 hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
-hi init            Start a project from a template (python, web, and your server's own)
+hi init            Start a project from a template (python, web, service, pipeline, ml, and your server's own)
 hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
 hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute

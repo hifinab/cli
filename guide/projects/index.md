@@ -68,8 +68,10 @@ they still work when the server can't be reached.
 | `--name <name>`         | Project name; by default the directory's name               |
 | `--dry-run`             | Print the plan and stop                                     |
 | `--yes`                 | Do not ask for confirmation                                 |
-| `--no-setup`            | Write the files but run no setup command (`uv sync`, `npm ci`) |
+| `--no-setup`            | Write the files but run no setup command (`uv sync`, `npm ci`, or `make sync` in `ml`) |
 | `--github <owner/repo>` | Also create a private GitHub repository and push the first commit |
+| `--force`               | With `--update` or `--adopt`: overwrite files `hi` owns even when edited by hand |
+| `--strict`              | With `--check`: fail when private layers can't be checked   |
 
 Project names use lowercase letters, digits, and dashes, starting with a
 letter. In `python`, `pricing-tools` becomes the package `pricing_tools`.
@@ -123,6 +125,10 @@ project is behind the templates or has conflicts. Add it to CI:
 CI can't reach your team's `hi server`, so there it checks only what came
 from the built-in templates and says which private layers it skipped.
 `--strict` makes that an error, for a check on a connected machine.
+
+When an admin renames a private template source, `--update` notices that the
+recorded source is gone, uses the renamed one with the same layers, and
+records its new name.
 
 ## Adopt an existing repository
 
