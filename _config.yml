@@ -15,6 +15,7 @@ exclude:
   - go.mod
   - go.sum
   - skills/
+  - templates/
   - scripts/compute/
   - vendor/
 defaults:

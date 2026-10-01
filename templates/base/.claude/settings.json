@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "allow": ["Bash(make check)", "Bash(make fix)", "Bash(make test)"],
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(./secrets/**)"]
+  }
+}

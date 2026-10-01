@@ -1,1 +1,4 @@
 .env
+templates/*/node_modules/
+templates/*/.venv/
+templates/*/dist/

@@ -1,0 +1,10 @@
+{
+  "name": "python",
+  "summary": "Python library or scripts (uv, ruff, pyrefly, pytest)",
+  "extends": "base",
+  "schema": 1,
+  "commands": {
+    "setup": [["uv", "sync"]],
+    "check": [["make", "check"]]
+  }
+}

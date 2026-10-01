@@ -1,0 +1,19 @@
+{
+  "name": "base",
+  "summary": "Shared by every template",
+  "hidden": true,
+  "schema": 1,
+  "params": {
+    "name": {"pattern": "^[a-z][a-z0-9-]*$"}
+  },
+  "substitute": {
+    "hifin-template-name": "{{name}}",
+    "hifin_template_name": "{{name_snake}}",
+    "Hifin Template Name": "{{name_title}}"
+  },
+  "files": {
+    "owned": ["CLAUDE.md", ".claude/settings.json", ".pre-commit-config.yaml", ".github/workflows/check.yml"],
+    "managed": ["AGENTS.md", ".gitignore", "Makefile"]
+  },
+  "skills": ["hi"]
+}

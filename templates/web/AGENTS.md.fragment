@@ -1,0 +1,7 @@
+
+## Web
+
+- Use npm: `npm install <package>` (`--save-dev` for tools), and commit
+  `package-lock.json`. `npm run dev` starts the dev server.
+- Code lives in `src/`, with tests next to the code as `*.test.tsx`.
+- Keep quant and data logic in a Python service, not in the browser.

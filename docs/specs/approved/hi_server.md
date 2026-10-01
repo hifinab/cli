@@ -25,6 +25,9 @@ and stop anything that runs amok, all from Slack.
 - Management is opt-in. A `hi` that has never run `hi connect` works exactly
   as it does today, with the user's own keys on their own machines. Colab is
   never managed.
+- The server is also where connected devices get the firm's private project
+  templates and agent skills, so firm knowledge never has to be public or
+  handed out as repository access (see [Template sources](#template-sources)).
 
 ## Design choice: broker, don't distribute
 
@@ -365,6 +368,85 @@ session:
 Users can also see their own part with `hi compute live`, which is the same
 screen limited to their own instances, requests, and budget.
 
+## Template sources
+
+`hi` ships generic project templates (`python`, `web`) built in
+([hi_init.md](hi_init.md)). The firm's own templates and skills, such as
+quant research layouts, backtest guards, and the `firm-data` skill, must not
+be public. The server distributes them, in the same way it brokers provider
+keys: it holds the repository access, and enrolled devices ask it for what
+they need.
+
+### Adding a source
+
+```text
+hi server templates add firm https://github.com/hifinab/templates [--ref main]
+```
+
+- `<name>` is how devices and `.hifin/template.json` refer to the source. It
+  must not be `builtin` or `local`.
+- For an `https://` URL the server asks for a read-only token (a GitHub
+  fine-grained token limited to that one repository, with contents read
+  access), showing `*` per character like `hi server provider add`. The token
+  is stored in `keys.json` next to the provider keys and never leaves the
+  server box. An `ssh://` or `git@` URL uses the server account's own SSH key
+  instead, for example a GitHub deploy key.
+- `--ref` is a branch or tag; the default is the repository's default branch.
+- Before saving, the server clones the repository into
+  `templates/<name>.git` in its state folder and checks it: each
+  `<layer>/layer.json` must be valid, layer names must not reuse built-in
+  names, and every skill must have a `SKILL.md`. A source that fails is not
+  added, and the errors are printed.
+
+### Keeping it current
+
+- The server fetches each source every 15 minutes, and at once with
+  `hi server templates sync [<name>]`. A new commit on the ref becomes the
+  source's current commit only if it passes the same checks; otherwise the
+  previous commit stays current and the channel gets an alert.
+- Every change of current commit is written to the audit log with the old
+  and new commit and the layers and skills it contains.
+- The mirror keeps history, so the server can serve any commit it has served
+  before. That lets `hi init --update` compare a repository's recorded commit
+  with the current one.
+- `hi server templates list` shows each source, its URL, ref, current commit,
+  last fetch, and layers and skills. `hi server templates remove <name>`
+  stops serving it and deletes the mirror and its token.
+
+### Serving devices
+
+Two calls on the signed client API, for enrolled user devices only (viewer
+devices get nothing):
+
+- `GET /v1/templates`: each source the user's group may see, with its current
+  commit, layers (name, summary, extends, required `hi`), and skills.
+- `GET /v1/templates/<source>/<commit>`: the source at that commit as a
+  `tar.gz` archive (`git archive`), with the server's signature over the
+  source name, commit, and archive digest.
+
+`hi init` on the device uses these as described in
+[hi_init.md](hi_init.md#server-templates-on-the-device). A group's access is
+set in policy with `template_sources`; with no such field the group sees
+every source.
+
+### Why the server signs
+
+Templates run commands on the device (`uv sync`, `npm ci`) and put code and
+agent instructions into new repositories, so a device must know they came
+from its own server. The client API is plain HTTP inside NetBird and so far
+only the device signs. For templates the server signs too:
+
+- `hi server init` creates a server ed25519 key in the state folder. An
+  existing server creates it on first start after the upgrade.
+- `hi connect` receives the server's public key in the enrollment answer and
+  stores it in `server.json`. A device enrolled before this release receives
+  it on its next call and prints the fingerprint once.
+- The device refuses a bundle whose signature does not match the stored key.
+
+Whoever can change the source repository can change what every new
+repository gets. That is the same trust as any shared code; the audit log
+and the commit shown in every `hi init` plan make it visible.
+
 ## Workflows
 
 ### 1. Admin sets up the server (once)
@@ -377,6 +459,8 @@ hi server slack setup               # prints the app manifest to install,
                                     # asks for the bot and app tokens,
                                     # picks #compute-approvals and approvers
 hi server policy edit               # groups, limits, auto-approve rules
+hi server templates add firm https://github.com/hifinab/templates
+                                    # optional: the firm's private templates
 sudo systemctl enable --now hi-server
 ```
 
@@ -508,7 +592,8 @@ limited.
     "students": {
       "max_hours": 4,
       "hardware": ["l4", "rtx-4090", "rtx-a5000", "a40"],
-      "user_monthly_budget_usd": 25
+      "user_monthly_budget_usd": 25,
+      "template_sources": []
     }
   },
   "reports": { "daily": true, "weekly": true, "monthly": true }
@@ -523,6 +608,8 @@ limited.
   The channel gets one alert per user or group per month when a budget is
   crossed. The user also sees the spend in `hi connect status` and
   `hi compute ls`.
+- `template_sources` lists the template sources a group's devices may see
+  and use. An empty list hides them all; a missing field allows every source.
 - `auto_approve` approves a start or extension within its price and total
   hours, when the user and group are within budget. The message says
   `approved by policy (staff: up to $1.00/h and 2h)` and keeps its Stop
@@ -552,6 +639,10 @@ limited.
 - If Slack is down, requests wait. Anything auto-approved still starts, and
   the reconciler keeps enforcing limits. Admins can approve and stop from the
   server box with `hi server approve` and `hi server stop`.
+- Template source tokens stay in `keys.json` on the server, like provider
+  keys. Devices receive templates, never repository access, and every
+  template bundle is signed with the server key that the device stored at
+  `hi connect`.
 - The server does not control personal provider accounts, and doesn't try
   to. Someone with their own RunPod account can still use it on a device that
   has not joined the server. The server governs the organization's accounts
@@ -585,6 +676,8 @@ hi server audit [--since 7d]
 hi server viewer add|remove|list <name> [--key k]
 hi server wall setup [--session s] [--size WxH]
 hi server wall add|remove|list <screen> [<ssh-pubkey>] [--session s]
+hi server templates add <name> <git-url> [--ref <ref>]
+hi server templates remove|list|sync [<name>]
 ```
 
 Approver devices and wall displays:
@@ -617,7 +710,10 @@ Slack: the `/hi` commands, App Home, and channel buttons above.
    metrics come last, provider by provider.
 5. **App Home dashboard.** Now, Waiting, This month, and Devices, plus the
    per-user view and direct messages for linked users.
-6. **More providers.** Hugging Face Jobs, then the providers on the roadmap.
+6. **Template sources.** The server key and signed answers, `hi server
+   templates`, the two template calls, `template_sources` in policy, and
+   server templates in `hi init`.
+7. **More providers.** Hugging Face Jobs, then the providers on the roadmap.
    Colab is never managed (see
    [Managed and unmanaged](#managed-and-unmanaged)).
 
@@ -636,7 +732,8 @@ Every phase keeps the never-connected behaviour unchanged, and the existing
 3. HTTPS for the client API inside the VPN: use an internal certificate
    authority, or rely on WireGuard encryption and signed requests. With no web
    page, only `hi` clients connect, so signed requests over WireGuard may be
-   enough.
+   enough. Template bundles are signed by the server either way (see
+   [Why the server signs](#why-the-server-signs)).
 4. Whether students' reasons and usage should be visible to approvers only, or
    to the student's supervisor as well, for example by a direct message to the
    supervisor.
@@ -694,3 +791,10 @@ Every phase keeps the never-connected behaviour unchanged, and the existing
 18. Colab never goes through the server, and nothing about Colab runtimes or
     own-key instances is sent to it, whether or not the device is connected.
 19. After `hi disconnect`, the device behaves as if it had never connected.
+20. A source's token is never sent to a device, Slack, or the audit log.
+21. A new commit that fails the source checks does not replace the current
+    commit, and the channel is alerted.
+22. A device whose group's `template_sources` excludes a source neither sees
+    it in the catalog nor can download it.
+23. A device refuses a template bundle not signed by the server key it stored
+    at `hi connect`.
