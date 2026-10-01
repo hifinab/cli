@@ -39,9 +39,11 @@ plan, or `--yes` to skip the question (for agents and scripts).
 `hi init --list` shows them. `python` needs `uv`, and `web` needs Node.js
 with npm; `hi install` sets up both.
 
-These built-in templates are public and generic. The firm's own templates,
-such as quant research, will come from the firm's `hi server` to connected
-devices.
+These built-in templates are public and generic. On a device connected to
+the firm's `hi server` (`hi connect`), `hi init --list` also shows the firm's
+own templates, such as `research`, with the source and commit they come
+from. `hi` checks that they are signed by the server and keeps a copy, so
+they still work when the server can't be reached.
 
 ## Options
 

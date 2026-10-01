@@ -28,10 +28,10 @@ type templateCatalog struct {
 	skills map[string]fs.FS // source name → its skills/ folder
 }
 
-// loadTemplateCatalog reads the built-in templates and, for template
-// authors, a local source from HI_TEMPLATES_DIR. Server sources come in
-// v0.17.0.
-func loadTemplateCatalog() (*templateCatalog, error) {
+// loadTemplateCatalog reads the built-in templates, a local source from
+// HI_TEMPLATES_DIR for template authors, and on a connected device the
+// server's sources.
+func loadTemplateCatalog(stderr io.Writer) (*templateCatalog, error) {
 	layers, err := builtinTemplateLayers()
 	if err != nil {
 		return nil, err
@@ -59,7 +59,39 @@ func loadTemplateCatalog() (*templateCatalog, error) {
 		}
 		catalog.skills["local"] = skills
 	}
+	catalog.addServerSources(loadServerTemplateSources(stderr), stderr)
 	return catalog, nil
+}
+
+// addServerSources registers each server source's layers. Built-in names
+// stay built-in; a name two sources share is chosen as source/name.
+func (c *templateCatalog) addServerSources(sources []serverTemplateSource, stderr io.Writer) {
+	all := map[string][]*templateLayer{}
+	for _, source := range sources {
+		layers, err := loadTemplateSource(source.name, source.files)
+		if err != nil {
+			fmt.Fprintf(stderr, "hi: warning: skipping the %s templates: %v\n", source.name, err)
+			continue
+		}
+		for name, layer := range layers {
+			layer.commit, layer.cached = source.commit, source.cached
+			all[name] = append(all[name], layer)
+		}
+		if skills, err := fs.Sub(source.files, "skills"); err == nil {
+			c.skills[source.name] = skills
+		}
+	}
+	for name, layers := range all {
+		if _, builtin := c.layers[name]; builtin {
+			continue
+		}
+		for _, layer := range layers {
+			if len(layers) > 1 {
+				layer.key = layer.source + "/" + name
+			}
+			c.layers[layer.key] = layer
+		}
+	}
 }
 
 // choosable returns the templates a person may pick, sorted by name.
@@ -70,8 +102,21 @@ func (c *templateCatalog) choosable() []*templateLayer {
 			list = append(list, layer)
 		}
 	}
-	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
+	sort.Slice(list, func(i, j int) bool { return list[i].key < list[j].key })
 	return list
+}
+
+// label names a layer's source and version for plans and lists.
+func (layer *templateLayer) label() string {
+	switch {
+	case layer.source == "builtin":
+		return "hi " + version
+	case layer.commit != "" && layer.cached:
+		return layer.source + " " + shortCommit(layer.commit) + ", cached"
+	case layer.commit != "":
+		return layer.source + " " + shortCommit(layer.commit)
+	}
+	return layer.source
 }
 
 // tooOld says which hi a layer needs when this one is older.
@@ -280,6 +325,7 @@ type templateMetadataSource struct {
 	Name    string `json:"name,omitempty"`
 	Source  string `json:"source"`
 	Version string `json:"version,omitempty"`
+	Commit  string `json:"commit,omitempty"`
 }
 
 type templateMetadataHash struct {
@@ -290,11 +336,17 @@ type templateMetadataHash struct {
 // templateMetadata records what generated the repository. It holds names,
 // versions, and hashes only: no paths, users, hosts, or secrets.
 func templateMetadata(composed *composedTemplate, entries []initEntry, skillSources map[string]string, name string) ([]byte, error) {
-	sourceVersion := func(source string) string {
-		if source == "builtin" {
-			return "hi " + version
+	commits := map[string]string{}
+	for _, layer := range composed.Layers {
+		if layer.commit != "" {
+			commits[layer.source] = layer.commit
 		}
-		return ""
+	}
+	record := func(name, source string) templateMetadataSource {
+		if source == "builtin" {
+			return templateMetadataSource{Name: name, Source: source, Version: "hi " + version}
+		}
+		return templateMetadataSource{Name: name, Source: source, Commit: commits[source]}
 	}
 	metadata := templateMetadataFile{
 		Template:    composed.Name,
@@ -305,10 +357,10 @@ func templateMetadata(composed *composedTemplate, entries []initEntry, skillSour
 	}
 	for _, layer := range composed.Layers {
 		metadata.Schema = max(metadata.Schema, layer.Schema)
-		metadata.Layers = append(metadata.Layers, templateMetadataSource{Name: layer.Name, Source: layer.source, Version: sourceVersion(layer.source)})
+		metadata.Layers = append(metadata.Layers, record(layer.Name, layer.source))
 	}
 	for skill, source := range skillSources {
-		metadata.Skills[skill] = templateMetadataSource{Source: source, Version: sourceVersion(source)}
+		metadata.Skills[skill] = record("", source)
 	}
 	for _, entry := range entries {
 		if entry.link != "" {
@@ -422,7 +474,7 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	catalog, err := loadTemplateCatalog()
+	catalog, err := loadTemplateCatalog(stderr)
 	if err != nil {
 		return exitCode(err, stderr)
 	}
@@ -482,11 +534,11 @@ func guidedInit(ui menuUI, catalog *templateCatalog, request *initRequest) error
 	templates := catalog.choosable()
 	width := 0
 	for _, layer := range templates {
-		width = max(width, len(layer.Name))
+		width = max(width, len(layer.key))
 	}
 	labels := make([]string, len(templates))
 	for i, layer := range templates {
-		labels[i] = fmt.Sprintf("%-*s  %s", width, layer.Name, layer.Summary)
+		labels[i] = fmt.Sprintf("%-*s  %s", width, layer.key, layer.Summary)
 		if layer.source != "builtin" {
 			labels[i] += "  (" + layer.source + ")"
 		}
@@ -495,7 +547,7 @@ func guidedInit(ui menuUI, catalog *templateCatalog, request *initRequest) error
 	if err != nil {
 		return errMenuBack
 	}
-	request.template = templates[choice].Name
+	request.template = templates[choice].key
 	pattern := projectNamePattern(catalog, request.template)
 	if request.name == "" {
 		request.name, err = ui.input("Project name", "", func(answer string) error {
@@ -566,6 +618,12 @@ func executeInit(catalog *templateCatalog, request initRequest, yes, dryRun bool
 		}
 	}
 
+	for _, layer := range plan.template.Layers {
+		if layer.commit != "" {
+			reportTemplateUse(request.template)
+			break
+		}
+	}
 	fmt.Fprintf(stdout, "\nCreated %s from the %s template (%d files).\n", plan.target, request.template, len(changes))
 	fmt.Fprintln(stdout, "Next:")
 	if relative, err := filepath.Rel(mustGetwd(), plan.target); err == nil && relative != "." {
@@ -586,13 +644,7 @@ func executeInit(catalog *templateCatalog, request initRequest, yes, dryRun bool
 func printInitPlan(plan *initPlan, stdout io.Writer) {
 	var layers []string
 	for _, layer := range plan.template.Layers {
-		label := layer.Name
-		if layer.source == "builtin" {
-			label += " (hi " + version + ")"
-		} else {
-			label += " (" + layer.source + ")"
-		}
-		layers = append(layers, label)
+		layers = append(layers, layer.Name+" ("+layer.label()+")")
 	}
 	where := "existing directory"
 	if plan.newTarget {
@@ -667,7 +719,7 @@ func printTemplateList(catalog *templateCatalog, stdout io.Writer) {
 		if required := layer.tooOld(); required != "" {
 			summary += " (needs hi " + required + ")"
 		}
-		fmt.Fprintf(table, "%s\t%s\t%s\n", layer.Name, layer.source, summary)
+		fmt.Fprintf(table, "%s\t%s\t%s\n", layer.key, layer.label(), summary)
 	}
 	table.Flush()
 }

@@ -68,6 +68,9 @@ type serverState struct {
 	Leases   map[string]*serverLease   `json:"leases"`
 	// Alerts records budget alerts already sent, per month.
 	Alerts map[string]bool `json:"alerts,omitempty"`
+	// TemplateSources are the repositories of templates and skills served
+	// to devices (server_templates.go).
+	TemplateSources map[string]*templateSource `json:"template_sources,omitempty"`
 	// Reported records the last period each Slack report covered.
 	Reported map[string]string `json:"reported,omitempty"`
 }
@@ -169,6 +172,10 @@ type hiServer struct {
 	slack *slackBridge
 	// feed is recent activity for the live dashboard.
 	feed liveFeed
+	// serverKey signs what devices must trust, such as template bundles.
+	serverKey ed25519.PrivateKey
+	// templateMu serializes git work on the template mirrors.
+	templateMu sync.Mutex
 }
 
 func serverDirectory(flagValue string) (string, error) {
@@ -252,6 +259,12 @@ func openServer(dir string, log io.Writer) (*hiServer, error) {
 	}
 	if server.state.Leases == nil {
 		server.state.Leases = map[string]*serverLease{}
+	}
+	if server.state.TemplateSources == nil {
+		server.state.TemplateSources = map[string]*templateSource{}
+	}
+	if server.serverKey, err = loadServerKey(dir); err != nil {
+		return nil, err
 	}
 	if data, err := os.ReadFile(filepath.Join(dir, "keys.json")); err == nil {
 		if err := json.Unmarshal(data, &server.keys); err != nil {
@@ -443,6 +456,9 @@ type apiMe struct {
 	// Budget is this month's spend against the user's and group's budgets.
 	Budget     string `json:"budget,omitempty"`
 	OverBudget bool   `json:"over_budget,omitempty"`
+	// ServerKey is the server's public signing key, which devices store at
+	// the first connection and check template bundles against.
+	ServerKey string `json:"server_key,omitempty"`
 }
 
 type apiHardware struct {
@@ -513,6 +529,8 @@ func (s *hiServer) clientHandler() http.Handler {
 	mux.HandleFunc("GET /v1/live", s.device(s.handleLive))
 	mux.HandleFunc("POST /v1/activity", s.device(s.handleActivity))
 	mux.HandleFunc("POST /v1/slack-link", s.device(s.handleSlackLink))
+	mux.HandleFunc("GET /v1/templates", s.device(s.handleTemplateCatalog))
+	mux.HandleFunc("GET /v1/templates/{source}/{commit}", s.device(s.handleTemplateBundle))
 	return mux
 }
 
@@ -619,7 +637,8 @@ func (s *hiServer) handleMe(w http.ResponseWriter, _ *http.Request, device serve
 	policy := s.policy()
 	s.mu.Lock()
 	user := s.state.Users[device.User]
-	me := apiMe{User: user.Name, Group: user.Group, Device: device.Fingerprint}
+	me := apiMe{User: user.Name, Group: user.Group, Device: device.Fingerprint,
+		ServerKey: base64.StdEncoding.EncodeToString(s.serverKey.Public().(ed25519.PublicKey))}
 	if budget := s.budgetLocked(policy, user.Name, computeNow()); budget.IsSet || budget.UserSpend > 0 {
 		me.Budget, me.OverBudget = budget.text(), budget.over()
 	}
@@ -1352,6 +1371,7 @@ func (s *hiServer) reconcile() {
 
 func (s *hiServer) adminHandler() http.Handler {
 	mux := http.NewServeMux()
+	s.templateAdminRoutes(mux)
 	mux.HandleFunc("GET /admin/requests", func(w http.ResponseWriter, r *http.Request) {
 		all := r.URL.Query().Get("all") == "1"
 		s.mu.Lock()
@@ -1686,7 +1706,10 @@ func (s *hiServer) serve(ctx context.Context, listen string) error {
 
 	ticker := time.NewTicker(serverReconcileEvery)
 	defer ticker.Stop()
+	templates := time.NewTicker(templateSyncEvery)
+	defer templates.Stop()
 	s.reconcile()
+	s.syncTemplatesInBackground()
 	for {
 		select {
 		case <-ctx.Done():
@@ -1698,6 +1721,8 @@ func (s *hiServer) serve(ctx context.Context, listen string) error {
 			return nil
 		case <-ticker.C:
 			s.reconcile()
+		case <-templates.C:
+			s.syncTemplatesInBackground()
 		}
 	}
 }
@@ -1766,6 +1791,8 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(serverLiveCommand(rest, stdin, stdout, stderr), stderr)
 	case "wall":
 		return exitCode(serverWallCommand(rest, stdout, stderr), stderr)
+	case "templates":
+		return exitCode(serverTemplatesCommand(rest, stdin, stdout, stderr), stderr)
 	default:
 		fmt.Fprintf(stderr, "hi: unknown server command %q\n\n", command)
 		printServerUsage(stderr)
@@ -1803,6 +1830,9 @@ Usage:
   hi server live [--wall]                 Live dashboard; --wall is read-only for a shared screen
   hi server wall setup|add|remove|list    Show the wall dashboard on screens over SSH (needs sudo)
   hi server viewer add <name> --key K     A device that may only watch the dashboard
+  hi server templates add <name> <git-url> [--ref R]
+                                          Serve a private repository's templates and skills
+  hi server templates list|sync|remove    Show, fetch now, or stop serving template sources
 
 Commands other than init and run talk to the running server through its
 admin socket, so they work only on the server box. Decisions are recorded

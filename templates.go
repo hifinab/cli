@@ -37,8 +37,17 @@ type templateLayer struct {
 	Files      templateFileClasses      `json:"files"`
 	Skills     []string                 `json:"skills"`
 	Commands   map[string][][]string    `json:"commands"`
-	source     string
-	files      fs.FS
+	// Remove drops files that earlier layers wrote, such as their examples.
+	Remove []string `json:"remove"`
+	source string
+	files  fs.FS
+	// key is the name to choose it by: the layer's name, or source/name
+	// when two server sources use the same name.
+	key string
+	// commit is a server source's commit; cached marks one read from the
+	// cache because the server was unreachable.
+	commit string
+	cached bool
 }
 
 type templateParam struct {
@@ -86,7 +95,7 @@ func loadTemplateSource(source string, files fs.FS) (map[string]*templateLayer, 
 		if layer.Name != entry.Name() {
 			return nil, fmt.Errorf("%s: %s/%s names the layer %q", source, entry.Name(), layerManifestName, layer.Name)
 		}
-		layer.source = source
+		layer.source, layer.key = source, layer.Name
 		layer.files, err = fs.Sub(files, entry.Name())
 		if err != nil {
 			return nil, err
@@ -121,7 +130,12 @@ func layerChain(layers map[string]*templateLayer, name string) ([]*templateLayer
 		}
 		seen[current] = true
 		chain = append([]*templateLayer{layer}, chain...)
+		// A parent in the layer's own source wins over one with the same
+		// name elsewhere.
 		current = layer.Extends
+		if _, ok := layers[layer.source+"/"+current]; ok && current != "" {
+			current = layer.source + "/" + current
+		}
 	}
 	return chain, nil
 }
@@ -160,6 +174,12 @@ func composeTemplate(layers map[string]*templateLayer, name string, params map[s
 		result.Skills = append(result.Skills, layer.Skills...)
 		for command, args := range layer.Commands {
 			result.Commands[command] = args
+		}
+		for _, removed := range layer.Remove {
+			if _, ok := result.Files[removed]; !ok {
+				return nil, fmt.Errorf("%s removes %s, which no earlier layer writes", layer.Name, removed)
+			}
+			delete(result.Files, removed)
 		}
 		err := fs.WalkDir(layer.files, ".", func(name string, entry fs.DirEntry, err error) error {
 			if err != nil {

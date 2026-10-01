@@ -36,6 +36,9 @@ type groupPolicy struct {
 	// UserMonthlyBudget and GroupMonthlyBudget are in US dollars.
 	UserMonthlyBudget  float64 `json:"user_monthly_budget_usd,omitempty"`
 	GroupMonthlyBudget float64 `json:"group_monthly_budget_usd,omitempty"`
+	// TemplateSources, when set, are the only template sources the group's
+	// devices see; an empty list hides them all.
+	TemplateSources *[]string `json:"template_sources,omitempty"`
 }
 
 type autoApprove struct {

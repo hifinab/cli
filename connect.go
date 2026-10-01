@@ -30,6 +30,8 @@ type serverConnection struct {
 	User      string        `json:"user"`
 	Group     string        `json:"group,omitempty"`
 	Providers []apiProvider `json:"providers,omitempty"`
+	// ServerKey is the server's public key, stored at the first connection.
+	ServerKey string `json:"server_key,omitempty"`
 }
 
 func hiConfigDirectory() string {
@@ -212,10 +214,15 @@ func connectCommand(args []string, stdout, stderr io.Writer) error {
 	if !validServerName(*user) {
 		return usageError{fmt.Sprintf("invalid user name %q; use lowercase letters, digits, dots, or hyphens", *user)}
 	}
-	if existing, err := loadServerConnection(); err != nil {
+	existing, err := loadServerConnection()
+	if err != nil {
 		return err
 	} else if existing != nil && existing.URL != url {
 		return fmt.Errorf("this device is connected to %s; run `hi disconnect` first", existing.URL)
+	}
+	serverKey := ""
+	if existing != nil {
+		serverKey = existing.ServerKey
 	}
 	key, err := loadDeviceKey(true)
 	if err != nil {
@@ -235,7 +242,7 @@ func connectCommand(args []string, stdout, stderr io.Writer) error {
 	if err := client.call(http.MethodPost, "/v1/enroll", enroll, &request); err != nil {
 		return err
 	}
-	if err := saveServerConnection(serverConnection{URL: url, User: *user}); err != nil {
+	if err := saveServerConnection(serverConnection{URL: url, User: *user, ServerKey: serverKey}); err != nil {
 		return err
 	}
 	if request.State == "pending" {
@@ -272,7 +279,15 @@ func refreshConnection(client *serverClient, user string, stdout io.Writer) erro
 	if err != nil {
 		return err
 	}
-	if err := saveServerConnection(serverConnection{URL: client.url, User: me.User, Group: me.Group, Providers: me.Providers}); err != nil {
+	connection := serverConnection{URL: client.url}
+	if existing, err := loadServerConnection(); err == nil && existing != nil && existing.URL == client.url {
+		connection.ServerKey = existing.ServerKey
+	}
+	if err := pinServerKey(&connection, me, stdout); err != nil {
+		return err
+	}
+	connection.User, connection.Group, connection.Providers = me.User, me.Group, me.Providers
+	if err := saveServerConnection(connection); err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "Connected to %s as %s (%s).\n", client.url, me.User, me.Group)
@@ -349,6 +364,9 @@ func runDisconnect(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Not connected to a hi server.")
 		return 0
 	}
+	// Server templates go with the connection; repositories made from them
+	// keep their files.
+	os.RemoveAll(templateCacheDirectory())
 	for _, path := range []string{serverConnectionPath(), deviceKeyPath()} {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return exitCode(err, stderr)

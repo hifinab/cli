@@ -164,6 +164,8 @@ needs no extra parser.
   The `hi` skill is always the one `hi skill` writes.
 - `commands` are argument lists, shown in the plan; never shell strings. A
   later layer's commands replace an earlier layer's.
+- `remove` drops files an earlier layer wrote, such as the `python` layer's
+  example code that a `research` layer replaces.
 - A layer that needs a newer `hi` than the device has is listed with the
   version to update to and cannot be chosen.
 

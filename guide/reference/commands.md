@@ -104,6 +104,8 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server live [--wall] [--names full] [--reasons]` | Live dashboard; `--wall` is read-only               |
 | `sudo hi server wall setup\|add\|remove\|list`       | Show the wall on screens over SSH                    |
 | `hi server viewer add <name> --key <k>`             | A device that may only watch                         |
+| `hi server templates add <name> <git-url> [--ref <r>]` | Serve a private repository's templates and skills |
+| `hi server templates list\|sync\|remove [<name>]`    | Show, fetch now, or stop serving template sources  |
 
 ## hi login
 

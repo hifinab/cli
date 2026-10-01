@@ -9,7 +9,18 @@ import (
 	"testing"
 )
 
+// runInitIn runs hi init as a device that never connected to a server.
 func runInitIn(t *testing.T, directory, input string, args ...string) (int, string, string) {
+	t.Helper()
+	isolated := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(isolated, "config"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(isolated, "cache"))
+	return runInitConnected(t, directory, input, args...)
+}
+
+// runInitConnected runs hi init with whatever server connection the test
+// set up.
+func runInitConnected(t *testing.T, directory, input string, args ...string) (int, string, string) {
 	t.Helper()
 	t.Chdir(directory)
 	var stdout, stderr bytes.Buffer
@@ -123,7 +134,7 @@ func TestInitRefusesBadInput(t *testing.T) {
 func TestInitUsesALocalSourceOnTopOfBuiltinLayers(t *testing.T) {
 	source := t.TempDir()
 	files := map[string]string{
-		"quant/layer.json":                  `{"name": "quant", "summary": "Test layer", "extends": "python", "schema": 1, "skills": ["checks"]}`,
+		"quant/layer.json":                  `{"name": "quant", "summary": "Test layer", "extends": "python", "schema": 1, "skills": ["checks"], "remove": ["tests/test_greet.py"]}`,
 		"quant/notes.md":                    "# Hifin Template Name notes\n",
 		"quant/.gitignore.fragment":         "results-cache/\n",
 		"skills/checks/SKILL.md":            "---\nname: checks\ndescription: Test skill\n---\n\nRun the checks.\n",
@@ -147,6 +158,9 @@ func TestInitUsesALocalSourceOnTopOfBuiltinLayers(t *testing.T) {
 	project := filepath.Join(parent, "alpha")
 	if got := readTestFile(t, filepath.Join(project, "notes.md")); got != "# Alpha notes\n" {
 		t.Errorf("notes.md = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(project, "tests/test_greet.py")); err == nil {
+		t.Error("the removed example test was written")
 	}
 	if !strings.Contains(readTestFile(t, filepath.Join(project, ".gitignore")), "results-cache/") {
 		t.Error("the local layer's ignore rules are missing")

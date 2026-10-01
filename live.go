@@ -283,6 +283,15 @@ func (s *hiServer) handleActivity(w http.ResponseWriter, _ *http.Request, device
 	}
 	switch input.Command {
 	case "ssh", "tunnel", "logs", "serve":
+	case "init":
+		// A project made from a server template: the template's name only.
+		if !validServerName(strings.ReplaceAll(input.Instance, "/", "-")) {
+			writeAPIError(w, http.StatusBadRequest, "malformed template name")
+			return
+		}
+		s.feed.add(liveEvent{Time: computeNow(), Text: fmt.Sprintf("%s started a project from %s", device.User, input.Instance), User: device.User})
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
 	default:
 		writeAPIError(w, http.StatusBadRequest, "unknown activity")
 		return
