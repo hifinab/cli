@@ -100,7 +100,7 @@ func update(requested string, check bool, stdout io.Writer) error {
 // the API (60 unauthenticated calls an hour per address); the API is the
 // fallback.
 func latestRelease() (string, error) {
-	if tag, err := latestReleaseFromRedirect(); err == nil {
+	if tag, err := latestReleaseFromRedirect(30 * time.Second); err == nil {
 		return tag, nil
 	}
 	var release struct {
@@ -117,8 +117,8 @@ func latestRelease() (string, error) {
 	return release.TagName, nil
 }
 
-func latestReleaseFromRedirect() (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func latestReleaseFromRedirect(timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	url := fmt.Sprintf("%s/%s/releases/latest", updateDownloadBase, updateRepository)
 	request, err := http.NewRequestWithContext(ctx, http.MethodHead, url, nil)

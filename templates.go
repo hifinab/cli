@@ -68,6 +68,9 @@ type composedTemplate struct {
 	Managed  []string
 	Skills   []string
 	Commands map[string][][]string
+	// Origins names the source of the last layer that wrote or added to
+	// each file.
+	Origins map[string]string
 }
 
 // loadTemplateSource reads every layer in a source: each top-level folder
@@ -151,7 +154,8 @@ func composeTemplate(layers map[string]*templateLayer, name string, params map[s
 	if chain[len(chain)-1].Hidden {
 		return nil, fmt.Errorf("%q is a shared layer, not a template", name)
 	}
-	result := &composedTemplate{Name: name, Layers: chain, Files: map[string][]byte{}, Commands: map[string][][]string{}}
+	result := &composedTemplate{Name: name, Layers: chain, Files: map[string][]byte{}, Commands: map[string][][]string{},
+		Origins: map[string]string{}}
 	substitute := map[string]string{}
 	for _, layer := range chain {
 		for key, param := range layer.Params {
@@ -180,6 +184,7 @@ func composeTemplate(layers map[string]*templateLayer, name string, params map[s
 				return nil, fmt.Errorf("%s removes %s, which no earlier layer writes", layer.Name, removed)
 			}
 			delete(result.Files, removed)
+			delete(result.Origins, removed)
 		}
 		err := fs.WalkDir(layer.files, ".", func(name string, entry fs.DirEntry, err error) error {
 			if err != nil {
@@ -198,11 +203,14 @@ func composeTemplate(layers map[string]*templateLayer, name string, params map[s
 			if err != nil {
 				return err
 			}
-			if target, ok := strings.CutSuffix(name, fragmentSuffix); ok {
+			target, fragment := strings.CutSuffix(name, fragmentSuffix)
+			if fragment {
 				result.Files[target] = insertFragment(result.Files[target], data)
 			} else {
-				result.Files[name] = data
+				target = name
+				result.Files[target] = data
 			}
+			result.Origins[target] = layer.source
 			return nil
 		})
 		if err != nil {
@@ -222,13 +230,15 @@ func composeTemplate(layers map[string]*templateLayer, name string, params map[s
 	}
 	replacer := strings.NewReplacer(pairs...)
 	files := make(map[string][]byte, len(result.Files))
+	origins := make(map[string]string, len(result.Origins))
 	for name, data := range result.Files {
 		if isTextFile(data) {
 			data = []byte(replacer.Replace(string(data)))
 		}
 		files[replacer.Replace(name)] = data
+		origins[replacer.Replace(name)] = result.Origins[name]
 	}
-	result.Files = files
+	result.Files, result.Origins = files, origins
 	result.Skills = uniqueStrings(result.Skills)
 	return result, nil
 }

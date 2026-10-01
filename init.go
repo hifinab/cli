@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 const templateMetadataPath = ".hifin/template.json"
@@ -140,6 +141,7 @@ type initEntry struct {
 	data   []byte
 	link   string // a symlink target instead of data
 	class  string // owned, managed, seeded; empty for metadata
+	source string // the source of the layer that wrote it
 	exists bool   // already there with the same content
 }
 
@@ -185,32 +187,13 @@ func planInit(catalog *templateCatalog, templateName, name, directory string, se
 		return nil, fmt.Errorf("%s exists and is not a directory", target)
 	}
 
-	classes := map[string]string{}
-	for _, owned := range composed.Owned {
-		classes[owned] = "owned"
-	}
-	for _, managed := range composed.Managed {
-		classes[managed] = "managed"
-	}
-	paths := make([]string, 0, len(composed.Files))
-	for file := range composed.Files {
-		paths = append(paths, file)
-	}
-	sort.Strings(paths)
-	for _, file := range paths {
-		class := classes[file]
-		if class == "" {
-			class = "seeded"
-		}
-		plan.entries = append(plan.entries, initEntry{path: file, data: composed.Files[file], class: class})
-	}
-	skills, skillSources, err := planSkills(catalog, composed)
+	entries, skillSources, err := templateEntries(catalog, composed)
 	if err != nil {
 		return nil, err
 	}
-	plan.entries = append(plan.entries, skills...)
+	plan.entries = entries
 
-	metadata, err := templateMetadata(composed, plan.entries, skillSources, name)
+	metadata, err := templateMetadata(composed, plan.entries, skillSources, name, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -244,6 +227,36 @@ func planInit(catalog *templateCatalog, templateName, name, directory string, se
 	return plan, nil
 }
 
+// templateEntries lists a composed template's files with their classes,
+// then its skills.
+func templateEntries(catalog *templateCatalog, composed *composedTemplate) ([]initEntry, map[string]string, error) {
+	classes := map[string]string{}
+	for _, owned := range composed.Owned {
+		classes[owned] = "owned"
+	}
+	for _, managed := range composed.Managed {
+		classes[managed] = "managed"
+	}
+	paths := make([]string, 0, len(composed.Files))
+	for file := range composed.Files {
+		paths = append(paths, file)
+	}
+	sort.Strings(paths)
+	var entries []initEntry
+	for _, file := range paths {
+		class := classes[file]
+		if class == "" {
+			class = "seeded"
+		}
+		entries = append(entries, initEntry{path: file, data: composed.Files[file], class: class, source: composed.Origins[file]})
+	}
+	skills, skillSources, err := planSkills(catalog, composed)
+	if err != nil {
+		return nil, nil, err
+	}
+	return append(entries, skills...), skillSources, nil
+}
+
 // planSkills copies each skill into .agents/skills and links it for Claude
 // Code, which reads only .claude/skills. The links are per skill, as
 // `hi skill` writes them.
@@ -254,7 +267,7 @@ func planSkills(catalog *templateCatalog, composed *composedTemplate) ([]initEnt
 		folder := path.Join(".agents/skills", skill)
 		sources[skill] = "builtin"
 		if skill == "hi" {
-			entries = append(entries, initEntry{path: folder + "/SKILL.md", data: skillContent(), class: "owned"})
+			entries = append(entries, initEntry{path: folder + "/SKILL.md", data: skillContent(), class: "owned", source: "builtin"})
 		} else {
 			files, source := findSkill(catalog, composed, skill)
 			if files == nil {
@@ -271,7 +284,7 @@ func planSkills(catalog *templateCatalog, composed *composedTemplate) ([]initEnt
 				if name == "SKILL.md" {
 					data = markSkill(data, source)
 				}
-				entries = append(entries, initEntry{path: path.Join(folder, name), data: data, class: "owned"})
+				entries = append(entries, initEntry{path: path.Join(folder, name), data: data, class: "owned", source: source})
 				return nil
 			})
 			if err != nil {
@@ -331,11 +344,15 @@ type templateMetadataSource struct {
 type templateMetadataHash struct {
 	Class  string `json:"class"`
 	SHA256 string `json:"sha256"`
+	// Source is where the file came from, so a check without the server
+	// can skip what came from it.
+	Source string `json:"source,omitempty"`
 }
 
 // templateMetadata records what generated the repository. It holds names,
-// versions, and hashes only: no paths, users, hosts, or secrets.
-func templateMetadata(composed *composedTemplate, entries []initEntry, skillSources map[string]string, name string) ([]byte, error) {
+// versions, and hashes only: no paths, users, hosts, or secrets. keep holds
+// earlier records to carry over unchanged, such as files left in conflict.
+func templateMetadata(composed *composedTemplate, entries []initEntry, skillSources map[string]string, name string, keep map[string]templateMetadataHash) ([]byte, error) {
 	commits := map[string]string{}
 	for _, layer := range composed.Layers {
 		if layer.commit != "" {
@@ -366,15 +383,29 @@ func templateMetadata(composed *composedTemplate, entries []initEntry, skillSour
 		if entry.link != "" {
 			continue
 		}
-		data := entry.data
-		if entry.class == "managed" {
-			data = managedBlock(data)
+		if kept, ok := keep[entry.path]; ok {
+			metadata.Files[entry.path] = kept
+			continue
 		}
-		sum := sha256.Sum256(data)
-		metadata.Files[entry.path] = templateMetadataHash{Class: entry.class, SHA256: hex.EncodeToString(sum[:])}
+		metadata.Files[entry.path] = templateMetadataHash{Class: entry.class, SHA256: entryHash(entry), Source: entry.source}
 	}
 	data, err := json.MarshalIndent(metadata, "", "  ")
 	return append(data, '\n'), err
+}
+
+// entryHash is what the metadata records for a file: its whole content, or
+// for a managed file only its block.
+func entryHash(entry initEntry) string {
+	data := entry.data
+	if entry.class == "managed" {
+		data = managedBlock(data)
+	}
+	return sha256Hex(data)
+}
+
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 // managedBlock returns the lines from hi:begin to hi:end, the part hi may
@@ -436,7 +467,40 @@ func insideGitRepository(target string) bool {
 // ---------------------------------------------------------------------------
 // the command
 
+// startReleaseCheck looks for a newer hi in the background, since newer
+// built-in templates come with it. The answer is used only if it arrives
+// by the time hi init is done.
+func startReleaseCheck() func() string {
+	if !releaseTagPattern.MatchString(version) {
+		return func() string { return "" }
+	}
+	newer := make(chan string, 1)
+	go func() {
+		if tag, err := latestReleaseFromRedirect(3 * time.Second); err == nil && olderRelease(version, tag) {
+			newer <- tag
+		}
+		close(newer)
+	}()
+	return func() string {
+		select {
+		case tag := <-newer:
+			return tag
+		case <-time.After(time.Second):
+			return ""
+		}
+	}
+}
+
 func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	newer := startReleaseCheck()
+	code := runInitCommand(args, stdin, stdout, stderr)
+	if tag := newer(); tag != "" {
+		fmt.Fprintf(stderr, "hi %s is out, with the latest built-in templates; run `hi update`.\n", tag)
+	}
+	return code
+}
+
+func runInitCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("hi init", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	name := flags.String("name", "", "project name")
@@ -445,8 +509,11 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	noSetup := flags.Bool("no-setup", false, "write the files but run no setup commands")
 	github := flags.String("github", "", "also create this private GitHub repository and push")
 	list := flags.Bool("list", false, "list the templates")
-	update := flags.Bool("update", false, "")
-	adopt := flags.String("adopt", "", "")
+	update := flags.Bool("update", false, "bring this repository up to the current templates")
+	check := flags.Bool("check", false, "with --update: change nothing; fail when the repository is behind")
+	strict := flags.Bool("strict", false, "with --check: fail when private layers can't be checked")
+	force := flags.Bool("force", false, "overwrite files hi owns even when they were edited by hand")
+	adopt := flags.String("adopt", "", "bring this existing repository under a template")
 	positional, err := (&flagSet{flags}).parse(args)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -461,9 +528,27 @@ func runInit(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		printInitUsage(stdout)
 		return 0
 	}
-	if *update || *adopt != "" {
-		fmt.Fprintln(stderr, "hi: hi init --update and --adopt are planned for hi v0.18.0")
-		return 1
+	if (*update || *check) && *adopt != "" {
+		fmt.Fprintln(stderr, "hi: choose --update or --adopt, not both")
+		return 2
+	}
+	if *update || *check || *adopt != "" {
+		if len(positional) > 1 {
+			printInitUsage(stderr)
+			return 2
+		}
+		directory := "."
+		if len(positional) == 1 {
+			directory = positional[0]
+		}
+		catalog, err := loadTemplateCatalog(stderr)
+		if err != nil {
+			return exitCode(err, stderr)
+		}
+		if *adopt != "" {
+			return exitCode(executeAdopt(catalog, *adopt, *name, directory, *force, *yes, *dryRun, stdin, stdout, stderr), stderr)
+		}
+		return exitCode(executeUpdate(catalog, directory, *check, *strict, *force, *yes, *dryRun, stdin, stdout, stderr), stderr)
 	}
 	if len(positional) > 2 {
 		printInitUsage(stderr)
@@ -740,11 +825,17 @@ func printInitUsage(w io.Writer) {
   hi init                         choose a template, name, and directory
   hi init <template> [directory]  create a project, for example hi init python pricing-tools
   hi init --list                  list the templates
+  hi init --update [directory]    bring a repository up to the current templates
+  hi init --update --check        change nothing; fail when it is behind (for CI)
+  hi init --adopt <template> [directory]
+                                  bring an existing repository under a template
 
 options:
   --name <name>          project name (default: the directory's name)
   --yes                  do not ask for confirmation (for agents and CI)
   --dry-run              print the plan and stop
   --no-setup             write the files but run no setup commands
-  --github <owner/repo>  also create a private GitHub repository and push`)
+  --github <owner/repo>  also create a private GitHub repository and push
+  --strict               with --check: fail when private layers can't be checked
+  --force                overwrite files hi owns even when edited by hand`)
 }
