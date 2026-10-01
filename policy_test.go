@@ -85,6 +85,7 @@ func TestPolicyRefusesWhatAGroupMayNeverDo(t *testing.T) {
 }
 
 // spent records an instance that already ran, so the user has spent money.
+// Keep runs short: a run that began last month counts only its part in this one.
 func (ts *testServer) spent(user string, hours float64, rate string) {
 	now := time.Now()
 	id := newServerID("r")
@@ -97,7 +98,7 @@ func TestOverBudgetWarnsButDoesNotBlock(t *testing.T) {
 	fake := withSlack(t, ts)
 	writePolicy(t, ts, testPolicy)
 	ts.connectAs(t, "alice", "staff")
-	ts.spent("alice", 20, "$0.60/h") // $12 of a $10 budget
+	ts.spent("alice", 0.1, "$120.00/h") // $12 of a $10 budget
 
 	code, stdout, stderr := runHi("compute", "up", "--on", "runpod", "--gpu", "l4", "--name", "more", "--max", "1h",
 		"--reason", "x", "--yes", "--no-wait")
@@ -215,8 +216,8 @@ func TestReportsAndSlashCommandsForSpend(t *testing.T) {
 	writePolicy(t, ts, testPolicy)
 	ts.server.state.Users["alice"] = &serverUser{Name: "alice", Group: "staff"}
 	ts.server.state.Users["sam"] = &serverUser{Name: "sam", Group: "students"}
-	ts.spent("alice", 2, "$1.00/h")
-	ts.spent("sam", 1, "$0.50/h")
+	ts.spent("alice", 0.1, "$20.00/h")
+	ts.spent("sam", 0.1, "$5.00/h")
 
 	now := time.Now()
 	report := ts.server.report("weekly", now.Add(time.Hour))
