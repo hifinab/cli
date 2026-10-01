@@ -447,22 +447,7 @@ each type starts.
 
 ## Planned
 
-### v0.19.0 — Focused machine operations
-
-- [ ] Read and change the machine hostname independently of installation.
-  Approved spec: [hi_hostname.md](specs/approved/hi_hostname.md).
-- [ ] Inspect users and login history; manage accounts, groups, and sudo access.
-  Approved spec: [hi_user.md](specs/approved/hi_user.md).
-- [ ] Install `hi` and the AI and developer tools for all users, including
-  accounts created later. Review the caveats before starting.
-  Approved spec: [hi_install_shared.md](specs/approved/hi_install_shared.md).
-- [ ] Offer the per-user or all-users choice in the v0.15.0 install menu.
-
-Dependency: shared tools no longer update themselves, so they rely on
-rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
-`hi` also changes how `hi update` replaces the binary.
-
-### v0.20.0 — Learn from agent-machine services
+### v0.19.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -479,7 +464,7 @@ rerunning `hi install` or on `hi update` (v0.7.1) to stay current. A shared
 - [ ] Turn the ideas worth building into draft specs in `specs/ideas/`.
   Spec not yet written.
 
-### v0.21.0 — Containers
+### v0.20.0 — Containers
 
 - [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
   - One image, anywhere: `hi compute run --image` starts the same container

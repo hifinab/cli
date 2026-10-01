@@ -25,6 +25,3 @@ so a new user runs the installer once to get `hi` and the compute tools:
 ```sh
 curl -fsSL https://hifin.sh/install.sh | sh
 ```
-
-Installing everything for all users at once is on the
-[roadmap](https://github.com/hifinab/cli/blob/main/docs/roadmap.md).
