@@ -507,13 +507,25 @@ each type starts.
 
 ## Planned
 
-### v0.21.0 — `hi q`: more backends and project notes
+### v0.21.0 — A team model through `hi server`
+
+- [ ] `hi server ai set|off|remove` stores the team's OpenRouter key on the
+  server, and connected devices and agents use it through a signed
+  pass-through endpoint, with any model and the server's default first.
+- [ ] `hi q` uses the connected server without setup, lists it first in
+  `hi q --setup`, and falls back to a personal provider when the server
+  can't be used.
+- [ ] Usage per user, device, and model, without prompts, in `hi server ai`
+  and `hi server spend`.
+  Approved spec: [hi_server_ai.md](specs/approved/hi_server_ai.md).
+
+### v0.22.0 — `hi q`: more backends and project notes
 
 - [ ] Codex, local models (Ollama, `hi model serve`), and opencode.
 - [ ] Project notes in `.hifin/q.md`, used only after the user allows them
   once.
 
-### v0.22.0 — Containers
+### v0.23.0 — Containers
 
 - [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
   - One image, anywhere: `hi compute run --image` starts the same container
@@ -542,7 +554,7 @@ each type starts.
 Dependency: local GPU containers need the v0.1.0 workstation setup; image
 policy extends v0.11.0; project images extend the v0.16.0 templates.
 
-### v0.23.0 — Learn from agent-machine services
+### v0.24.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -563,7 +575,7 @@ policy extends v0.11.0; project images extend the v0.16.0 templates.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_sandbox.md](specs/ideas/hi_sandbox.md#services).
 
-### v0.24.0 — skills.sh
+### v0.25.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`

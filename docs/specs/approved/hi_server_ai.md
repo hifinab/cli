@@ -1,6 +1,6 @@
 # `hi server ai` specification
 
-Status: Draft (2026-10-02)
+Status: Approved (2026-10-02). Planned as v0.21.0.
 
 Dependencies: `hi server` and `hi connect` (device keys, users, audit,
 spend), and `hi q` v0.20.
@@ -25,6 +25,8 @@ What it gives a team:
 - **One bill**, with spend per user in `hi server spend`.
 - **Nothing to set up** on a connected device: `hi q` uses the server by
   itself.
+- **Agents too.** Agents enrolled with `hi connect --agent` use it like
+  people, and their requests are recorded under the agent and its owner.
 
 ## Commands
 
@@ -94,6 +96,22 @@ The team's server comes before personal keys on purpose: a team member with
 an old `OPENAI_API_KEY` in their shell uses the team's key unless they
 choose otherwise in `hi q --setup`.
 
+### When the server can't be used
+
+When the server can't be reached, answers with a 5xx, or no longer serves a
+model, `hi q` falls back to the next personal provider in the order above:
+`HI_Q_BASE_URL`, then `OPENAI_API_KEY`, `OPENROUTER_API_KEY`,
+`ANTHROPIC_API_KEY`, then Claude Code. It says so in one dim line, such as
+"vmhiserver can't be reached; using OPENROUTER_API_KEY", and remembers the
+failure for five minutes so later questions don't wait for the server
+again. This also applies when the server was saved by `hi q --setup`. With
+no personal provider, `hi q` fails with the server's error and suggests
+`hi q --setup`.
+
+Errors from the upstream that the server passes on, such as an unknown
+model or no credit, don't cause a fallback: they would happen with a
+personal key too, and falling back would hide them.
+
 ## Protocol
 
 Three device routes, signed with the device key like every other `/v1`
@@ -136,8 +154,8 @@ The server passes them on and keeps none of it:
 ## Records
 
 Usage goes to `ai_usage.jsonl` in the server's state folder, one line per
-request: time, user, device, model, prompt and completion tokens, cost, and
-status. `hi server ai` sums this month's per user; `hi server spend` adds
+request: time, user, device, agent (if any), model, prompt and completion
+tokens, cost, and status. `hi server ai` sums this month's per user; `hi server spend` adds
 it next to compute. The audit log gets `ai set`, `ai off`, and `ai remove`,
 but not each request.
 
@@ -156,17 +174,18 @@ but not each request.
   key (OpenRouter keys can have a spending limit) as the backstop.
 - An expensive model chosen by mistake costs more than expected. The cost
   is visible per user in `hi server spend`.
-- If the server is down, `hi q` stops working for people relying on it. A
-  personal key or Claude Code in `hi q --setup` is the fallback, and the
-  error says so.
-- A compromised device can use the key until it is removed. The usage
-  records show which device made each request.
+- If the server is down, `hi q` falls back to a personal key or Claude Code
+  when there is one, which changes who pays and where prompts go; the dim
+  line says so each time. Without one, it stops working until the server is
+  back.
+- A compromised device, or an agent that misbehaves, can use the key until
+  it is removed. The usage records show which device or agent made each
+  request.
 - Prompts pass through the team's server (see Privacy).
 
-## Open questions
+## Decisions
 
-1. Should agents enrolled with `hi connect --agent` get the endpoint too, or
-   only people at first?
-2. Should `hi q` fall back to a personal key automatically when the server
-   is unreachable, or fail and say so? Falling back is convenient but
-   silently changes who pays and where prompts go; the draft says fail.
+1. Agents enrolled with `hi connect --agent` may use the endpoint, recorded
+   under the agent and its owner.
+2. When the server can't be used, `hi q` falls back to a personal provider,
+   and fails only when there is none.
