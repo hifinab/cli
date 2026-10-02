@@ -516,8 +516,7 @@ each type starts.
 - [x] Usage per user, device, and model, without prompts, in `hi server ai`
   and `hi server spend`.
   Tested live against OpenRouter through a local server. The production
-  server runs v0.21.0 since 2026-10-02; the team key (`hi server ai set`)
-  is not stored there yet.
+  server runs v0.21.0 and serves the team's OpenRouter key since 2026-10-02.
   Approved spec: [hi_server_ai.md](specs/approved/hi_server_ai.md).
 
 ## Planned
