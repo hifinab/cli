@@ -47,6 +47,8 @@
   pages:
     - title: Ask for a command
       url: /guide/q/
+    - title: Run agents in a box
+      url: /guide/box/
 - section: Projects
   pages:
     - title: Start a project

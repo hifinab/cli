@@ -45,6 +45,7 @@ hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute
 hi disconnect               Leave it; hi compute uses your own keys again
 hi server          Run the server that brokers compute and serves templates for a team (hi server help)
+hi box claude      Run an agent, a shell, or a command in a rootless box (hi box help)
 hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
@@ -277,6 +278,26 @@ runs land in your history, and `cd` or `export` run in your shell. Each
 question carries a short, redacted context, which `hi q --context` shows.
 Commands that run are logged to `~/.local/state/hi/q/log.jsonl`, without
 their output.
+
+## Agent boxes
+
+`hi box` runs Claude Code or Codex without permission prompts in a rootless
+Podman container that holds the project, on a new git worktree, and nothing
+else from the home folder:
+
+```sh
+hi box claude "make the flaky test reliable"   # runs on its own; hi box attach follows it
+hi box codex                                   # interactive
+hi box shell                                   # or hi box run -- make test
+hi box diff myproject-1                        # what it changed, flagging files that run on the host
+```
+
+The box's only way out is hi's proxy, which allows the agents' own hosts and,
+by default, GitHub and package registries (`--network locked|dev|open`,
+`hi box allow`). Claude Code's token never enters the box: the proxy swaps a
+placeholder for it. Git hooks and config are read-only, `--gpu` passes the
+Strix Halo in, and `devcontainer.json`'s image, environment, and
+`postCreateCommand` are used, with hi's settings under `customizations.hi`.
 
 ## Agent skill
 

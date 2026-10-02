@@ -15,6 +15,7 @@ description: Every hi command and option in one place.
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
 | `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
 | `hi shell-init bash\|zsh`        | Shell integration for `hi q`                           |
+| `hi box …`                       | Run agents and commands in a rootless box; see below   |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
@@ -168,6 +169,24 @@ Options: `--provider server|openai|openrouter|anthropic|claude` and `--model <na
 for one question or chat, `--no-context` to send only the question, and
 `--yes` to run read-only commands without asking. Dangerous commands always
 need `yes` typed. See [Ask for a command](/guide/q/).
+
+## hi box
+
+| Command                              | Does                                                     |
+|--------------------------------------|----------------------------------------------------------|
+| `hi box claude\|codex [prompt]`      | An agent without permission prompts on a new worktree; with a prompt, in the background |
+| `hi box shell`                       | A shell in a box for this project                        |
+| `hi box run -- <command>`            | One command; exits with its status                       |
+| `hi box ls`                          | Boxes, state, branch, and changes                        |
+| `hi box attach <name>`               | Follow a background agent, or take over a box's terminal |
+| `hi box diff <name> [--full]`        | Commits and files, flagging files that run on the host   |
+| `hi box allow <name> [<domain>]`     | Allow a domain, or list what was refused                 |
+| `hi box stop\|rm <name> [--force]`   | Stop, or remove the box and its worktree                 |
+| `hi box token claude`                | Store a long-lived token from `claude setup-token`       |
+
+Options when starting: `--name`, `--network locked|dev|open`, `--allow
+<domain>`, `--gpu`, `--worktree`, `--here`, `--image`, and `--memory`. See
+[Run agents in a box](/guide/box/).
 
 ## hi skill
 
