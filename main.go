@@ -64,6 +64,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runSkill(args[1:], stdout, stderr)
 	case "q":
 		return runQ(args[1:], stdin, stdout, stderr)
+	case "shell-init":
+		return runShellInit(args[1:], stdout, stderr)
 	case "init":
 		return runInit(args[1:], stdin, stdout, stderr)
 	case "login":
@@ -117,7 +119,7 @@ Usage:
   hi server                     Run the server that brokers compute and serves templates for a team
   hi init [<template> <dir>]    Start a project from a template (python, web, service, pipeline, ml)
   hi q <what you want to do>    Ask an AI model for a shell command, then run, copy, or explain it
-  hi q --setup                  Choose the model hi q uses
+  hi q                          Chat with it; hi q --setup chooses the model and sets up the shell
   hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
   hi update [--check]           Update hi to the latest release

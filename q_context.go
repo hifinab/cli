@@ -42,7 +42,9 @@ type qContext struct {
 	listing []string
 	total   int
 	history []string
+	status  int
 	tools   []string
+	screen  string
 	piped   string
 }
 
@@ -56,7 +58,16 @@ func gatherQContext(piped string) qContext {
 	c.folder, _ = os.Getwd()
 	c.git = qGitSummary()
 	c.listing, c.total = qListing(".")
-	c.history = qRecentHistory(c.shell, qHistoryLines)
+	c.status = -1
+	if link := currentQShellLink(); link != nil {
+		if lines, status, ok := link.history(); ok {
+			c.history, c.status = qCleanHistory(lines, qHistoryLines), status
+		}
+	}
+	if c.history == nil {
+		c.history = qRecentHistory(c.shell, qHistoryLines)
+	}
+	c.screen = qTmuxScreen()
 	for _, tool := range qContextTools {
 		if _, err := exec.LookPath(tool); err == nil {
 			c.tools = append(c.tools, tool)
@@ -94,6 +105,13 @@ func (c qContext) render() string {
 		for _, line := range c.history {
 			fmt.Fprintf(&b, "  %s\n", line)
 		}
+	}
+	if c.status > 0 {
+		fmt.Fprintf(&b, "the last command exited with status %d\n", c.status)
+	}
+	if c.screen != "" {
+		b.WriteString("recent terminal output (tmux):\n")
+		b.WriteString(c.screen + "\n")
 	}
 	if c.piped != "" {
 		b.WriteString("piped input:\n")
@@ -196,8 +214,8 @@ func qListing(folder string) ([]string, int) {
 }
 
 // qRecentHistory reads the end of the shell's history file. A separate
-// process can't see the history the shell holds in memory, so this can lag
-// until shell integration (v0.20.0) writes it on each prompt.
+// process can't see the history the shell holds in memory, so without the
+// shell integration this lags behind the current session.
 func qRecentHistory(shell string, count int) []string {
 	path := os.Getenv("HISTFILE")
 	if path == "" {
@@ -238,8 +256,18 @@ func qRecentHistory(shell string, count int) []string {
 		case strings.HasPrefix(line, "  when: ") || strings.HasPrefix(line, "  paths:"):
 			continue
 		}
+		lines = append(lines, line)
+	}
+	return qCleanHistory(lines, count)
+}
+
+// qCleanHistory drops hi q's own lines and anything that mentions a
+// password or secret, redacts the rest, and keeps the last count.
+func qCleanHistory(raw []string, count int) []string {
+	var lines []string
+	for _, line := range raw {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "hi q") {
+		if line == "" || strings.HasPrefix(line, "hi q") || strings.HasPrefix(line, "q ") || line == "q" {
 			continue
 		}
 		lower := strings.ToLower(line)
@@ -252,6 +280,35 @@ func qRecentHistory(shell string, count int) []string {
 		lines = lines[len(lines)-count:]
 	}
 	return lines
+}
+
+// qTmuxScreen returns the last 100 lines of the tmux pane hi runs in, so
+// the model sees the output the user is asking about. Outside tmux there is
+// no way to read it, and the user pipes it in instead.
+func qTmuxScreen() string {
+	if os.Getenv("TMUX") == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), qProbeTimeout)
+	defer cancel()
+	args := []string{"capture-pane", "-p", "-J", "-S", "-100"}
+	if pane := os.Getenv("TMUX_PANE"); pane != "" {
+		args = append(args, "-t", pane)
+	}
+	output, err := exec.CommandContext(ctx, "tmux", args...).Output()
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimRight(string(output), "\n "), "\n")
+	// The last line is the hi q command itself.
+	if len(lines) > 0 {
+		lines = lines[:len(lines)-1]
+	}
+	text := strings.TrimSpace(strings.Join(lines, "\n"))
+	if len(text) > qPipeLimit/4 {
+		text = "[... cut ...]\n" + text[len(text)-qPipeLimit/4:]
+	}
+	return redactQText(text)
 }
 
 // readQPipe keeps the start and end of piped input, where the command and

@@ -20,6 +20,9 @@ description: The environment variables hi reads and the files it writes.
 | `OPENROUTER_API_KEY`    | `hi q`: OpenRouter                                                |
 | `ANTHROPIC_API_KEY`     | `hi q`: the Anthropic API                                         |
 | `SHELL`, `HISTFILE`     | `hi q`: the shell that runs commands, and its history file        |
+| `HI_Q_STATE`, `HI_Q_SHELL`, `HI_Q_PID` | Set by the shell integration; `hi q` trusts the state file only inside `~/.local/state/hi/q/` |
+| `TMUX`, `TMUX_PANE`     | `hi q`: inside tmux, the pane's last 100 lines are context        |
+| `VISUAL`, `EDITOR`      | `hi q`: the editor behind `e`                                     |
 | `HI_TEMPLATES_DIR`      | `hi init`: a folder of extra template layers, for template authors |
 | `HI_INSTALL_DIR`        | Installer: where to put `hi`                                      |
 | `HI_VERSION`            | Installer: which release to install                               |
@@ -41,6 +44,9 @@ description: The environment variables hi reads and the files it writes.
 | `~/.config/hi/server.json`, `~/.config/hi/device_key` | The hi server this device joined, its stored key, and this device's private key (`hi connect`) |
 | `~/.config/hi/q.json`, `~/.config/hi/q-key` | The model chosen with `hi q --setup`, and its key (mode 0600) |
 | `~/.local/state/hi/q/log.jsonl`             | Commands `hi q` ran: time, folder, prompt, class, exit status; no output |
+| `~/.local/state/hi/q/last.json`             | The last conversation, for `hi q -c`; mode 0600       |
+| `~/.local/state/hi/q/shell-<pid>`           | With shell integration: that shell's last 30 commands and exit status, and commands handed between it and `hi q`; removed after the shell exits |
+| `~/.bashrc`, `~/.zshrc`                     | Two lines for the shell integration, added by `hi q --setup` after asking |
 | `~/.cache/hi/templates/<source>/<commit>/`  | Server templates, cached after their signature was checked; deleted by `hi disconnect` |
 | `.hifin/template.json` (in a project)       | What `hi init` generated: template, versions or commits, and file hashes; no paths or names |
 | `docs/upgrades/<version>.md` (in a project) | From `hi init --update`: template changes to the project's own files, for an agent to apply; delete it afterward |

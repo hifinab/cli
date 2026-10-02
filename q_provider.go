@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -35,40 +36,96 @@ type qReply struct {
 	Answer  string `json:"answer,omitempty"`
 }
 
-// qProvider sends one request to a model. Release 1 has no tool loop, so a
-// request is the system prompt and one user message.
+// qToolCall is a request from the model to run one of hi's tools.
+type qToolCall struct {
+	ID   string          `json:"id"`
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args"`
+}
+
+// qTurn is one entry of a conversation: the user's words, the model's text
+// or tool calls, or the result of one tool call.
+type qTurn struct {
+	Role   string      `json:"role"` // user, assistant, or tool
+	Text   string      `json:"text,omitempty"`
+	Calls  []qToolCall `json:"calls,omitempty"`
+	CallID string      `json:"call_id,omitempty"`
+	Tool   string      `json:"tool,omitempty"`
+}
+
+// qStep is what a model did with a conversation: replied, or asked for
+// tools. A command arrives as a propose call, kept in proposal.
+type qStep struct {
+	reply    qReply
+	proposal qToolCall
+	calls    []qToolCall
+}
+
+// qProvider takes one step of a conversation. lookup offers the read-only
+// tools as well as propose.
 type qProvider interface {
 	label() string
-	ask(ctx context.Context, system, user string) (qReply, error)
+	step(ctx context.Context, system string, turns []qTurn, lookup bool) (qStep, error)
 }
 
-// qProposeDescription and qProposeSchema describe the one tool API backends
-// get: propose a command. A plain text reply is an answer.
-const qProposeDescription = "Propose one shell command (or a short script) for the user to confirm and run. Use this whenever the user wants something done."
+// qAskOnce sends one message with no lookup tools, for setup checks and
+// explanations.
+func qAskOnce(ctx context.Context, provider qProvider, system, user string) (qReply, error) {
+	step, err := provider.step(ctx, system, []qTurn{{Role: "user", Text: user}}, false)
+	return step.reply, err
+}
 
-var qProposeSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"command": map[string]any{"type": "string", "description": "The exact command to run in the user's shell."},
-		"reason":  map[string]any{"type": "string", "description": "One short sentence saying what it does."},
-		"risk": map[string]any{"type": "string", "enum": []string{"read-only", "changes", "dangerous"},
-			"description": "read-only if it changes nothing; dangerous if it deletes data, needs root, or is hard to undo."},
+// qToolSpec describes a tool to the model.
+type qToolSpec struct {
+	name        string
+	description string
+	schema      map[string]any
+}
+
+var qProposeSpec = qToolSpec{
+	name:        "propose",
+	description: "Propose one shell command (or a short script) for the user to confirm and run. Use this whenever the user wants something done. This ends your turn.",
+	schema: map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"command": map[string]any{"type": "string", "description": "The exact command to run in the user's shell."},
+			"reason":  map[string]any{"type": "string", "description": "One short sentence saying what it does."},
+			"risk": map[string]any{"type": "string", "enum": []string{"read-only", "changes", "dangerous"},
+				"description": "read-only if it changes nothing; dangerous if it deletes data, needs root, or is hard to undo."},
+		},
+		"required": []string{"command", "reason", "risk"},
 	},
-	"required": []string{"command", "reason", "risk"},
 }
 
-// qReplySchema is the structured output asked of agent CLIs, which can't
-// take custom tools.
-var qReplySchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"kind":    map[string]any{"type": "string", "enum": []string{"command", "answer"}},
+func qTools(lookup bool) []qToolSpec {
+	if !lookup {
+		return []qToolSpec{qProposeSpec}
+	}
+	return append([]qToolSpec{qProposeSpec}, qLookupTools...)
+}
+
+// qStepSchema is the structured output asked of agent CLIs, which can't
+// take custom tools: one reply or one tool call per step.
+func qStepSchema(lookup bool) map[string]any {
+	kinds := []string{"command", "answer"}
+	properties := map[string]any{
+		"kind":    nil,
 		"command": map[string]any{"type": "string"},
 		"reason":  map[string]any{"type": "string"},
 		"risk":    map[string]any{"type": "string", "enum": []string{"read-only", "changes", "dangerous"}},
 		"answer":  map[string]any{"type": "string"},
-	},
-	"required": []string{"kind"},
+	}
+	if lookup {
+		kinds = append(kinds, "tool")
+		var names []string
+		for _, tool := range qLookupTools {
+			names = append(names, tool.name)
+		}
+		properties["tool"] = map[string]any{"type": "string", "enum": names}
+		properties["args"] = map[string]any{"type": "object"}
+	}
+	properties["kind"] = map[string]any{"type": "string", "enum": kinds}
+	return map[string]any{"type": "object", "properties": properties, "required": []string{"kind"}}
 }
 
 func (r qReply) valid() error {
@@ -87,6 +144,65 @@ func (r qReply) valid() error {
 	return nil
 }
 
+// qStepFromCalls turns tool calls into a step: a propose call wins, since
+// it ends the turn.
+func qStepFromCalls(calls []qToolCall, text string) (qStep, error) {
+	for _, call := range calls {
+		if call.Name != "propose" {
+			continue
+		}
+		var reply qReply
+		if err := json.Unmarshal(call.Args, &reply); err != nil {
+			return qStep{}, fmt.Errorf("the model's command could not be read: %w", err)
+		}
+		reply.Kind = "command"
+		return qStep{reply: reply, proposal: call}, reply.valid()
+	}
+	if len(calls) > 0 {
+		return qStep{calls: calls}, nil
+	}
+	reply, err := qTextReply(text)
+	return qStep{reply: reply}, err
+}
+
+var qCallCounter struct {
+	sync.Mutex
+	n int
+}
+
+func qNewCallID() string {
+	qCallCounter.Lock()
+	defer qCallCounter.Unlock()
+	qCallCounter.n++
+	return fmt.Sprintf("call_hi_%d_%d", time.Now().UnixNano()%1e6, qCallCounter.n)
+}
+
+// qCompleteTurns adds a result for any tool call that has none, which
+// APIs require, for example a proposal the user never answered. Results
+// follow their call directly.
+func qCompleteTurns(turns []qTurn) []qTurn {
+	var out []qTurn
+	for i := 0; i < len(turns); i++ {
+		turn := turns[i]
+		out = append(out, turn)
+		if turn.Role != "assistant" || len(turn.Calls) == 0 {
+			continue
+		}
+		answered := map[string]bool{}
+		for i+1 < len(turns) && turns[i+1].Role == "tool" {
+			i++
+			out = append(out, turns[i])
+			answered[turns[i].CallID] = true
+		}
+		for _, call := range turn.Calls {
+			if !answered[call.ID] {
+				out = append(out, qTurn{Role: "tool", CallID: call.ID, Tool: call.Name, Text: "The user did not run it."})
+			}
+		}
+	}
+	return out
+}
+
 // ---------------------------------------------------------------------------
 // OpenAI-compatible chat completions
 
@@ -98,40 +214,62 @@ type qOpenAI struct {
 }
 
 func (p qOpenAI) label() string {
-	host := strings.TrimPrefix(strings.TrimPrefix(p.baseURL, "https://"), "http://")
-	host, _, _ = strings.Cut(host, "/")
-	return fmt.Sprintf("%s at %s", p.model, host)
+	return fmt.Sprintf("%s at %s", p.model, qHost(p.baseURL))
 }
 
-func (p qOpenAI) ask(ctx context.Context, system, user string) (qReply, error) {
-	reply, err := p.request(ctx, system, user, true)
+// qNoTools remembers endpoints and models that rejected tools, so later
+// steps don't try again.
+var qNoTools sync.Map
+
+func (p qOpenAI) step(ctx context.Context, system string, turns []qTurn, lookup bool) (qStep, error) {
+	cacheKey := p.baseURL + " " + p.model
+	if _, ok := qNoTools.Load(cacheKey); !ok {
+		step, err := p.request(ctx, system, turns, qTools(lookup))
+		if err == nil || !qToolsUnsupported(err) {
+			return step, err
+		}
+		qNoTools.Store(cacheKey, true)
+	}
 	// Some models, mostly small local ones, reject tools. They are asked
 	// for the reply as JSON instead, which qTextReply reads.
-	if err != nil && qToolsUnsupported(err) {
-		return p.request(ctx, system+"\n\n"+qJSONInstruction, user, false)
-	}
-	return reply, err
+	return p.request(ctx, system+"\n\n"+qJSONInstruction, qFlattenTurns(turns), nil)
 }
 
 const qJSONInstruction = `You have no tools here. To propose a command, reply with only this JSON and nothing else: {"kind":"command","command":"...","reason":"...","risk":"read-only|changes|dangerous"}. To answer a question, reply in plain text.`
 
-func (p qOpenAI) request(ctx context.Context, system, user string, tools bool) (qReply, error) {
-	body := map[string]any{
-		"model": p.model,
-		"messages": []map[string]string{
-			{"role": "system", "content": system},
-			{"role": "user", "content": user},
-		},
+func (p qOpenAI) request(ctx context.Context, system string, turns []qTurn, tools []qToolSpec) (qStep, error) {
+	messages := []map[string]any{{"role": "system", "content": system}}
+	for _, turn := range qCompleteTurns(turns) {
+		switch turn.Role {
+		case "user":
+			messages = append(messages, map[string]any{"role": "user", "content": turn.Text})
+		case "assistant":
+			message := map[string]any{"role": "assistant", "content": turn.Text}
+			if len(turn.Calls) > 0 {
+				var calls []map[string]any
+				for _, call := range turn.Calls {
+					calls = append(calls, map[string]any{
+						"id": call.ID, "type": "function",
+						"function": map[string]any{"name": call.Name, "arguments": string(call.Args)},
+					})
+				}
+				message["tool_calls"] = calls
+			}
+			messages = append(messages, message)
+		case "tool":
+			messages = append(messages, map[string]any{"role": "tool", "tool_call_id": turn.CallID, "content": turn.Text})
+		}
 	}
-	if tools {
-		body["tools"] = []map[string]any{{
-			"type": "function",
-			"function": map[string]any{
-				"name":        "propose",
-				"description": qProposeDescription,
-				"parameters":  qProposeSchema,
-			},
-		}}
+	body := map[string]any{"model": p.model, "messages": messages}
+	if len(tools) > 0 {
+		var specs []map[string]any
+		for _, tool := range tools {
+			specs = append(specs, map[string]any{
+				"type":     "function",
+				"function": map[string]any{"name": tool.name, "description": tool.description, "parameters": tool.schema},
+			})
+		}
+		body["tools"] = specs
 		body["tool_choice"] = "auto"
 	}
 	headers := map[string]string{}
@@ -148,6 +286,7 @@ func (p qOpenAI) request(ctx context.Context, system, user string, tools bool) (
 			Message struct {
 				Content   string `json:"content"`
 				ToolCalls []struct {
+					ID       string `json:"id"`
 					Function struct {
 						Name      string `json:"name"`
 						Arguments string `json:"arguments"`
@@ -157,24 +296,55 @@ func (p qOpenAI) request(ctx context.Context, system, user string, tools bool) (
 		} `json:"choices"`
 	}
 	if err := qPostJSON(ctx, p.client, strings.TrimRight(p.baseURL, "/")+"/chat/completions", headers, body, &response); err != nil {
-		return qReply{}, err
+		return qStep{}, err
 	}
 	if len(response.Choices) == 0 {
-		return qReply{}, errors.New("the model sent no reply")
+		return qStep{}, errors.New("the model sent no reply")
 	}
 	message := response.Choices[0].Message
+	var calls []qToolCall
 	for _, call := range message.ToolCalls {
-		if call.Function.Name != "propose" {
-			continue
+		id := call.ID
+		if id == "" {
+			id = qNewCallID()
 		}
-		reply := qReply{Kind: "command"}
-		if err := json.Unmarshal([]byte(call.Function.Arguments), &reply); err != nil {
-			return qReply{}, fmt.Errorf("the model's command could not be read: %w", err)
+		arguments := call.Function.Arguments
+		if strings.TrimSpace(arguments) == "" {
+			arguments = "{}"
 		}
-		reply.Kind = "command"
-		return reply, reply.valid()
+		calls = append(calls, qToolCall{ID: id, Name: call.Function.Name, Args: json.RawMessage(arguments)})
 	}
-	return qTextReply(message.Content)
+	return qStepFromCalls(calls, message.Content)
+}
+
+// qFlattenTurns writes tool calls and results as text, for models without
+// tools.
+func qFlattenTurns(turns []qTurn) []qTurn {
+	var out []qTurn
+	var pending strings.Builder
+	flush := func(role string) {
+		if pending.Len() > 0 {
+			out = append(out, qTurn{Role: role, Text: strings.TrimSpace(pending.String())})
+			pending.Reset()
+		}
+	}
+	for _, turn := range turns {
+		switch turn.Role {
+		case "user":
+			pending.WriteString(turn.Text + "\n")
+			flush("user")
+		case "assistant":
+			text := turn.Text
+			for _, call := range turn.Calls {
+				text += fmt.Sprintf("\n[%s %s]", call.Name, call.Args)
+			}
+			out = append(out, qTurn{Role: "assistant", Text: strings.TrimSpace(text)})
+		case "tool":
+			pending.WriteString(fmt.Sprintf("[result of %s]\n%s\n", turn.Tool, turn.Text))
+		}
+	}
+	flush("user")
+	return out
 }
 
 // qHTTPError is a non-2xx answer, kept typed so callers can look at it.
@@ -209,17 +379,46 @@ type qAnthropic struct {
 
 func (p qAnthropic) label() string { return p.model + " (Anthropic API)" }
 
-func (p qAnthropic) ask(ctx context.Context, system, user string) (qReply, error) {
+func (p qAnthropic) step(ctx context.Context, system string, turns []qTurn, lookup bool) (qStep, error) {
+	// Anthropic wants alternating roles, with tool results inside a user
+	// message, so consecutive user-side turns are merged.
+	var messages []map[string]any
+	var userBlocks []map[string]any
+	flushUser := func() {
+		if len(userBlocks) > 0 {
+			messages = append(messages, map[string]any{"role": "user", "content": userBlocks})
+			userBlocks = nil
+		}
+	}
+	for _, turn := range qCompleteTurns(turns) {
+		switch turn.Role {
+		case "user":
+			userBlocks = append(userBlocks, map[string]any{"type": "text", "text": turn.Text})
+		case "tool":
+			userBlocks = append(userBlocks, map[string]any{"type": "tool_result", "tool_use_id": turn.CallID, "content": turn.Text})
+		case "assistant":
+			flushUser()
+			var blocks []map[string]any
+			if strings.TrimSpace(turn.Text) != "" {
+				blocks = append(blocks, map[string]any{"type": "text", "text": turn.Text})
+			}
+			for _, call := range turn.Calls {
+				blocks = append(blocks, map[string]any{"type": "tool_use", "id": call.ID, "name": call.Name, "input": call.Args})
+			}
+			messages = append(messages, map[string]any{"role": "assistant", "content": blocks})
+		}
+	}
+	flushUser()
+	var tools []map[string]any
+	for _, tool := range qTools(lookup) {
+		tools = append(tools, map[string]any{"name": tool.name, "description": tool.description, "input_schema": tool.schema})
+	}
 	body := map[string]any{
 		"model":      p.model,
-		"max_tokens": 1024,
+		"max_tokens": 2048,
 		"system":     system,
-		"messages":   []map[string]string{{"role": "user", "content": user}},
-		"tools": []map[string]any{{
-			"name":         "propose",
-			"description":  qProposeDescription,
-			"input_schema": qProposeSchema,
-		}},
+		"messages":   messages,
+		"tools":      tools,
 	}
 	headers := map[string]string{
 		"x-api-key":         p.key,
@@ -229,28 +428,29 @@ func (p qAnthropic) ask(ctx context.Context, system, user string) (qReply, error
 		Content []struct {
 			Type  string          `json:"type"`
 			Text  string          `json:"text"`
+			ID    string          `json:"id"`
 			Name  string          `json:"name"`
 			Input json.RawMessage `json:"input"`
 		} `json:"content"`
 	}
 	if err := qPostJSON(ctx, p.client, strings.TrimRight(p.baseURL, "/")+"/v1/messages", headers, body, &response); err != nil {
-		return qReply{}, err
+		return qStep{}, err
 	}
 	var text strings.Builder
+	var calls []qToolCall
 	for _, block := range response.Content {
-		switch {
-		case block.Type == "tool_use" && block.Name == "propose":
-			reply := qReply{}
-			if err := json.Unmarshal(block.Input, &reply); err != nil {
-				return qReply{}, fmt.Errorf("the model's command could not be read: %w", err)
+		switch block.Type {
+		case "tool_use":
+			id := block.ID
+			if id == "" {
+				id = qNewCallID()
 			}
-			reply.Kind = "command"
-			return reply, reply.valid()
-		case block.Type == "text":
+			calls = append(calls, qToolCall{ID: id, Name: block.Name, Args: block.Input})
+		case "text":
 			text.WriteString(block.Text)
 		}
 	}
-	return qTextReply(text.String())
+	return qStepFromCalls(calls, text.String())
 }
 
 // ---------------------------------------------------------------------------
@@ -263,13 +463,16 @@ type qClaudeCode struct {
 
 func (p qClaudeCode) label() string { return "Claude Code (" + p.model + ")" }
 
-func (p qClaudeCode) ask(ctx context.Context, system, user string) (qReply, error) {
-	schema, _ := json.Marshal(qReplySchema)
+func (p qClaudeCode) step(ctx context.Context, system string, turns []qTurn, lookup bool) (qStep, error) {
+	schema, _ := json.Marshal(qStepSchema(lookup))
+	if lookup {
+		system += "\n\n" + qClaudeCodeToolNote()
+	}
 	command := exec.CommandContext(ctx, p.binary,
 		"-p", "--tools", "", "--json-schema", string(schema),
 		"--output-format", "json", "--no-session-persistence",
 		"--model", p.model, "--system-prompt", system)
-	command.Stdin = strings.NewReader(user)
+	command.Stdin = strings.NewReader(qTranscript(turns))
 	// An empty folder keeps Claude Code from loading this project's
 	// CLAUDE.md, settings, and hooks into a request that doesn't need them.
 	command.Dir = os.TempDir()
@@ -283,25 +486,79 @@ func (p qClaudeCode) ask(ctx context.Context, system, user string) (qReply, erro
 	}
 	if jsonErr := json.Unmarshal(output, &result); jsonErr != nil {
 		if err != nil {
-			return qReply{}, fmt.Errorf("claude failed: %s", qFirstLine(stderr.String(), err.Error()))
+			return qStep{}, fmt.Errorf("claude failed: %s", qFirstLine(stderr.String(), err.Error()))
 		}
-		return qReply{}, fmt.Errorf("claude sent output hi could not read: %w", jsonErr)
+		return qStep{}, fmt.Errorf("claude sent output hi could not read: %w", jsonErr)
 	}
 	if result.IsError {
-		return qReply{}, fmt.Errorf("claude: %s", qFirstLine(result.Result, "request failed"))
+		return qStep{}, fmt.Errorf("claude: %s", qFirstLine(result.Result, "request failed"))
 	}
-	var reply qReply
-	if len(result.StructuredOutput) > 0 && string(result.StructuredOutput) != "null" {
-		if err := json.Unmarshal(result.StructuredOutput, &reply); err != nil {
-			return qReply{}, fmt.Errorf("claude's reply could not be read: %w", err)
+	var parsed struct {
+		qReply
+		Tool string          `json:"tool"`
+		Args json.RawMessage `json:"args"`
+	}
+	raw := result.StructuredOutput
+	if len(raw) == 0 || string(raw) == "null" {
+		raw = json.RawMessage(result.Result)
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		reply, textErr := qTextReply(result.Result)
+		return qStep{reply: reply}, textErr
+	}
+	if parsed.Kind == "tool" {
+		args := parsed.Args
+		if len(args) == 0 || string(args) == "null" {
+			args = json.RawMessage("{}")
 		}
-	} else if err := json.Unmarshal([]byte(result.Result), &reply); err != nil {
-		return qTextReply(result.Result)
+		return qStep{calls: []qToolCall{{ID: qNewCallID(), Name: parsed.Tool, Args: args}}}, nil
 	}
+	reply := parsed.qReply
 	if reply.Kind == "" && reply.Command != "" {
 		reply.Kind = "command"
 	}
-	return reply, reply.valid()
+	step := qStep{reply: reply}
+	if reply.Kind == "command" {
+		args, _ := json.Marshal(reply)
+		step.proposal = qToolCall{ID: qNewCallID(), Name: "propose", Args: args}
+	}
+	return step, reply.valid()
+}
+
+func qClaudeCodeToolNote() string {
+	var b strings.Builder
+	b.WriteString(`Each reply is one step. Use kind "tool" with "tool" and "args" to call one of these, and you'll get its result in the next message; use kind "command" to propose a command, or kind "answer" to answer.` + "\n")
+	for _, tool := range qLookupTools {
+		schema, _ := json.Marshal(tool.schema["properties"])
+		fmt.Fprintf(&b, "- %s %s: %s\n", tool.name, schema, tool.description)
+	}
+	return b.String()
+}
+
+// qTranscript writes a conversation as one prompt, for backends that take
+// a single message.
+func qTranscript(turns []qTurn) string {
+	if len(turns) == 1 && turns[0].Role == "user" {
+		return turns[0].Text
+	}
+	var b strings.Builder
+	b.WriteString("The conversation so far, oldest first. Reply to the end of it.\n\n")
+	for _, turn := range qCompleteTurns(turns) {
+		switch turn.Role {
+		case "user":
+			fmt.Fprintf(&b, "<user>\n%s\n</user>\n", turn.Text)
+		case "assistant":
+			if turn.Text != "" {
+				fmt.Fprintf(&b, "<you>\n%s\n</you>\n", turn.Text)
+			}
+			for _, call := range turn.Calls {
+				fmt.Fprintf(&b, "<you called=%q>%s</you>\n", call.Name, call.Args)
+			}
+		case "tool":
+			fmt.Fprintf(&b, "<result of=%q>\n%s\n</result>\n", turn.Tool, turn.Text)
+		}
+	}
+	return b.String()
 }
 
 // ---------------------------------------------------------------------------

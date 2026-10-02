@@ -13,7 +13,8 @@ description: Every hi command and option in one place.
 | `hi disconnect`                  | Leave it; use your own keys again                      |
 | `hi server …`                    | Run the server that brokers compute; see below         |
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
-| `hi q <what you want>`           | Ask for a shell command; see below                     |
+| `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
+| `hi shell-init bash\|zsh`        | Shell integration for `hi q`                           |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
@@ -147,22 +148,25 @@ device the team's private ones.
 
 | Command                          | Does                                                         |
 |----------------------------------|--------------------------------------------------------------|
-| `hi q <what you want>`           | Propose one command; Enter runs it, c copies, ? explains, Esc cancels |
+| `hi q`                           | Chat: ask, run, and follow up; `/clear`, `/context`, `/model`, `/exit` or Ctrl-D |
+| `hi q <what you want>`           | Propose one command; Enter runs it, e edits, c copies, ? explains, Esc cancels |
+| `hi q -c [question]`             | Continue the last conversation                               |
 | `<cmd> \| hi q <question>`       | Ask about piped output, up to 32 KB                          |
 | `hi q --explain '<command>'`     | Explain a command without running it                         |
-| `hi q --print <prompt>`          | Print only the command, for scripts                          |
-| `hi q --setup`                   | Choose the model: Claude Code, OpenRouter, an OpenAI-compatible endpoint, or an Anthropic key |
-| `hi q --status`                  | The model in use and where it came from                      |
+| `hi q --print <question>`        | Print only the command, for scripts                          |
+| `hi q --setup`                   | Choose the model (Claude Code, OpenRouter, an OpenAI-compatible endpoint, or an Anthropic key), and set up the shell |
+| `hi q --status`                  | The model in use, where it came from, and the shell integration |
 | `hi q --context`                 | What is sent with each question                              |
+| `hi shell-init bash\|zsh`        | The shell integration script, for `eval` in an rc file       |
 
-Everything after the first word that doesn't start with `-` is the
+Everything from the first word that doesn't start with `-` is the
 question, so `hi q status of the log file` asks the model. hi's own options
 go before it; put `--` before a question that starts with a dash.
 
-Options: `--provider openai|openrouter|anthropic|claude` and `--model <name>` for one
-question, `--no-context` to send only the prompt, and `--yes` to run
-read-only commands without asking. Dangerous commands always need `yes`
-typed. See [Ask for a command](/guide/q/).
+Options: `--provider openai|openrouter|anthropic|claude` and `--model <name>`
+for one question or chat, `--no-context` to send only the question, and
+`--yes` to run read-only commands without asking. Dangerous commands always
+need `yes` typed. See [Ask for a command](/guide/q/).
 
 ## hi skill
 

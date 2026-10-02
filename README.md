@@ -45,7 +45,7 @@ hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute
 hi disconnect               Leave it; hi compute uses your own keys again
 hi server          Run the server that brokers compute and serves templates for a team (hi server help)
-hi q <request>     Ask an AI model for a shell command, then run, copy, or explain it
+hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
 hi update          Update hi to the latest release (--check, --version)
@@ -247,29 +247,36 @@ authors can try a folder of layers with `HI_TEMPLATES_DIR=<path> hi init …`.
 
 ## Terminal helper
 
-`hi q` turns a request in plain words into one shell command, and shows it
+`hi q` turns a request in plain words into a shell command, and shows it
 before anything runs:
 
 ```sh
 hi q move all the md files here into a new folder called notes
+hi q                                  # a chat: ask, run, follow up
+hi q -c and now zip them              # continue the last conversation
 make test 2>&1 | hi q why does this fail
 hi q --explain 'tar -xzvf x.tar.gz -C /tmp'
 hi q --print find files over 1 GB in my home folder
 ```
 
-Enter runs the command in your shell, `c` copies it, `?` explains it, and
-Esc cancels. `hi` parses the command itself and marks it read-only, changing
-files, or dangerous; dangerous ones, such as `sudo`, `rm -r` outside the
-current folder, or `curl … | sh`, need `yes` typed, and globs in `mv`, `cp`,
-and `rm` show what they match first.
+Enter runs the command in your shell, `e` edits it, `c` copies it, `?`
+explains it, and Esc cancels; if it fails, the model gets the error and
+proposes a fix. Before proposing, the model can list files, read files in
+the current folder, read `--help`, and run read-only commands. `hi` parses
+every command itself and marks it read-only, changing files, or dangerous;
+dangerous ones, such as `sudo`, `rm -r` outside the current folder, or
+`curl … | sh`, need `yes` typed, and globs in `mv`, `cp`, and `rm` show what
+they match first.
 
-The model comes from `hi q --setup`, `HI_Q_BASE_URL` and `HI_Q_MODEL`,
-`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, or a signed-in
-Claude Code, in that order. Any OpenAI-compatible endpoint works, including
-OpenRouter, Ollama, and `hi compute serve`. Each question carries a short, redacted context: the
-system and shell, the folder listing, the git state, recent history, and
-piped input; `hi q --context` shows it. Commands that run are logged to
-`~/.local/state/hi/q/log.jsonl`, without their output.
+`hi q --setup` chooses the model (Claude Code, OpenRouter, any
+OpenAI-compatible endpoint including Ollama and `hi compute serve`, or an
+Anthropic key) and offers to add shell integration to `~/.bashrc` or
+`~/.zshrc`. With it, `hi q` sees the shell's current history and last exit
+status, `q count lines (and subfolders)` works without quotes, commands it
+runs land in your history, and `cd` or `export` run in your shell. Each
+question carries a short, redacted context, which `hi q --context` shows.
+Commands that run are logged to `~/.local/state/hi/q/log.jsonl`, without
+their output.
 
 ## Agent skill
 

@@ -478,17 +478,22 @@ each type starts.
   with fast, cheap ones first.
 - [x] Models that reject tools are asked for JSON instead.
 
-## Planned
-
 ### v0.20.0 — `hi q`: shell integration, tools, and chat
 
-- [ ] `hi shell-init bash|zsh` for fresh history, the last exit status,
-  editing a proposed command on the command line, run commands in the
-  shell's history, and a `q` function that keeps globs in prompts intact.
-- [ ] The last tmux output as context.
-- [ ] Tools: list, read, help, which, and read-only runs, so the model looks
-  before it proposes; a failed command goes back to the model for a fix.
-- [ ] `hi q` with no prompt opens a chat; `hi q -c` continues the last one.
+- [x] `hi shell-init bash|zsh`, added to the rc file by `hi q --setup` after
+  asking: the shell's current history and last exit status, `hi q …` and
+  `q …` lines quoted on Enter so `( ) * ?` need no quotes, commands that ran
+  in the shell's history, `cd` and `export` run in the shell itself, and in
+  zsh `e` puts the command on the prompt. Tested in bash 5.3 and zsh 5.9.
+- [x] The last 100 lines of the tmux pane as context.
+- [x] Tools: list, read, help, which, and read-only runs, so the model looks
+  before it proposes; a failed command goes back to the model for a fix,
+  up to three times.
+- [x] `hi q` with no question opens a chat; `hi q -c` continues the last
+  conversation.
+- [x] `e` edits a proposed command before it runs.
+
+## Planned
 
 ### v0.21.0 — `hi q`: more backends and project notes
 

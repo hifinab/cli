@@ -1,7 +1,7 @@
 # `hi q` specification
 
-Status: Approved (2026-10-02). Release 1 shipped in v0.19.0; releases 2
-and 3 are planned as v0.20.0 and v0.21.0.
+Status: Approved (2026-10-02). Release 1 shipped in v0.19.0 and release 2
+in v0.20.0; release 3 is planned as v0.21.0.
 
 Dependencies: none required. It can use `hi context` facts, a model served
 by `hi model serve`, and the bundled skill from `hi skill` if they exist.
@@ -52,11 +52,15 @@ Options: `--provider <name>`, `--model <name>`, `--yes` (run without asking,
 but only commands classed as read-only), `--no-context` (send only the
 prompt).
 
-Quoting: the shell expands the prompt before hi sees it, so `*`, `?`, and `'`
-in a prompt can break it or glob. With shell integration on, a `q` function
-switches globbing off for its arguments (`noglob` in zsh, `set -f` in bash)
-and calls `hi q`. Without it, `hi q` with no arguments is the safe way to
-type anything.
+Quoting: the shell reads the line before hi sees it, so `(` is a syntax
+error and `*`, `?`, and `'` can break or glob. A function can't help, since
+the shell parses its arguments first. With shell integration on, the Enter
+key rewrites a line that starts with `hi q ` or `q ` to `hi q -- '<the
+rest, quoted>'` before the shell reads it: a zsh `accept-line` widget, and
+in bash a `bind -x` function that Enter runs before `accept-line`. Lines
+whose question starts with `-`, `'`, or `"` are left alone. Without
+integration, `hi q` with no arguments opens the chat, where nothing is
+parsed by the shell.
 
 ## Answer flow
 
@@ -69,11 +73,18 @@ type anything.
    the user only asked a question.
 4. hi shows the command and waits:
    - **Enter** runs it in the user's shell, in the current folder, with the
-     output streamed. If it fails, the error goes back to the model, which
-     can suggest a fix. That is one turn, and the user confirms again.
-   - **e** puts the command on the shell's command line to edit, through
-     shell integration (`print -z` in zsh, `READLINE_LINE` in bash). Without
-     integration it opens `$EDITOR`.
+     output streamed. If it fails, the exit status and the end of standard
+     error go back to the model, which can suggest a fix. That is one turn,
+     and the user confirms again. Standard output stays on the terminal, so
+     colours and pagers work; only standard error is kept.
+   - With shell integration, a command that changes the shell itself (`cd`,
+     `export`, `source`, an assignment) is handed to the shell's wrapper and
+     runs there, ending the turn. Without it, hi says such a command can't
+     change the current shell.
+   - **e** puts the command on the shell's command line to edit with zsh
+     integration (`print -z`). Bash can't fill the next prompt from a
+     program, so there, and without integration, it opens `$EDITOR` and
+     shows the edited command again, checked afresh.
    - **c** copies it (OSC 52, so it also works over SSH).
    - **?** explains each part.
 5. Every command that runs goes into the shell's history as the command
@@ -97,8 +108,11 @@ sends none of it.
 
 A separate process can't see the shell's history in memory, so history comes
 from shell integration. `hi shell-init` adds a prompt hook (`PROMPT_COMMAND`
-in bash, `precmd` in zsh) that writes the last command, its exit status, and
-the folder to `~/.local/state/hi/q/shell-<pid>`. Without integration, hi
+in bash, `precmd` in zsh) that writes the last exit status and the last 30
+commands to `~/.local/state/hi/q/shell-<pid>`, in a folder only the user can
+read. hi trusts `HI_Q_STATE` only inside that folder, and leaves files for
+the wrapper (`.ran`, `.run`, `.edit`) only when its parent process is the
+shell itself, so a script can't leave a command for the shell to run. Without integration, hi
 reads the end of `$HISTFILE`, which can be stale or empty. `hi q --status`
 says which one is in use.
 

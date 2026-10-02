@@ -1,6 +1,6 @@
 ---
 title: Ask for a command
-description: Type what you want in plain words with hi q and get one shell command back to run, copy, or explain, from Claude Code, an OpenAI-compatible endpoint, or the Anthropic API.
+description: Type what you want in plain words with hi q, or chat with it, and get a shell command back to run, edit, copy, or explain. The model can look at files first, and works through Claude Code, OpenRouter, an OpenAI-compatible endpoint, or the Anthropic API.
 ---
 
 `hi q` turns a request in plain words into one shell command for your
@@ -14,13 +14,69 @@ $ hi q move all the files in this folder ending with md to a new folder called n
   Creates a folder called notes and moves the markdown files into it.
   *.md matches 3 files: README.md, my notes.md, plan.md
   changes files
-  enter run · c copy · ? explain · esc cancel
+  enter run · e edit · c copy · ? explain · esc cancel
 ```
 
-Press **Enter** to run it in your shell, in the current folder. Press **c**
-to copy it, **?** to have each part explained, or **Esc** to cancel. A
-question that needs no command gets a short answer instead:
-`hi q how do I see which ports are open`.
+Press **Enter** to run it in your shell, in the current folder. Press **e**
+to edit it first, **c** to copy it, **?** to have each part explained, or
+**Esc** to cancel. A question that needs no command gets a short answer
+instead: `hi q how do I see which ports are open`.
+
+If the command fails, `hi q` offers to ask for a fix: press Enter and the
+model gets the exit status and the end of the error output, and proposes
+something else. It tries up to three times.
+
+## Chat
+
+`hi q` on its own opens a prompt below the current line. Ask, run what it
+proposes, and follow up; the model remembers the conversation, including
+which commands ran and how they ended:
+
+```text
+$ hi q
+hi q · anthropic/claude-haiku-4.5 at openrouter.ai · /help · Ctrl-D leaves
+q› how many md files are here (not counting txt)?
+There are 2 Markdown files here: a.md and b.md.
+q› move them into a folder called docs
+╭───────────────────────────────────────────╮
+│ mkdir -p docs && mv -n -- a.md b.md docs/ │
+╰───────────────────────────────────────────╯
+```
+
+What you type there never passes through your shell, so `(`, `*`, `?`, and
+quotes need no escaping. The arrow keys edit the line and recall earlier
+questions. `/clear` starts a new conversation, `/context` shows what was
+sent about the folder, `/model` names the model, and `/exit` or Ctrl-D
+leaves.
+
+`hi q -c` reopens the last conversation, from a chat or a single question,
+and `hi q -c <question>` asks one follow-up. Only the last conversation is
+kept, in `~/.local/state/hi/q/last.json`.
+
+## How it looks around
+
+Before it proposes, the model can look, and each look shows as one dim line:
+
+```text
+$ hi q what Go version does this module need
+  · read go.mod
+The module needs Go 1.24.0.
+```
+
+It has five tools, all read-only, which `hi` runs itself:
+
+| Tool    | What it does                                                         |
+|---------|----------------------------------------------------------------------|
+| `list`  | Names and sizes in a folder, two levels deep at most                 |
+| `read`  | Up to 200 lines of a file in or below the current folder; it asks you first for files elsewhere |
+| `help`  | A command's `--help` or man page, for the version installed here     |
+| `which` | Whether commands are installed, and where                            |
+| `run`   | A read-only command such as `wc -l` or `git status`, for 10 seconds at most |
+
+`run` takes only commands `hi` classes as read-only (see below); anything
+else is refused, and the model has to propose it to you instead. `read`
+never opens credential files, such as `.env`, `~/.ssh`, `.netrc`, or `hi`'s
+own settings. What a tool returns is redacted like the rest of the context.
 
 ## Choose a model
 
@@ -65,7 +121,10 @@ With each question, `hi q` sends a short description of where you are:
 - your system, shell, and whether the core tools are GNU or BSD;
 - the current folder, its first 50 names, and the git branch and state;
 - which useful tools are installed, such as `rg`, `jq`, or `docker`;
-- the last 20 commands from your shell's history file;
+- the last 20 commands from your shell, and the exit status of the last one
+  with shell integration;
+- inside tmux, the last 100 lines of the pane, so you can ask about output
+  that is already on the screen;
 - anything piped into `hi q`.
 
 Values that look like keys, tokens, or passwords are removed first, and
@@ -73,9 +132,42 @@ history lines that mention a password or secret are left out. File contents
 are never sent. Run `hi q --context` to see exactly what goes out, or add
 `--no-context` to send only your question.
 
-History comes from the history file, so the last few commands of the shell
-you are typing in may be missing until the shell writes them. Shell
-integration in a later release fixes this.
+Without shell integration, history comes from the history file, which
+bash writes only when a shell exits, so the commands of the shell you are
+typing in are missing.
+
+## Shell integration
+
+`hi q --setup` offers to add two lines to `~/.bashrc` or `~/.zshrc`, once,
+after showing them:
+
+```sh
+# hi q: fresh history, questions without quotes, and cd in this shell.
+# Remove these lines to turn it off.
+command -v hi >/dev/null 2>&1 && eval "$(hi shell-init bash)"
+```
+
+In a new terminal, this gives `hi q`:
+
+- **Your current history and the last exit status.** Before each prompt
+  the shell writes its last 30 commands to a file only you can read.
+- **Questions without quotes.** A line that starts with `hi q ` or `q ` is
+  quoted before the shell reads it, so `q count lines (and subfolders)`
+  works as typed. A line whose question starts with `-`, `'`, or `"` is
+  left alone; use that to pass options, as in `hi q --print …`.
+- **`q` as a short name** for `hi q`, unless your machine already has a `q`
+  command.
+- **Commands in your history.** What `hi q` runs is added to the shell's
+  history, so Up and Ctrl-R find it.
+- **`cd`, `export`, and `source` that work.** These change the shell
+  itself, so `hi q` hands them to your shell to run instead of running
+  them in a new one.
+- **Edit on the prompt (zsh).** `e` puts the command on your prompt line.
+  In bash, and without integration, `e` opens it in `$EDITOR`.
+
+It works in bash 4 or later and zsh. `hi shell-init bash` prints the whole
+script, and `hi q --status` says whether it is on. To turn it off, delete
+the lines from the rc file.
 
 ## How hi judges a command
 
@@ -137,10 +229,10 @@ model, and so does `hi q setup a python venv`. hi's own options start with
 
 ## Quoting
 
-Your shell expands `*`, `?`, and quotes before `hi q` sees the prompt, so
-`hi q what is in *.log` may send the matching file names instead. Put
-the prompt in single quotes when it has these characters:
+Without shell integration, your shell reads the line before `hi q` does:
+`(` stops it with a syntax error, and `*` and `?` may turn into file names.
+Put such a question in single quotes, or type it in the chat:
 
 ```sh
-hi q 'delete the *.tmp files older than a week'
+hi q 'delete the *.tmp files older than a week (but keep logs)'
 ```

@@ -16,12 +16,35 @@ import (
 	"time"
 )
 
+// qSetupCommand is hi q --setup: the model, then the shell integration.
 func qSetupCommand(stdin io.Reader, stdout io.Writer) error {
-	_, err := runQSetup(newMenuUI(stdin, stdout))
-	if errors.Is(err, errMenuBack) {
-		return nil
+	ui := newMenuUI(stdin, stdout)
+	current, err := resolveQProvider("", "")
+	if err != nil {
+		return err
 	}
-	return err
+	if current.provider != nil {
+		_, rc := qShellRC()
+		options := []string{"Choose the model (now " + current.provider.label() + ")"}
+		if rc != "" && qShellInstalled() == "" {
+			options = append(options, "Set up the shell ("+rc+")")
+		}
+		options = append(options, "Cancel")
+		choice, err := ui.choose("What do you want to set up?", options, false)
+		if err != nil || options[choice] == "Cancel" {
+			return nil
+		}
+		if choice == 1 {
+			return offerQShell(ui)
+		}
+	}
+	if _, err := runQSetup(ui); err != nil {
+		if errors.Is(err, errMenuBack) {
+			return nil
+		}
+		return err
+	}
+	return offerQShell(ui)
 }
 
 // runQSetup is the first-run menu: it offers what it found on the machine,
@@ -130,7 +153,7 @@ func runQSetup(ui menuUI) (qChoice, error) {
 		ui.busy("Trying "+provider.label()+"…", func() {
 			ctx, cancel := context.WithTimeout(context.Background(), qRequestTimeout)
 			defer cancel()
-			_, testErr = provider.ask(ctx, "Reply with the single word ok.", "Are you there?")
+			_, testErr = qAskOnce(ctx, provider, "Reply with the single word ok.", "Are you there?")
 		})
 		if testErr != nil {
 			ui.failure(testErr)

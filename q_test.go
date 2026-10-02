@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -164,7 +167,8 @@ func isolateQ(t *testing.T) string {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
 	t.Setenv("HISTFILE", filepath.Join(root, "no-history"))
 	t.Setenv("SHELL", "/bin/sh")
-	for _, name := range []string{"HI_Q_BASE_URL", "HI_Q_API_KEY", "HI_Q_MODEL", "OPENAI_API_KEY", "OPENAI_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"} {
+	t.Setenv("HOME", root)
+	for _, name := range []string{"HI_Q_STATE", "HI_Q_SHELL", "HI_Q_PID", "OPENROUTER_API_KEY", "VISUAL", "EDITOR", "HI_Q_BASE_URL", "HI_Q_API_KEY", "HI_Q_MODEL", "OPENAI_API_KEY", "OPENAI_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL"} {
 		t.Setenv(name, "")
 	}
 	t.Setenv("PATH", filepath.Join(root, "bin")+":/usr/bin:/bin")
@@ -315,7 +319,7 @@ func TestQAnthropicProvider(t *testing.T) {
 		}})
 	}))
 	defer server.Close()
-	reply, err := qAnthropic{baseURL: server.URL, key: "k", model: "m"}.ask(context.Background(), "s", "u")
+	reply, err := qAskOnce(context.Background(), qAnthropic{baseURL: server.URL, key: "k", model: "m"}, "s", "u")
 	if err != nil || reply.Kind != "command" || reply.Command != "df -h" {
 		t.Fatalf("reply = %+v, err = %v", reply, err)
 	}
@@ -331,12 +335,12 @@ func TestQClaudeCodeProvider(t *testing.T) {
 cat > /dev/null
 echo '{"is_error":false,"result":"","structured_output":{"kind":"command","command":"ls","reason":"Lists.","risk":"read-only"}}'
 `), 0o755)
-	reply, err := qClaudeCode{binary: script, model: "haiku"}.ask(context.Background(), "s", "u")
+	reply, err := qAskOnce(context.Background(), qClaudeCode{binary: script, model: "haiku"}, "s", "u")
 	if err != nil || reply.Command != "ls" {
 		t.Fatalf("reply = %+v, err = %v", reply, err)
 	}
 	os.WriteFile(script, []byte("#!/bin/sh\necho '{\"is_error\":true,\"result\":\"Not logged in\"}'\n"), 0o755)
-	if _, err := (qClaudeCode{binary: script, model: "haiku"}).ask(context.Background(), "s", "u"); err == nil || !strings.Contains(err.Error(), "Not logged in") {
+	if _, err := qAskOnce(context.Background(), qClaudeCode{binary: script, model: "haiku"}, "s", "u"); err == nil || !strings.Contains(err.Error(), "Not logged in") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -394,7 +398,7 @@ func TestQWordsAreAlwaysTheQuestion(t *testing.T) {
 func TestQActionsAreOptions(t *testing.T) {
 	isolateQ(t)
 	var stdout, stderr bytes.Buffer
-	if status := runQ([]string{"--status"}, strings.NewReader(""), &stdout, &stderr); status != 0 || !strings.Contains(stdout.String(), "Model: none") {
+	if status := runQ([]string{"--status"}, strings.NewReader(""), &stdout, &stderr); status != 0 || !strings.Contains(stdout.String(), "none. Run hi q --setup") {
 		t.Fatalf("--status: %d %q %q", status, stdout.String(), stderr.String())
 	}
 	stdout.Reset()
@@ -426,7 +430,7 @@ func TestQOpenAIFallsBackWithoutTools(t *testing.T) {
 			"content": `{"kind":"command","command":"ls -la","reason":"Lists.","risk":"read-only"}`}}}})
 	}))
 	defer server.Close()
-	reply, err := qOpenAI{baseURL: server.URL, model: "m"}.ask(context.Background(), "s", "u")
+	reply, err := qAskOnce(context.Background(), qOpenAI{baseURL: server.URL, model: "m"}, "s", "u")
 	if err != nil || reply.Command != "ls -la" || calls != 2 {
 		t.Fatalf("reply = %+v, err = %v, calls = %d", reply, err, calls)
 	}
@@ -438,7 +442,7 @@ func TestQOpenAIKeepsOtherErrors(t *testing.T) {
 		w.Write([]byte(`{"error":{"message":"No auth credentials found"}}`))
 	}))
 	defer server.Close()
-	_, err := qOpenAI{baseURL: server.URL, model: "m"}.ask(context.Background(), "s", "u")
+	_, err := qAskOnce(context.Background(), qOpenAI{baseURL: server.URL, model: "m"}, "s", "u")
 	if err == nil || !strings.Contains(err.Error(), "401") || !strings.Contains(err.Error(), "No auth credentials") {
 		t.Fatalf("err = %v", err)
 	}
@@ -469,5 +473,299 @@ func TestQOpenRouterFromEnvironment(t *testing.T) {
 	provider := choice.provider.(qOpenAI)
 	if provider.baseURL != qOpenRouterURL || provider.key != "or-key" || provider.model != qOpenRouterModel {
 		t.Fatalf("provider = %+v", provider)
+	}
+}
+
+// fakeOpenAISequence answers chat completions with each message in turn,
+// repeating the last, and records the requests.
+func fakeOpenAISequence(t *testing.T, messages ...map[string]any) (*httptest.Server, *[]map[string]any) {
+	t.Helper()
+	var requests []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		requests = append(requests, body)
+		message := messages[min(len(requests), len(messages))-1]
+		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": message}}})
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("HI_Q_BASE_URL", server.URL+"/v1")
+	t.Setenv("HI_Q_MODEL", "m")
+	return server, &requests
+}
+
+func toolCallMessage(id, name string, args map[string]any) map[string]any {
+	arguments, _ := json.Marshal(args)
+	return map[string]any{"tool_calls": []any{map[string]any{"id": id, "function": map[string]any{"name": name, "arguments": string(arguments)}}}}
+}
+
+func lastMessages(request map[string]any) []any {
+	return request["messages"].([]any)
+}
+
+func TestQLooksBeforeProposing(t *testing.T) {
+	isolateQ(t)
+	os.WriteFile("notes.md", []byte("one\ntwo\n"), 0o644)
+	_, requests := fakeOpenAISequence(t,
+		toolCallMessage("c1", "list", map[string]any{"pattern": "*.md"}),
+		toolCallMessage("c2", "run", map[string]any{"command": "wc -l notes.md"}),
+		toolCallMessage("c3", "run", map[string]any{"command": "rm notes.md"}),
+		map[string]any{"content": "notes.md has 2 lines."},
+	)
+	var stdout, stderr bytes.Buffer
+	if status := runQ([]string{"how", "long", "is", "the", "md", "file"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s", status, stderr.String())
+	}
+	if len(*requests) != 4 {
+		t.Fatalf("%d requests", len(*requests))
+	}
+	messages := lastMessages((*requests)[3])
+	var results []string
+	for _, message := range messages {
+		m := message.(map[string]any)
+		if m["role"] == "tool" {
+			results = append(results, m["tool_call_id"].(string)+": "+m["content"].(string))
+		}
+	}
+	if len(results) != 3 || !strings.Contains(results[0], "notes.md") || !strings.Contains(results[1], "2 notes.md") || !strings.Contains(results[2], "not run") {
+		t.Fatalf("tool results = %q", results)
+	}
+	if _, err := os.Stat("notes.md"); err != nil {
+		t.Fatal("the run tool deleted a file")
+	}
+	for _, want := range []string{"· list . *.md", "· run wc -l notes.md", "refused", "notes.md has 2 lines."} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("output lacks %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestQReadToolRefusesCredentials(t *testing.T) {
+	isolateQ(t)
+	os.WriteFile(".env", []byte("TOKEN=abc"), 0o600)
+	os.WriteFile("Makefile", []byte("test:\n\tgo test\n"), 0o644)
+	session := &qSession{stdout: io.Discard, stderr: io.Discard}
+	call := func(path string) string {
+		args, _ := json.Marshal(map[string]string{"path": path})
+		return session.runTool(context.Background(), qToolCall{ID: "x", Name: "read", Args: args})
+	}
+	if got := call(".env"); !strings.Contains(got, "not read") {
+		t.Fatalf(".env: %q", got)
+	}
+	if got := call("Makefile"); !strings.Contains(got, "2: \tgo test") {
+		t.Fatalf("Makefile: %q", got)
+	}
+	if got := call("/etc/hostname"); !strings.Contains(got, "not read") {
+		t.Fatalf("outside without a terminal: %q", got)
+	}
+}
+
+func TestQFixAfterFailure(t *testing.T) {
+	isolateQ(t)
+	_, requests := fakeOpenAISequence(t,
+		proposeMessage("ls does-not-exist", "Lists it.", "read-only"),
+		proposeMessage("touch fixed", "Makes it.", "changes"),
+	)
+	withQTTY(t, "\n\n\n")
+	var stdout, stderr bytes.Buffer
+	if status := runQ([]string{"make", "it"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s %s", status, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat("fixed"); err != nil {
+		t.Fatal("the fix did not run")
+	}
+	messages := lastMessages((*requests)[1])
+	text := fmt.Sprint(messages)
+	if !strings.Contains(text, "Exit status 2") || !strings.Contains(text, "does-not-exist") || !strings.Contains(text, "That failed") {
+		t.Fatalf("second request lacks the failure: %s", text)
+	}
+}
+
+func TestQChat(t *testing.T) {
+	isolateQ(t)
+	_, requests := fakeOpenAISequence(t,
+		map[string]any{"content": "First answer."},
+		proposeMessage("touch from-chat", "Makes a file.", "changes"),
+	)
+	withQTTY(t, "what is (this) folder?\n/context\nmake a file\n\n/exit\n")
+	var stdout, stderr bytes.Buffer
+	if status := runQ(nil, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s", status, stderr.String())
+	}
+	if _, err := os.Stat("from-chat"); err != nil {
+		t.Fatalf("chat command did not run:\n%s", stdout.String())
+	}
+	if len(*requests) != 2 {
+		t.Fatalf("%d requests", len(*requests))
+	}
+	second := lastMessages((*requests)[1])
+	// system, first question with context, first answer, second question
+	if len(second) != 4 || !strings.Contains(fmt.Sprint(second[1]), "what is (this) folder?") || strings.Contains(fmt.Sprint(second[3]), "<context>") {
+		t.Fatalf("second request = %v", second)
+	}
+	if !strings.Contains(stdout.String(), "First answer.") || !strings.Contains(stdout.String(), "current folder:") {
+		t.Fatalf("output:\n%s", stdout.String())
+	}
+
+	// -c continues the saved conversation.
+	_, requests = fakeOpenAISequence(t, map[string]any{"content": "Continued."})
+	stdout.Reset()
+	if status := runQ([]string{"-c", "and", "now?"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s", status, stderr.String())
+	}
+	continued := fmt.Sprint(lastMessages((*requests)[0]))
+	if !strings.Contains(continued, "what is (this) folder?") || !strings.Contains(continued, "The user ran it. Exit status 0.") || !strings.Contains(continued, "and now?") {
+		t.Fatalf("continued request = %s", continued)
+	}
+}
+
+func TestQAnthropicConversation(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&body)
+		json.NewEncoder(w).Encode(map[string]any{"content": []any{map[string]any{"type": "text", "text": "ok"}}})
+	}))
+	defer server.Close()
+	turns := []qTurn{
+		{Role: "user", Text: "q1"},
+		{Role: "assistant", Calls: []qToolCall{{ID: "t1", Name: "list", Args: json.RawMessage(`{}`)}}},
+		{Role: "tool", CallID: "t1", Tool: "list", Text: "a.md"},
+		{Role: "assistant", Calls: []qToolCall{{ID: "p1", Name: "propose", Args: json.RawMessage(`{"command":"ls"}`)}}},
+		{Role: "user", Text: "q2"},
+	}
+	if _, err := (qAnthropic{baseURL: server.URL, key: "k", model: "m"}).step(context.Background(), "s", turns, true); err != nil {
+		t.Fatal(err)
+	}
+	messages := body["messages"].([]any)
+	if len(messages) != 5 {
+		t.Fatalf("messages = %v", messages)
+	}
+	last := messages[4].(map[string]any)["content"].([]any)
+	// The unanswered proposal gets a result, followed by the new question.
+	if last[0].(map[string]any)["tool_use_id"] != "p1" || last[1].(map[string]any)["text"] != "q2" {
+		t.Fatalf("last message = %v", last)
+	}
+	if len(body["tools"].([]any)) != 1+len(qLookupTools) {
+		t.Fatalf("tools = %v", body["tools"])
+	}
+}
+
+func TestQClaudeCodeToolStep(t *testing.T) {
+	directory := t.TempDir()
+	script := filepath.Join(directory, "claude")
+	os.WriteFile(script, []byte(`#!/bin/sh
+cat > "$(dirname "$0")/stdin"
+echo '{"is_error":false,"structured_output":{"kind":"tool","tool":"list","args":{"path":"."}}}'
+`), 0o755)
+	turns := []qTurn{{Role: "user", Text: "q1"}, {Role: "assistant", Text: "a1"}, {Role: "user", Text: "q2"}}
+	step, err := qClaudeCode{binary: script, model: "haiku"}.step(context.Background(), "s", turns, true)
+	if err != nil || len(step.calls) != 1 || step.calls[0].Name != "list" {
+		t.Fatalf("step = %+v, err = %v", step, err)
+	}
+	prompt, _ := os.ReadFile(filepath.Join(directory, "stdin"))
+	if !strings.Contains(string(prompt), "<user>\nq1\n</user>") || !strings.Contains(string(prompt), "<you>\na1\n</you>") {
+		t.Fatalf("prompt = %s", prompt)
+	}
+}
+
+func TestQNeedsShell(t *testing.T) {
+	for command, want := range map[string]bool{
+		"cd /tmp":                   true,
+		"mkdir -p x && cd x":        true,
+		"export FOO=1":              true,
+		"FOO=1":                     true,
+		"source .venv/bin/activate": true,
+		"ls | cd /tmp":              false,
+		"(cd /tmp && ls)":           false,
+		"ls -la":                    false,
+		"bash -c 'cd /tmp'":         false,
+		"FOO=1 make":                false,
+	} {
+		if got := qNeedsShell(command); got != want {
+			t.Errorf("qNeedsShell(%q) = %v, want %v", command, got, want)
+		}
+	}
+}
+
+func TestQShellLink(t *testing.T) {
+	root := isolateQ(t)
+	state := filepath.Join(root, "state", "hi", "q", "shell-"+strconv.Itoa(os.Getppid()))
+	os.MkdirAll(filepath.Dir(state), 0o700)
+	os.WriteFile(state, []byte("status 1\n  101  ls -la\n  102  for f in *; do\n  echo $f\ndone\n  103  export API_KEY=sk-abcdefghijklmnopqrstu\n  104  hi q what now\n"), 0o600)
+	t.Setenv("HI_Q_STATE", state)
+	t.Setenv("HI_Q_SHELL", "bash")
+	t.Setenv("HI_Q_PID", strconv.Itoa(os.Getppid()))
+	link := currentQShellLink()
+	if link == nil || !link.direct {
+		t.Fatalf("link = %+v", link)
+	}
+	context := gatherQContext("")
+	if strings.Join(context.history, "|") != "ls -la|for f in *; do\n  echo $f\ndone|export API_KEY=[removed]" || context.status != 1 {
+		t.Fatalf("history = %q status %d", context.history, context.status)
+	}
+
+	// A command that changes the shell is handed to it.
+	fakeOpenAISequence(t, proposeMessage("cd /tmp", "Goes there.", "read-only"))
+	withQTTY(t, "\n")
+	var stdout, stderr bytes.Buffer
+	if status := runQ([]string{"go", "to", "tmp"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s", status, stderr.String())
+	}
+	if data, err := os.ReadFile(state + ".run"); err != nil || string(data) != "cd /tmp" {
+		t.Fatalf("run file = %q, %v", data, err)
+	}
+
+	// Other commands run here and are left for the shell's history.
+	fakeOpenAISequence(t, proposeMessage("true", "Nothing.", "read-only"))
+	withQTTY(t, "\n")
+	runQ([]string{"do", "nothing"}, strings.NewReader(""), &stdout, &stderr)
+	if data, _ := os.ReadFile(state + ".ran"); string(data) != "true\x00" {
+		t.Fatalf("ran file = %q", data)
+	}
+}
+
+func TestQShellLinkIgnoresOtherFolders(t *testing.T) {
+	isolateQ(t)
+	t.Setenv("HI_Q_STATE", "/tmp/elsewhere/shell-1")
+	t.Setenv("HI_Q_SHELL", "bash")
+	if currentQShellLink() != nil {
+		t.Fatal("a state file outside hi's folder was trusted")
+	}
+}
+
+func TestShellInitScriptsParse(t *testing.T) {
+	for _, shell := range []string{"bash", "zsh"} {
+		var stdout, stderr bytes.Buffer
+		if status := run([]string{"shell-init", shell}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+			t.Fatalf("%s: %d %s", shell, status, stderr.String())
+		}
+		if _, err := exec.LookPath(shell); err != nil {
+			continue
+		}
+		check := exec.Command(shell, "-n")
+		check.Stdin = &stdout
+		if output, err := check.CombinedOutput(); err != nil {
+			t.Fatalf("%s -n: %v\n%s", shell, err, output)
+		}
+	}
+}
+
+func TestOfferQShell(t *testing.T) {
+	root := isolateQ(t)
+	t.Setenv("SHELL", "/bin/bash")
+	rc := filepath.Join(root, ".bashrc")
+	os.WriteFile(rc, []byte("# mine\n"), 0o644)
+	if err := offerQShell(lineUI{in: strings.NewReader("y\n"), out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(rc)
+	if !strings.HasPrefix(string(data), "# mine\n") || !strings.Contains(string(data), `eval "$(hi shell-init bash)"`) {
+		t.Fatalf("rc = %s", data)
+	}
+	// Once only.
+	offerQShell(lineUI{in: strings.NewReader("y\n"), out: io.Discard})
+	again, _ := os.ReadFile(rc)
+	if strings.Count(string(again), "hi shell-init") != 1 {
+		t.Fatalf("added twice:\n%s", again)
 	}
 }
