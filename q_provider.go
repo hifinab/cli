@@ -19,13 +19,15 @@ import (
 const (
 	qOpenAIURL       = "https://api.openai.com/v1"
 	qOpenAIModel     = "gpt-5-mini"
-	qOpenRouterURL   = "https://openrouter.ai/api/v1"
 	qOpenRouterModel = "anthropic/claude-haiku-4.5"
 	qAnthropicURL    = "https://api.anthropic.com"
 	qAnthropicModel  = "claude-haiku-4-5"
 	qClaudeCodeModel = "haiku"
 	qRequestTimeout  = 90 * time.Second
 )
+
+// qOpenRouterURL is a variable so tests can point it elsewhere.
+var qOpenRouterURL = "https://openrouter.ai/api/v1"
 
 // qReply is one answer from a model: a command to confirm, or plain text.
 type qReply struct {

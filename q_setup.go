@@ -56,6 +56,25 @@ func runQSetup(ui menuUI) (qChoice, error) {
 		pick  func() (qProvider, qConfig, string, error)
 	}
 	var options []option
+	saved, savedKey, _ := loadQConfig()
+	// askKey asks for a key; when one is saved for the same provider and
+	// address, Enter keeps it.
+	askKey := func(title, provider, base string) (string, error) {
+		if saved.Provider != provider || savedKey == "" || (base != "" && strings.TrimRight(saved.BaseURL, "/") != base) {
+			return ui.secret(title)
+		}
+		key, err := ui.secretOrKeep(title + " (Enter keeps the saved one)")
+		if err != nil || key != "" {
+			return key, err
+		}
+		return savedKey, nil
+	}
+	savedModel := func(provider string) string {
+		if saved.Provider == provider {
+			return saved.Model
+		}
+		return ""
+	}
 	if binary, err := exec.LookPath("claude"); err == nil {
 		options = append(options, option{"Claude Code: your Claude sign-in, a few seconds per answer", func() (qProvider, qConfig, string, error) {
 			return qClaudeCode{binary: binary, model: qClaudeCodeModel}, qConfig{Provider: "claude", Model: qClaudeCodeModel}, "", nil
@@ -64,7 +83,7 @@ func runQSetup(ui menuUI) (qChoice, error) {
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
 		options = append(options, option{"OpenAI, with OPENAI_API_KEY from the environment", func() (qProvider, qConfig, string, error) {
 			base := firstNonEmpty(os.Getenv("OPENAI_BASE_URL"), qOpenAIURL)
-			model, err := qChooseModel(ui, base, key)
+			model, err := qChooseModel(ui, base, key, savedModel("openai"))
 			if err != nil {
 				return nil, qConfig{}, "", err
 			}
@@ -80,11 +99,11 @@ func runQSetup(ui menuUI) (qChoice, error) {
 		return func() (qProvider, qConfig, string, error) {
 			if key == "" {
 				var err error
-				if key, err = ui.secret("OpenRouter API key (openrouter.ai/keys)"); err != nil {
+				if key, err = askKey("OpenRouter API key (openrouter.ai/keys)", "openrouter", ""); err != nil {
 					return nil, qConfig{}, "", err
 				}
 			}
-			model, err := qChooseModel(ui, qOpenRouterURL, key)
+			model, err := qChooseModel(ui, qOpenRouterURL, key, savedModel("openrouter"))
 			if err != nil {
 				return nil, qConfig{}, "", err
 			}
@@ -101,29 +120,37 @@ func runQSetup(ui menuUI) (qChoice, error) {
 	options = append(options,
 		option{"OpenRouter: one key for models from Anthropic, OpenAI, Google, DeepSeek, …", openRouter("", true)},
 		option{"An OpenAI-compatible endpoint: OpenAI, Ollama, vLLM, llama.cpp, …", func() (qProvider, qConfig, string, error) {
-			base, err := ui.input("Base URL", qOpenAIURL, qValidBaseURL)
+			fallback := qOpenAIURL
+			if saved.Provider == "openai" && saved.BaseURL != "" {
+				fallback = saved.BaseURL
+			}
+			base, err := ui.input("Base URL", fallback, qValidBaseURL)
 			if err != nil {
 				return nil, qConfig{}, "", err
 			}
 			base = strings.TrimRight(base, "/")
 			key := ""
 			if !qLocalURL(base) {
-				if key, err = ui.secret("API key"); err != nil {
+				if key, err = askKey("API key", "openai", base); err != nil {
 					return nil, qConfig{}, "", err
 				}
 			}
-			model, err := qChooseModel(ui, base, key)
+			current := ""
+			if strings.TrimRight(saved.BaseURL, "/") == base {
+				current = savedModel("openai")
+			}
+			model, err := qChooseModel(ui, base, key, current)
 			if err != nil {
 				return nil, qConfig{}, "", err
 			}
 			return qOpenAI{baseURL: base, key: key, model: model}, qConfig{Provider: "openai", BaseURL: base, Model: model}, key, nil
 		}},
 		option{"An Anthropic API key", func() (qProvider, qConfig, string, error) {
-			key, err := ui.secret("Anthropic API key")
+			key, err := askKey("Anthropic API key", "anthropic", "")
 			if err != nil {
 				return nil, qConfig{}, "", err
 			}
-			model, err := ui.input("Model", qAnthropicModel, nil)
+			model, err := ui.input("Model", firstNonEmpty(savedModel("anthropic"), qAnthropicModel), nil)
 			if err != nil {
 				return nil, qConfig{}, "", err
 			}
@@ -180,12 +207,12 @@ var qSuggestedModels = []string{
 
 // qChooseModel offers the endpoint's model list when it has one, and asks
 // for a name otherwise.
-func qChooseModel(ui menuUI, base, key string) (string, error) {
+func qChooseModel(ui menuUI, base, key, current string) (string, error) {
 	var models []string
 	ui.busy("Listing models…", func() { models = qListModels(base, key) })
 	if len(models) == 0 {
-		fallback := ""
-		if strings.TrimRight(base, "/") == qOpenAIURL {
+		fallback := current
+		if fallback == "" && strings.TrimRight(base, "/") == qOpenAIURL {
 			fallback = qOpenAIModel
 		}
 		return ui.input("Model", fallback, func(value string) error {
@@ -195,7 +222,7 @@ func qChooseModel(ui menuUI, base, key string) (string, error) {
 			return nil
 		})
 	}
-	models = qSuggestedFirst(models)
+	models = qSuggestedFirst(models, current)
 	index, err := ui.choose("Model", models, len(models) > 10)
 	if err != nil {
 		return "", err
@@ -203,13 +230,14 @@ func qChooseModel(ui menuUI, base, key string) (string, error) {
 	return models[index], nil
 }
 
-func qSuggestedFirst(models []string) []string {
+func qSuggestedFirst(models []string, current string) []string {
 	present := map[string]bool{}
 	for _, model := range models {
 		present[model] = true
 	}
 	var first []string
-	for _, model := range qSuggestedModels {
+	// The model in use comes first, so Enter keeps it.
+	for _, model := range append([]string{current}, qSuggestedModels...) {
 		if present[model] {
 			first = append(first, model)
 			delete(present, model)

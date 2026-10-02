@@ -106,7 +106,9 @@ If none of these are there, a menu opens. Run `hi q --setup` to choose again:
 - **An Anthropic API key**.
 
 `hi q` tries the choice with one small request before saving it. The key is
-kept in `~/.config/hi/q-key`, readable only by you. `hi q --status` shows
+kept in `~/.config/hi/q-key`, readable only by you. When you run
+`hi q --setup` again for the same provider, Enter at the key prompt keeps
+the saved key, and the model in use is first in the list. `hi q --status` shows
 which model is in use and where it came from. Use
 `--provider openai|openrouter|anthropic|claude`
 or `--model <name>` to change them for one question.

@@ -493,6 +493,11 @@ each type starts.
   conversation.
 - [x] `e` edits a proposed command before it runs.
 
+### v0.20.1 — Keep the saved key
+
+- [x] `hi q --setup` for the same provider keeps the saved key when Enter
+  is pressed at the key prompt, and lists the model in use first.
+
 ## Planned
 
 ### v0.21.0 — `hi q`: more backends and project notes

@@ -457,7 +457,7 @@ func TestQListModelsKeepsToolModels(t *testing.T) {
 			{"id":"anthropic/claude-haiku-4.5:batch","supported_parameters":["tools"]}]}`))
 	}))
 	defer server.Close()
-	got := qSuggestedFirst(qListModels(server.URL, ""))
+	got := qSuggestedFirst(qListModels(server.URL, ""), "")
 	if strings.Join(got, ",") != "anthropic/claude-haiku-4.5,a/tools" {
 		t.Fatalf("models = %q", got)
 	}
@@ -767,5 +767,38 @@ func TestOfferQShell(t *testing.T) {
 	again, _ := os.ReadFile(rc)
 	if strings.Count(string(again), "hi shell-init") != 1 {
 		t.Fatalf("added twice:\n%s", again)
+	}
+}
+
+func TestQSetupKeepsSavedKey(t *testing.T) {
+	isolateQ(t)
+	var keys []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		keys = append(keys, r.Header.Get("Authorization"))
+		if r.URL.Path == "/models" {
+			w.Write([]byte(`{"data":[{"id":"a/one","supported_parameters":["tools"]},{"id":"b/two","supported_parameters":["tools"]}]}`))
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": "ok"}}}})
+	}))
+	defer server.Close()
+	previous := qOpenRouterURL
+	qOpenRouterURL = server.URL
+	defer func() { qOpenRouterURL = previous }()
+
+	// First time: a key and the second model.
+	if _, err := runQSetup(lineUI{in: strings.NewReader("1\nfirst-key\n2\n"), out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	// Again: Enter keeps the key, and the saved model is listed first.
+	if _, err := runQSetup(lineUI{in: strings.NewReader("1\n\n1\n"), out: io.Discard}); err != nil {
+		t.Fatal(err)
+	}
+	config, key, err := loadQConfig()
+	if err != nil || key != "first-key" || config.Model != "b/two" {
+		t.Fatalf("config %+v key %q err %v", config, key, err)
+	}
+	if keys[len(keys)-1] != "Bearer first-key" {
+		t.Fatalf("authorization = %q", keys)
 	}
 }

@@ -20,6 +20,7 @@ type menuUI interface {
 	choose(title string, options []string, filter bool) (int, error)
 	input(title, fallback string, validate func(string) error) (string, error)
 	secret(title string) (string, error)
+	secretOrKeep(title string) (string, error)
 	confirm(title, card string, warning bool) (bool, error)
 	command(line string)
 	note(text string)
@@ -76,6 +77,9 @@ func (u lineUI) secret(title string) (string, error) {
 	}
 	return strings.TrimSpace(answer), nil
 }
+
+// secretOrKeep is secret where an empty answer keeps a saved key.
+func (u lineUI) secretOrKeep(title string) (string, error) { return u.secret(title) }
 
 func (u lineUI) confirm(title, card string, warning bool) (bool, error) {
 	if card != "" {
@@ -271,6 +275,21 @@ func (u *styledUI) secret(title string) (string, error) {
 		})
 	if err := u.run(field); err != nil {
 		return "", err
+	}
+	u.answered(title, "(hidden)")
+	return strings.TrimSpace(value), nil
+}
+
+// secretOrKeep is secret where an empty answer keeps a saved key.
+func (u *styledUI) secretOrKeep(title string) (string, error) {
+	value := ""
+	field := huh.NewInput().Title(title).Value(&value).EchoMode(huh.EchoModePassword)
+	if err := u.run(field); err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(value) == "" {
+		u.answered(title, "(kept)")
+		return "", nil
 	}
 	u.answered(title, "(hidden)")
 	return strings.TrimSpace(value), nil
