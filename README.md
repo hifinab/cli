@@ -45,6 +45,7 @@ hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute
 hi disconnect               Leave it; hi compute uses your own keys again
 hi server          Run the server that brokers compute and serves templates for a team (hi server help)
+hi q <request>     Ask an AI model for a shell command, then run, copy, or explain it
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
 hi update          Update hi to the latest release (--check, --version)
@@ -243,6 +244,32 @@ are embedded in the binary. Private templates, such as quant `research`,
 live in a private repository that a `hi server` mirrors
 (`hi server templates add`) and serves, signed, to connected devices. Template
 authors can try a folder of layers with `HI_TEMPLATES_DIR=<path> hi init …`.
+
+## Terminal helper
+
+`hi q` turns a request in plain words into one shell command, and shows it
+before anything runs:
+
+```sh
+hi q move all the md files here into a new folder called notes
+make test 2>&1 | hi q why does this fail
+hi q --explain 'tar -xzvf x.tar.gz -C /tmp'
+hi q --print find files over 1 GB in my home folder
+```
+
+Enter runs the command in your shell, `c` copies it, `?` explains it, and
+Esc cancels. `hi` parses the command itself and marks it read-only, changing
+files, or dangerous; dangerous ones, such as `sudo`, `rm -r` outside the
+current folder, or `curl … | sh`, need `yes` typed, and globs in `mv`, `cp`,
+and `rm` show what they match first.
+
+The model comes from `hi q setup`, `HI_Q_BASE_URL` and `HI_Q_MODEL`,
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or a signed-in Claude Code, in that
+order. Any OpenAI-compatible endpoint works, including Ollama and
+`hi compute serve`. Each question carries a short, redacted context: the
+system and shell, the folder listing, the git state, recent history, and
+piped input; `hi q context` shows it. Commands that run are logged to
+`~/.local/state/hi/q/log.jsonl`, without their output.
 
 ## Agent skill
 

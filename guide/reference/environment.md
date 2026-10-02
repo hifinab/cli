@@ -15,6 +15,10 @@ description: The environment variables hi reads and the files it writes.
 | `HF_ENDPOINT`           | Another Hugging Face API endpoint                                 |
 | `RUNPOD_API_KEY`        | RunPod API key; otherwise read from `~/.runpod/config.toml`       |
 | `HI_NETBIRD_SETUP_KEY`  | Setup key for `hi net` in scripts                                 |
+| `HI_Q_BASE_URL`, `HI_Q_MODEL`, `HI_Q_API_KEY` | `hi q`: an OpenAI-compatible endpoint, its model, and key |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL` | `hi q`: OpenAI, or another endpoint with an OpenAI key |
+| `ANTHROPIC_API_KEY`     | `hi q`: the Anthropic API                                         |
+| `SHELL`, `HISTFILE`     | `hi q`: the shell that runs commands, and its history file        |
 | `HI_TEMPLATES_DIR`      | `hi init`: a folder of extra template layers, for template authors |
 | `HI_INSTALL_DIR`        | Installer: where to put `hi`                                      |
 | `HI_VERSION`            | Installer: which release to install                               |
@@ -34,6 +38,8 @@ description: The environment variables hi reads and the files it writes.
 | `.agents/skills/hi/SKILL.md`, `.claude/skills/hi` | The agent skill, from `hi skill`               |
 | `~/.config/hi/shadeform_key`                | The Shadeform API key from `hi login shadeform` (mode 0600) |
 | `~/.config/hi/server.json`, `~/.config/hi/device_key` | The hi server this device joined, its stored key, and this device's private key (`hi connect`) |
+| `~/.config/hi/q.json`, `~/.config/hi/q-key` | The model chosen with `hi q setup`, and its key (mode 0600) |
+| `~/.local/state/hi/q/log.jsonl`             | Commands `hi q` ran: time, folder, prompt, class, exit status; no output |
 | `~/.cache/hi/templates/<source>/<commit>/`  | Server templates, cached after their signature was checked; deleted by `hi disconnect` |
 | `.hifin/template.json` (in a project)       | What `hi init` generated: template, versions or commits, and file hashes; no paths or names |
 | `docs/upgrades/<version>.md` (in a project) | From `hi init --update`: template changes to the project's own files, for an agent to apply; delete it afterward |
@@ -48,8 +54,9 @@ description: The environment variables hi reads and the files it writes.
 | `~/.ssh/id_ed25519`, `~/.ssh/id_ecdsa`      | Your SSH key, for shells and tunnels                 |
 
 `hi` never prints provider tokens. It stores them only for providers without
-a sign-in tool of their own: RunPod, in RunPod's standard file, and
-Shadeform, in `~/.config/hi/shadeform_key`.
+a sign-in tool of their own: RunPod, in RunPod's standard file,
+Shadeform, in `~/.config/hi/shadeform_key`, and the `hi q` model's key, in
+`~/.config/hi/q-key`.
 
 ## On a hi server
 

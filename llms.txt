@@ -2,8 +2,8 @@
 
 > hi is a single-binary CLI for Hifin machines and projects: it rents remote GPUs
 > (Google Colab, Hugging Face Jobs, RunPod, Shadeform) with `hi compute`, starts
-> projects from templates with `hi init`, and sets up Ubuntu workstations with
-> `hi install`. These notes are for coding agents such as Codex and Claude Code.
+> projects from templates with `hi init`, sets up Ubuntu workstations with
+> `hi install`, and turns plain-words requests into shell commands with `hi q`. These notes are for coding agents such as Codex and Claude Code.
 
 ## Instructions for agents
 
@@ -29,6 +29,7 @@
 - [Let your coding agent use a GPU](https://hifin.sh/guide/examples/agent/): what to ask an agent, and what it does
 - [Agent skill](https://hifin.sh/guide/reference/skill/): what `hi skill` writes and where
 - [All commands](https://hifin.sh/guide/reference/commands/): every command and option
+- [Ask for a command](https://hifin.sh/guide/q/): `hi q`, for people at a terminal; agents don't need it
 - [Start a project](https://hifin.sh/guide/projects/): `hi init` templates, `--update`, and `--adopt`
 - [Troubleshooting](https://hifin.sh/guide/reference/troubleshooting/): messages and what to do
 

@@ -445,24 +445,26 @@ each type starts.
   build; before, any `uv run` swapped the ROCm build back to the CPU one.
   `hi init ml` sets it up with `make sync`.
 
-## Planned
-
 ### v0.19.0 — `hi q`: a command from plain words
 
-- [ ] `hi q <prompt>` sends the prompt with a small, redacted context (OS,
+- [x] `hi q <prompt>` sends the prompt with a small, redacted context (OS,
   shell, folder listing, git state, recent history, piped input) and shows
   one proposed command to run, copy, explain, or cancel.
-- [ ] hi classifies each command itself (read-only, changes files,
+- [x] hi classifies each command itself (read-only, changes files,
   dangerous) by parsing it; dangerous commands need `yes` typed, and globs
   in `mv`, `cp`, and `rm` show what they match first.
-- [ ] `--print` for scripts, `--explain '<command>'`, `--no-context`, and
+- [x] `--print` for scripts, `--explain '<command>'`, `--no-context`, and
   `hi q context` to see exactly what is sent.
-- [ ] Providers: OpenAI-compatible endpoints, the Anthropic API, and a
-  signed-in Claude Code, found from flags, saved config, or the environment;
-  otherwise a first-run menu (`hi q setup`). `hi q status` names the one in
-  use.
-- [ ] A local log of commands that ran.
+- [x] Providers: OpenAI-compatible endpoints, the Anthropic API, and a
+  signed-in Claude Code, found from flags, saved config, or the
+  environment; otherwise a first-run menu (`hi q setup`). `hi q status`
+  names the one in use. Claude Code was tested live with Haiku (about 6
+  seconds an answer); the OpenAI-compatible and Anthropic clients only
+  against fake servers so far.
+- [x] A local log of commands that ran.
   Approved spec: [hi_q.md](specs/approved/hi_q.md).
+
+## Planned
 
 ### v0.20.0 — `hi q`: shell integration, tools, and chat
 

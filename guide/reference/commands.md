@@ -13,6 +13,7 @@ description: Every hi command and option in one place.
 | `hi disconnect`                  | Leave it; use your own keys again                      |
 | `hi server …`                    | Run the server that brokers compute; see below         |
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
+| `hi q <what you want>`           | Ask for a shell command; see below                     |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
@@ -141,6 +142,23 @@ hi init --adopt python           # bring this existing repository under a templa
 
 Templates: `python`, `web`, `service`, `pipeline`, `ml`, and on a connected
 device the team's private ones.
+
+## hi q
+
+| Command                          | Does                                                         |
+|----------------------------------|--------------------------------------------------------------|
+| `hi q <what you want>`           | Propose one command; Enter runs it, c copies, ? explains, Esc cancels |
+| `<cmd> \| hi q <question>`       | Ask about piped output, up to 32 KB                          |
+| `hi q --explain '<command>'`     | Explain a command without running it                         |
+| `hi q --print <prompt>`          | Print only the command, for scripts                          |
+| `hi q setup`                     | Choose the model: Claude Code, an OpenAI-compatible endpoint, or an Anthropic key |
+| `hi q status`                    | The model in use and where it came from                      |
+| `hi q context`                   | What is sent with each question                              |
+
+Options: `--provider openai|anthropic|claude` and `--model <name>` for one
+question, `--no-context` to send only the prompt, and `--yes` to run
+read-only commands without asking. Dangerous commands always need `yes`
+typed. See [Ask for a command](/guide/q/).
 
 ## hi skill
 
