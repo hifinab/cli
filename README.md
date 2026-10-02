@@ -48,7 +48,7 @@ hi server          Run the server that brokers compute and serves templates for 
 hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
 hi skill           Teach coding agents to use hi (writes SKILL.md)
 hi verify strix    Check an installed Strix Halo workstation
-hi update          Update hi to the latest release (--check, --version)
+hi update          Update hi to the latest release, and restart a hi server service on the old one (--check, --version, --restart)
 hi version         Print the installed version
 hi help            Show help
 ```

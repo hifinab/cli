@@ -82,6 +82,7 @@ to install the one it needs.
 hi update            # install the latest release
 hi update --check    # only say whether a newer release exists
 hi update --version v0.7.0
+hi update --restart  # and restart a hi server service without asking
 ```
 
 `hi update` downloads the release for your machine, checks its SHA-256

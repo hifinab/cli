@@ -33,16 +33,40 @@ var (
 
 var releaseTagPattern = regexp.MustCompile(`^v\d+\.\d+\.\d+$`)
 
-func runUpdate(args []string, stdout, stderr io.Writer) int {
+func runUpdate(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("hi update", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	requested := flags.String("version", "", "install this release, such as v0.7.0")
 	check := flags.Bool("check", false, "only report whether an update is available")
-	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fmt.Fprintln(stderr, "usage: hi update [--version vX.Y.Z] [--check]")
+	restart := flags.Bool("restart", false, "restart a hi server service that runs the old version, without asking")
+	noRestart := flags.Bool("no-restart", false, "never restart a hi server service; print the command instead")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || (*restart && *noRestart) {
+		fmt.Fprintln(stderr, "usage: hi update [--version vX.Y.Z] [--check] [--restart | --no-restart]")
 		return 2
 	}
-	return exitCode(update(*requested, *check, stdout), stderr)
+	mode := "ask"
+	switch {
+	case *restart:
+		mode = "yes"
+	case *noRestart || *check:
+		mode = "no"
+	}
+	if err := update(*requested, *check, stdout); err != nil {
+		return exitCode(err, stderr)
+	}
+	// A hi server started before this update still runs the old binary,
+	// also when this update found nothing new to install.
+	if path, err := updateExecutable(); err == nil {
+		if resolved, err := filepath.EvalSymlinks(path); err == nil {
+			path = resolved
+		}
+		installed := version
+		if output, err := exec.Command(path, "version").Output(); err == nil {
+			installed = strings.TrimPrefix(strings.TrimSpace(string(output)), "hi ")
+		}
+		return exitCode(restartStaleServers(path, installed, mode, stdin, stdout, stderr), stderr)
+	}
+	return 0
 }
 
 func update(requested string, check bool, stdout io.Writer) error {

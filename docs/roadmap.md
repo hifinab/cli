@@ -532,6 +532,13 @@ each type starts.
   and commands in 4–14 seconds, against about 2 seconds for Haiku through
   OpenRouter. The production server still uses OpenRouter.
 
+### v0.22.1 — `hi update` restarts the server
+
+- [x] `hi update` finds a `hi server run` still running the replaced binary,
+  also when nothing new was downloaded, and asks to restart its systemd
+  service (`sudo systemctl restart`, or `systemctl --user` for a user
+  service). `--restart` and `--no-restart` for scripts.
+
 ## Planned
 
 ### v0.23.0 — Containers

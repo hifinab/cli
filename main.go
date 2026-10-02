@@ -59,7 +59,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		return 0
 	case "update":
-		return runUpdate(args[1:], stdout, stderr)
+		return runUpdate(args[1:], stdin, stdout, stderr)
 	case "skill":
 		return runSkill(args[1:], stdout, stderr)
 	case "q":
@@ -122,7 +122,7 @@ Usage:
   hi q                          Chat with it; hi q --setup chooses the model and sets up the shell
   hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
-  hi update [--check]           Update hi to the latest release
+  hi update [--check]           Update hi to the latest release, and restart a hi server running the old one
   hi version                    Print the installed version
   hi help                       Show this help`)
 }

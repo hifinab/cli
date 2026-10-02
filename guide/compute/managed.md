@@ -235,10 +235,16 @@ forged, altered, or replayed request is refused, even from inside the VPN.
 As the account the server runs as:
 
 ```sh
-hi update                          # the binary; the running server is unchanged
-sudo systemctl restart hi-server   # runs the new version, a second's interruption
-hi server ai                       # any command works again once it is up
+hi update
 ```
+
+After installing the new binary, `hi update` finds the running server, which
+still runs the old one, and asks to restart its systemd service with
+`sudo systemctl restart hi-server.service`. It is down for about a second.
+It also asks when the binary is already current but the server was never
+restarted. `--restart` restarts without asking, for scripts, and
+`--no-restart` only prints the command. A server started by hand, outside
+systemd, is reported but not restarted.
 
 State, keys, and devices carry over; connected devices need no change.
 Devices on an older `hi` keep working, and get new features when they run
