@@ -1,12 +1,12 @@
 # `hi box` specification
 
-Status: Draft, with every open question answered (2026-10-02): the name
-`hi box`, rootless Podman with `crun` (Docker as the fallback, no Docker
-Sandboxes), `devcontainer.json` with `customizations.hi`, and Claude
-Code's token added at the proxy outside the box. Codex's ChatGPT sign-in
-still goes into the box in the first version: its traffic to `chatgpt.com`
-is encrypted end to end, and whether Codex accepts another base address
-for it is untested. Ready for approval.
+Status: Approved (2026-10-02). Release 1 is planned as v0.23.0. Decided
+before approval: the name `hi box`, rootless Podman with `crun` (Docker as
+the fallback, no Docker Sandboxes), `devcontainer.json` with
+`customizations.hi`, and Claude Code's token added at the proxy outside the
+box. Codex's ChatGPT sign-in still goes into the box in the first version:
+its traffic to `chatgpt.com` is encrypted end to end, and whether Codex
+accepts another base address for it is untested.
 
 Dependencies: `hi install` (Podman as a new tool), the v0.1.0 workstation
 setup (ROCm, render and video groups), `hi server` (policy, audit, Slack,
@@ -187,7 +187,7 @@ allowed host.
 - Background agents log to `~/.local/state/hi/sandbox/<name>/`; `attach`
   follows the log or opens the agent's terminal through tmux in the sandbox.
 - `--idle` stops a sandbox whose agent and GPU have been idle, sharing the
-  rule from [hi_compute_idle.md](hi_compute_idle.md); `--max` caps it.
+  rule from [hi_compute_idle.md](../ideas/hi_compute_idle.md); `--max` caps it.
 - Finished agent sandboxes are kept until `rm`, so the work can be checked.
   `hi box ls` shows what each one changed.
 - With a linked Slack account, the owner gets a message when an agent
@@ -216,8 +216,8 @@ NetBird is the fiddly part.
 `hi compute`, with the same mounts copied in, the same egress proxy running
 on the machine, and `--max` as always. RunPod and Hugging Face already run
 images; Shadeform runs them on its VMs; Colab cannot. It depends on pinned
-images ([hi_compute_serve_pinning.md](hi_compute_serve_pinning.md)) and on
-runs over SSH ([hi_compute_ssh_run.md](hi_compute_ssh_run.md)). The image
+images ([hi_compute_serve_pinning.md](../ideas/hi_compute_serve_pinning.md)) and on
+runs over SSH ([hi_compute_ssh_run.md](../ideas/hi_compute_ssh_run.md)). The image
 must suit the GPU: one Dockerfile with a build argument gives a `rocm` tag
 for the workstation and a `cuda` tag for the cloud.
 

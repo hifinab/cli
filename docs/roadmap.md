@@ -549,34 +549,28 @@ each type starts.
 
 ## Planned
 
-### v0.23.0 — Containers
+### v0.23.0 — `hi box`: local agent boxes
 
-- [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
-  - One image, anywhere: `hi compute run --image` starts the same container
-    on the local workstation (with the ROCm devices and render and video
-    groups that v0.1.0 sets up), RunPod, Shadeform, or Hugging Face Jobs.
-    Try it locally for free, then send it to a cloud GPU unchanged.
-  - Prebuilt project images: `hi init` templates include a Dockerfile, and a
-    pushed, digest-pinned image starts on a pod with everything installed,
-    instead of installing packages on every start. This is the nearest
-    thing to boxd's snapshots on providers that have none.
-  - Pinned serving images: `hi compute serve` recipes run a llama.cpp or
-    vLLM image pinned by digest, so a recipe that worked keeps working.
-  - Agent sandboxes on the workstation: run Claude Code or Codex in a
-    container per project, with only that project mounted, no keys, and
-    limited network, so an agent can work unattended safely.
-  - Image policy on the server: `policy.json` lists the registries or
-    digests a group may start, and requests show the image, so approvers
-    see what will run.
-  - `hi install` offers the container runtime and the ROCm container
-    tooling, as a checkbox in the v0.15.0 menu. Podman arrived in v0.22.2.
-  Drafts: [hi_box.md](specs/ideas/hi_box.md) grows the agent
-  sandbox into a general `hi box` (agents, untrusted code, previews, and
-  remote GPUs); [hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)
-  pins `serve` recipes and covers `--image` on Shadeform.
+- [ ] `hi box claude|codex [prompt]`, `shell`, and `run -- <command>`
+  start a rootless container with the project, or a new git worktree of it,
+  and nothing else from the home folder; with a prompt the agent runs on its
+  own, without permission prompts.
+- [ ] No route out but hi's proxy, with `locked`, `dev`, and `open`
+  presets, domains from `customizations.hi` in `devcontainer.json` after
+  asking once, and `hi box allow`.
+- [ ] Claude Code's token is added at the proxy; the box only holds a
+  placeholder. Codex's sign-in goes in for now.
+- [ ] `ls`, `attach`, `diff` (flagging files that run on the host), `stop`,
+  and `rm`; `--gpu` for the Strix Halo; read-only git hooks and config.
+- [ ] The safe parts of `devcontainer.json`: `image`, `build.dockerfile`,
+  `containerEnv`, and `postCreateCommand`.
+  Approved spec: [hi_box.md](specs/approved/hi_box.md).
 
-Dependency: local GPU containers need the v0.1.0 workstation setup; image
-policy extends v0.11.0; project images extend the v0.16.0 templates.
+Still open from the container ideas, for later releases: one image on the
+workstation and every provider (`hi compute run --image`), prebuilt project
+images, pinned serving images
+([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
+and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
 ### v0.24.0 — Learn from agent-machine services
 
@@ -597,7 +591,7 @@ policy extends v0.11.0; project images extend the v0.16.0 templates.
   idle GPU flag and why suspend and resume doesn't fit the current
   providers; [hi_compute_ssh_run.md](specs/ideas/hi_compute_ssh_run.md)
   covers runs on RunPod, Shadeform, and managed providers. The services
-  were compared on 2026-10-01 in [hi_box.md](specs/ideas/hi_box.md#services).
+  were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
 
 ### v0.25.0 — skills.sh
 
