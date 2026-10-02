@@ -147,6 +147,23 @@ Without shell integration, history comes from the history file, which
 bash writes only when a shell exits, so the commands of the shell you are
 typing in are missing.
 
+## Project notes
+
+A repository can tell `hi q` things the folder listing doesn't show, in
+`.hifin/q.md` at its root:
+
+```markdown
+- Check a change with `make check`; never run `make deploy`.
+- Logs are in `var/log/`, newest last.
+- The database is Postgres in Docker: `docker compose exec db psql`.
+```
+
+The repository writes this file, so `hi q` asks once before using it,
+offering to show it first, and asks again whenever it changes, as direnv
+does. Your answer is kept in `~/.local/state/hi/q/notes.json`. Without a
+terminal to ask in, new notes are not used. The notes, up to 4 KB, then go
+with each question, and `hi q --context` shows them.
+
 ## Shell integration
 
 `hi q --setup` offers to add two lines to `~/.bashrc` or `~/.zshrc`, once,

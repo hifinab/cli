@@ -103,7 +103,7 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server approvers add <id> --name <user>`        | Let a Slack member approve and stop; `remove`, `list` |
 | `hi server policy show\|edit\|example\|check`       | Group limits, auto-approve, and budgets              |
 | `hi server spend [--since <d>]`                     | Spend per user and group, compute and models         |
-| `hi server ai [set [--url <u>] [--model <m>]\|off\|remove]` | Pass `hi q`'s requests to OpenRouter with the team's key |
+| `hi server ai [set [--url <u>] [--model <m>] [--no-key]\|off\|remove]` | Pass `hi q`'s requests to OpenRouter with the team's key |
 | `hi server live [--wall] [--names full] [--reasons]` | Live dashboard; `--wall` is read-only               |
 | `sudo hi server wall setup\|add\|remove\|list`       | Show the wall on screens over SSH                    |
 | `hi server viewer add <name> --key <k>`             | A device that may only watch                         |

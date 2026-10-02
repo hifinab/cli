@@ -1,7 +1,7 @@
 # `hi server ai` specification
 
-Status: Approved (2026-10-02). Release 1 shipped in v0.21.0; release 2 is
-planned with v0.22.0.
+Status: Approved (2026-10-02). Release 1 shipped in v0.21.0 and release 2
+in v0.22.0, which also added `--no-key` for upstreams without a key.
 
 Dependencies: `hi server` and `hi connect` (device keys, users, audit,
 spend), and `hi q` v0.20.
@@ -43,7 +43,9 @@ hi server spend [--since 30d]    gains an AI column next to compute
 ```
 
 `--url` defaults to OpenRouter (`https://openrouter.ai/api/v1`); any
-OpenAI-compatible endpoint works. `--model` is the model `hi q` suggests
+OpenAI-compatible endpoint works. `--no-key` is for one that takes no key,
+such as a model served on the team's own machine; then no Authorization
+header is sent. `--model` is the model `hi q` suggests
 and uses when the user hasn't chosen one; it defaults to
 `anthropic/claude-haiku-4.5`. `set` makes one small request with the key
 before saving it, as `hi q --setup` does. The key is kept with the other

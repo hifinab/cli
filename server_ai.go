@@ -38,6 +38,9 @@ type serverAISettings struct {
 	URL   string `json:"url"`
 	Model string `json:"model"`
 	Off   bool   `json:"off,omitempty"`
+	// NoKey is set for an endpoint that takes no key, such as a model
+	// served on the team's own machine.
+	NoKey bool `json:"no_key,omitempty"`
 }
 
 // serverAIUsage is one line of ai_usage.jsonl: who, which model, and the
@@ -103,7 +106,14 @@ func (s *hiServer) aiConfig() (serverAISettings, string, bool) {
 	s.mu.Lock()
 	key := s.keys[serverAIKeyName]
 	s.mu.Unlock()
-	return settings, key, key != "" && !settings.Off
+	return settings, key, (key != "" || settings.NoKey) && !settings.Off
+}
+
+// setAuthorization adds the team's key, unless the endpoint takes none.
+func setAIAuthorization(request *http.Request, key string) {
+	if key != "" {
+		request.Header.Set("Authorization", "Bearer "+key)
+	}
 }
 
 func writeAIError(w http.ResponseWriter, status int, message string) {
@@ -139,7 +149,7 @@ func (s *hiServer) handleAIModels(w http.ResponseWriter, r *http.Request, device
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
 		request, _ := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(settings.URL, "/")+"/models", nil)
-		request.Header.Set("Authorization", "Bearer "+key)
+		setAIAuthorization(request, key)
 		response, err := http.DefaultClient.Do(request)
 		if err != nil {
 			writeAIError(w, http.StatusBadGateway, "the model list could not be fetched: "+err.Error())
@@ -186,7 +196,7 @@ func (s *hiServer) handleAIChat(w http.ResponseWriter, r *http.Request, device s
 	defer cancel()
 	upstream, _ := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(settings.URL, "/")+"/chat/completions", bytes.NewReader(payload))
 	upstream.Header.Set("Content-Type", "application/json")
-	upstream.Header.Set("Authorization", "Bearer "+key)
+	setAIAuthorization(upstream, key)
 	if qHost(settings.URL) == "openrouter.ai" {
 		upstream.Header.Set("HTTP-Referer", "https://hifin.sh")
 		upstream.Header.Set("X-Title", "hi q via hi server")
@@ -320,7 +330,7 @@ func (s *hiServer) aiAdminRoutes(mux *http.ServeMux) {
 		settings, key, on := s.aiConfig()
 		now := computeNow()
 		writeJSON(w, http.StatusOK, map[string]any{
-			"on": on, "has_key": key != "", "url": settings.URL, "model": settings.Model,
+			"on": on, "has_key": key != "" || settings.NoKey, "url": settings.URL, "model": settings.Model,
 			"usage": describeAIUsage(readAIUsage(s.dir, monthStart(now), now)),
 		})
 	})
@@ -331,6 +341,7 @@ func (s *hiServer) aiAdminRoutes(mux *http.ServeMux) {
 			URL   string `json:"url"`
 			Model string `json:"model"`
 			Off   *bool  `json:"off"`
+			NoKey *bool  `json:"no_key"`
 		}
 		json.NewDecoder(io.LimitReader(r.Body, serverMaxBody)).Decode(&input)
 		settings := readServerAISettings(s.dir)
@@ -343,11 +354,14 @@ func (s *hiServer) aiAdminRoutes(mux *http.ServeMux) {
 		if input.Off != nil {
 			settings.Off = *input.Off
 		}
+		if input.NoKey != nil {
+			settings.NoKey = *input.NoKey
+		}
 		s.mu.Lock()
 		if input.Key != "" {
 			s.keys[serverAIKeyName] = strings.TrimSpace(input.Key)
 		}
-		hasKey := s.keys[serverAIKeyName] != ""
+		hasKey := s.keys[serverAIKeyName] != "" || settings.NoKey
 		err := s.saveKeysLocked()
 		s.mu.Unlock()
 		if err == nil {
@@ -394,11 +408,12 @@ func serverAICommand(args []string, stdin io.Reader, stdout, stderr io.Writer) e
 	as := flags.String("as", currentUserName(), "who is acting")
 	urlFlag := flags.String("url", "", "an OpenAI-compatible base URL (default OpenRouter)")
 	modelFlag := flags.String("model", "", "the default model (default "+serverAIDefaultModel+")")
+	noKey := flags.Bool("no-key", false, "the endpoint takes no key, such as a model on the team's own machine")
 	positional, err := flags.parse(args)
 	if err != nil {
 		return err
 	}
-	usage := usageError{"usage: hi server ai [set [--url URL] [--model M] | off | remove]"}
+	usage := usageError{"usage: hi server ai [set [--url URL] [--model M] [--no-key] | off | remove]"}
 	dir, err := serverDirectory(*dirFlag)
 	if err != nil {
 		return err
@@ -438,7 +453,7 @@ func serverAICommand(args []string, stdin io.Reader, stdout, stderr io.Writer) e
 		case status.On:
 			fmt.Fprintf(stdout, "Serving %s's models to connected devices; the default is %s.\n", qHost(status.URL), status.Model)
 		case status.HasKey:
-			fmt.Fprintln(stdout, "Off; the key is kept. Turn it on with `hi server ai set`.")
+			fmt.Fprintln(stdout, "Off. Turn it on with `hi server ai set`.")
 		default:
 			fmt.Fprintln(stdout, "Not set up. Store an OpenRouter key with `hi server ai set`.")
 			return nil
@@ -461,7 +476,11 @@ func serverAICommand(args []string, stdin io.Reader, stdout, stderr io.Writer) e
 		if data, err := os.ReadFile(filepath.Join(dir, "keys.json")); err == nil {
 			json.Unmarshal(data, &keys)
 		}
-		if keys[serverAIKeyName] == "" || *urlFlag != "" || isTerminal(stdin) {
+		settings.NoKey = *noKey
+		if *noKey && *urlFlag == "" {
+			return usageError{"--no-key needs --url, the endpoint that takes no key"}
+		}
+		if !*noKey && (keys[serverAIKeyName] == "" || *urlFlag != "" || isTerminal(stdin)) {
 			prompt := "the upstream"
 			if qHost(settings.URL) == "openrouter.ai" {
 				prompt = "OpenRouter"
@@ -475,13 +494,16 @@ func serverAICommand(args []string, stdin io.Reader, stdout, stderr io.Writer) e
 			}
 		}
 		checkKey := firstNonEmpty(key, keys[serverAIKeyName])
+		if *noKey {
+			checkKey = ""
+		}
 		fmt.Fprintf(stdout, "Checking %s with %s...\n", settings.Model, qHost(settings.URL))
 		if err := checkServerAIKey(settings.URL, checkKey, settings.Model); err != nil {
 			return fmt.Errorf("the key or model doesn't work: %w", err)
 		}
 		off := false
 		if running {
-			body := map[string]any{"as": *as, "key": key, "url": settings.URL, "model": settings.Model, "off": &off}
+			body := map[string]any{"as": *as, "key": key, "url": settings.URL, "model": settings.Model, "off": &off, "no_key": noKey}
 			if err := adminCall(*dirFlag, http.MethodPost, "/admin/ai", body, nil); err != nil {
 				return err
 			}
@@ -499,7 +521,9 @@ func serverAICommand(args []string, stdin io.Reader, stdout, stderr io.Writer) e
 			}
 		}
 		fmt.Fprintf(stdout, "Connected devices can now use %s's models through this server; hi q's default is %s.\n", qHost(settings.URL), settings.Model)
-		fmt.Fprintln(stdout, "Tip: set a spending limit on the key with the upstream, too.")
+		if !*noKey {
+			fmt.Fprintln(stdout, "Tip: set a spending limit on the key with the upstream, too.")
+		}
 		return nil
 	case "off":
 		off := true

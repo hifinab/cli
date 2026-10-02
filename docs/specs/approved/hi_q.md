@@ -1,8 +1,8 @@
 # `hi q` specification
 
 Status: Approved (2026-10-02). Release 1 shipped in v0.19.0 and release 2
-in v0.20.0; release 3 is reshaped: project notes and a local model are planned as
-v0.22.0, and the Codex and opencode backends are deferred.
+in v0.20.0; release 3 is reshaped: project notes and the local-model recipe shipped
+in v0.22.0, and the Codex and opencode backends are deferred.
 
 Dependencies: none required. It can use `hi context` facts, a model served
 by `hi model serve`, and the bundled skill from `hi skill` if they exist.
@@ -174,9 +174,13 @@ a destructive reading. It also includes a short summary of hi's own commands,
 taken from the bundled `skills/hi/SKILL.md`, so `hi q rent me an h100 for an
 hour` can propose `hi compute ...`.
 
-Later, a project can add notes in `.hifin/q.md`, such as how to run its
-tests or where its logs are. It is off until the user allows it once, as
-direnv does, because the repository writes it.
+A project can add notes in `.hifin/q.md` at the repository's root (or the
+current folder outside git), such as how to run its tests or where its logs
+are. The repository writes them, so hi asks once before sending them,
+offering to show them, and asks again when their content changes, as
+direnv does; the decision per file and content hash is kept in
+`~/.local/state/hi/q/notes.json`. Without a terminal, undecided notes are
+not sent. Up to 4 KB go with each question, redacted like the rest.
 
 ## Providers
 

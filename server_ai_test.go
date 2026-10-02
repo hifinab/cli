@@ -304,3 +304,26 @@ func TestModelSpendOnTheDashboard(t *testing.T) {
 		t.Fatalf("user home line = %q", line)
 	}
 }
+
+func TestServerAIWithoutKey(t *testing.T) {
+	ts, _ := newAIServer(t)
+	local := newFakeUpstream(t, "uptime")
+	ts.server.mu.Lock()
+	delete(ts.server.keys, serverAIKeyName)
+	ts.server.mu.Unlock()
+	writeServerAISettings(ts.dir, serverAISettings{URL: local.server.URL, Model: "local-model", NoKey: true})
+	status, stdout, stderr := askQ(t, "--print", "uptime?")
+	if status != 0 || stdout != "uptime\n" {
+		t.Fatalf("status %d stdout %q stderr %q", status, stdout, stderr)
+	}
+	if local.auth[0] != "" || local.requests[0]["model"] != "local-model" {
+		t.Fatalf("auth %q body %v", local.auth, local.requests[0])
+	}
+
+	dir := filepath.Join(t.TempDir(), "server")
+	runHi("server", "init", "--dir", dir)
+	code, out, errOut := runHi("server", "ai", "set", "--dir", dir, "--url", local.server.URL, "--model", "local-model", "--no-key")
+	if code != 0 || !strings.Contains(out, "hi q's default is local-model") || !readServerAISettings(dir).NoKey {
+		t.Fatalf("set --no-key: %d %s %s", code, out, errOut)
+	}
+}

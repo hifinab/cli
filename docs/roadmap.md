@@ -519,18 +519,20 @@ each type starts.
   server runs v0.21.0 and serves the team's OpenRouter key since 2026-10-02.
   Approved spec: [hi_server_ai.md](specs/approved/hi_server_ai.md).
 
-## Planned
-
 ### v0.22.0 — `hi q`: project notes, team spend, and a local model
 
-- [ ] AI spend from `hi server ai` in `hi server live` and the Slack App
+- [x] AI spend from `hi server ai` in `hi server live` and the Slack App
   Home (release 2 of [hi_server_ai.md](specs/approved/hi_server_ai.md)).
-- [ ] Project notes in `.hifin/q.md`: how to test, where the logs are, what
+- [x] Project notes in `.hifin/q.md`: how to test, where the logs are, what
   not to run. `hi q` uses them only after the user allows them once per
-  repository.
-- [ ] A tested recipe for a local model on the Strix Halo as the team's
-  default behind `hi server ai set --url`, with the model chosen for tool
-  calls.
+  file content. This repository has its own.
+- [x] A local model as the team's default: `hi server ai set --url …
+  --no-key` for upstreams without a key. Tested on 2026-10-02 with
+  `halogen-qwen3.8-flash-next` already served on aiw11: correct tool calls
+  and commands in 4–14 seconds, against about 2 seconds for Haiku through
+  OpenRouter. The production server still uses OpenRouter.
+
+## Planned
 
 ### v0.23.0 — Containers
 

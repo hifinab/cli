@@ -495,7 +495,8 @@ their own:
 ```sh
 hi server ai set                       # asks for the OpenRouter key, shown as *
 hi server ai set --model google/gemini-2.5-flash   # change the default
-hi server ai set --url http://aiw11:8080/v1        # another endpoint
+hi server ai set --url http://aiw11.hi.fin:8731/v1 --model <name> --no-key
+                                       # a model on your own machine, no key
 hi server ai                           # the setup and this month's use per user
 hi server ai off                       # stop serving; keeps the key
 hi server ai remove                    # stop and delete the key
@@ -511,9 +512,28 @@ hi server ai remove                    # stop and delete the key
   shows it under "Models through hi q".
 - Nothing in hi limits spending on models. Set a credit limit on the key at
   OpenRouter as the backstop.
+- `hi server live` and the Slack Home tab show this month's model spend next
+  to compute.
 - Prompts carry the user's shell history and folder names. The server
   passes them on and stores none of them, but whoever runs it could read
   them in transit; tell your users.
+
+#### A model on your own machine
+
+Any OpenAI-compatible server on the network works as the upstream, such as
+llama.cpp's `llama-server`, vLLM, or Ollama (`http://<host>:11434/v1`), and
+prompts then never leave your network. `--no-key` is for servers that take
+no key; `--model` must be a name from the server's `/v1/models`.
+
+It needs a model that calls tools well, since `hi q` lists and reads files
+through tool calls. Tested on 2026-10-02 with `halogen-qwen3.8-flash-next`
+(Qwen 3.8 Flash Next) served on the Strix Halo workstation aiw11: correct
+commands and tool calls, 4–14 seconds an answer, against about 2 seconds for
+Claude Haiku 4.5 through OpenRouter. Large models need most of the machine's
+memory, so share it knowingly: a 4-bit Qwen 3.8 Flash Next is about 110 GB.
+
+Switch back to OpenRouter with `hi server ai set` without `--url`; the
+stored key is kept.
 
 ### Watch and stop
 
