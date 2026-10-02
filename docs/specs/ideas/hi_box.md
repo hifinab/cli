@@ -2,8 +2,11 @@
 
 Status: Draft, with every open question answered (2026-10-02): the name
 `hi box`, rootless Podman with `crun` (Docker as the fallback, no Docker
-Sandboxes), `devcontainer.json` with `customizations.hi`, and credentials
-added at the proxy for both agents. Ready for approval.
+Sandboxes), `devcontainer.json` with `customizations.hi`, and Claude
+Code's token added at the proxy outside the box. Codex's ChatGPT sign-in
+still goes into the box in the first version: its traffic to `chatgpt.com`
+is encrypted end to end, and whether Codex accepts another base address
+for it is untested. Ready for approval.
 
 Dependencies: `hi install` (Podman as a new tool), the v0.1.0 workstation
 setup (ROCm, render and video groups), `hi server` (policy, audit, Slack,
