@@ -18,6 +18,8 @@ import (
 const (
 	qOpenAIURL       = "https://api.openai.com/v1"
 	qOpenAIModel     = "gpt-5-mini"
+	qOpenRouterURL   = "https://openrouter.ai/api/v1"
+	qOpenRouterModel = "anthropic/claude-haiku-4.5"
 	qAnthropicURL    = "https://api.anthropic.com"
 	qAnthropicModel  = "claude-haiku-4-5"
 	qClaudeCodeModel = "haiku"
@@ -102,25 +104,44 @@ func (p qOpenAI) label() string {
 }
 
 func (p qOpenAI) ask(ctx context.Context, system, user string) (qReply, error) {
+	reply, err := p.request(ctx, system, user, true)
+	// Some models, mostly small local ones, reject tools. They are asked
+	// for the reply as JSON instead, which qTextReply reads.
+	if err != nil && qToolsUnsupported(err) {
+		return p.request(ctx, system+"\n\n"+qJSONInstruction, user, false)
+	}
+	return reply, err
+}
+
+const qJSONInstruction = `You have no tools here. To propose a command, reply with only this JSON and nothing else: {"kind":"command","command":"...","reason":"...","risk":"read-only|changes|dangerous"}. To answer a question, reply in plain text.`
+
+func (p qOpenAI) request(ctx context.Context, system, user string, tools bool) (qReply, error) {
 	body := map[string]any{
 		"model": p.model,
 		"messages": []map[string]string{
 			{"role": "system", "content": system},
 			{"role": "user", "content": user},
 		},
-		"tools": []map[string]any{{
+	}
+	if tools {
+		body["tools"] = []map[string]any{{
 			"type": "function",
 			"function": map[string]any{
 				"name":        "propose",
 				"description": qProposeDescription,
 				"parameters":  qProposeSchema,
 			},
-		}},
-		"tool_choice": "auto",
+		}}
+		body["tool_choice"] = "auto"
 	}
 	headers := map[string]string{}
 	if p.key != "" {
 		headers["Authorization"] = "Bearer " + p.key
+	}
+	if qHost(p.baseURL) == "openrouter.ai" {
+		// OpenRouter's optional attribution headers.
+		headers["HTTP-Referer"] = "https://hifin.sh"
+		headers["X-Title"] = "hi q"
 	}
 	var response struct {
 		Choices []struct {
@@ -154,6 +175,26 @@ func (p qOpenAI) ask(ctx context.Context, system, user string) (qReply, error) {
 		return reply, reply.valid()
 	}
 	return qTextReply(message.Content)
+}
+
+// qHTTPError is a non-2xx answer, kept typed so callers can look at it.
+type qHTTPError struct {
+	host    string
+	status  string
+	code    int
+	message string
+}
+
+func (e *qHTTPError) Error() string {
+	return fmt.Sprintf("%s answered %s: %s", e.host, e.status, e.message)
+}
+
+func qToolsUnsupported(err error) bool {
+	var httpErr *qHTTPError
+	if !errors.As(err, &httpErr) || httpErr.code < 400 || httpErr.code >= 500 || httpErr.code == 401 || httpErr.code == 403 {
+		return false
+	}
+	return strings.Contains(strings.ToLower(httpErr.message), "tool")
 }
 
 // ---------------------------------------------------------------------------
@@ -292,7 +333,7 @@ func qPostJSON(ctx context.Context, client *http.Client, url string, headers map
 		return err
 	}
 	if response.StatusCode/100 != 2 {
-		return fmt.Errorf("%s answered %s: %s", qHost(url), response.Status, qErrorMessage(payload))
+		return &qHTTPError{host: qHost(url), status: response.Status, code: response.StatusCode, message: qErrorMessage(payload)}
 	}
 	if err := json.Unmarshal(payload, out); err != nil {
 		return fmt.Errorf("%s sent a reply hi could not read: %w", qHost(url), err)
@@ -449,6 +490,10 @@ func resolveQProvider(name, model string) (qChoice, error) {
 		chosen := firstNonEmpty(model, os.Getenv("HI_Q_MODEL"), qOpenAIModel)
 		return qChoice{provider: qOpenAI{baseURL: base, key: key, model: chosen}, source: "OPENAI_API_KEY"}, nil
 	}
+	if key := os.Getenv("OPENROUTER_API_KEY"); key != "" {
+		chosen := firstNonEmpty(model, os.Getenv("HI_Q_MODEL"), qOpenRouterModel)
+		return qChoice{provider: qOpenAI{baseURL: qOpenRouterURL, key: key, model: chosen}, source: "OPENROUTER_API_KEY"}, nil
+	}
 	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
 		chosen := firstNonEmpty(model, os.Getenv("HI_Q_MODEL"), qAnthropicModel)
 		base := firstNonEmpty(os.Getenv("ANTHROPIC_BASE_URL"), qAnthropicURL)
@@ -472,6 +517,18 @@ func qProviderByName(name, model string, config qConfig, key string) (qChoice, e
 		}
 		chosen := firstNonEmpty(model, config.Model, qOpenAIModel)
 		return qChoice{provider: qOpenAI{baseURL: base, key: key, model: chosen}, source: "--provider openai"}, nil
+	case "openrouter":
+		if config.Provider != "openrouter" {
+			config = qConfig{}
+		}
+		if config.Provider != "openrouter" || key == "" {
+			key = os.Getenv("OPENROUTER_API_KEY")
+		}
+		if key == "" {
+			return qChoice{}, errors.New("no OpenRouter key; run hi q --setup or set OPENROUTER_API_KEY")
+		}
+		chosen := firstNonEmpty(model, config.Model, qOpenRouterModel)
+		return qChoice{provider: qOpenAI{baseURL: qOpenRouterURL, key: key, model: chosen}, source: "--provider openrouter"}, nil
 	case "anthropic":
 		if config.Provider != "anthropic" {
 			config = qConfig{}
@@ -495,7 +552,7 @@ func qProviderByName(name, model string, config qConfig, key string) (qChoice, e
 		}
 		return qChoice{provider: qClaudeCode{binary: binary, model: firstNonEmpty(model, chosen)}, source: "--provider claude"}, nil
 	}
-	return qChoice{}, fmt.Errorf("unknown provider %q; use openai, anthropic, or claude", name)
+	return qChoice{}, fmt.Errorf("unknown provider %q; use openai, openrouter, anthropic, or claude", name)
 }
 
 func firstNonEmpty(values ...string) string {

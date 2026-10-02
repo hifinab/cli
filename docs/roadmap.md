@@ -471,6 +471,13 @@ each type starts.
   showing the status. Everything from the first word that doesn't start with
   a dash is the question; `--` ends the options.
 
+### v0.19.2 — OpenRouter for hi q
+
+- [x] OpenRouter in `hi q --setup` and from `OPENROUTER_API_KEY`: only
+  models that call tools are listed, all of them (the list was cut at 300),
+  with fast, cheap ones first.
+- [x] Models that reject tools are asked for JSON instead.
+
 ## Planned
 
 ### v0.20.0 — `hi q`: shell integration, tools, and chat

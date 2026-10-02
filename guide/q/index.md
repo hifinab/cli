@@ -30,14 +30,19 @@ The first time, `hi q` uses what it finds, in this order:
 2. `HI_Q_BASE_URL` and `HI_Q_MODEL`, with `HI_Q_API_KEY` if the endpoint
    needs a key.
 3. `OPENAI_API_KEY` (and `OPENAI_BASE_URL` if set), then
-   `ANTHROPIC_API_KEY`.
+   `OPENROUTER_API_KEY`, then `ANTHROPIC_API_KEY`.
 4. Claude Code, if it is installed. It uses your Claude sign-in and the Haiku
    model; an answer takes a few seconds, because each one starts Claude Code.
 
 If none of these are there, a menu opens. Run `hi q --setup` to choose again:
 
 - **Claude Code**: no key needed.
-- **An OpenAI-compatible endpoint**: OpenAI, OpenRouter, Groq, Ollama
+- **OpenRouter**: one key from [openrouter.ai/keys](https://openrouter.ai/keys)
+  for models from Anthropic, OpenAI, Google, DeepSeek, and others. Only
+  models that can call tools are listed, with fast, cheap ones such as
+  `anthropic/claude-haiku-4.5` and `google/gemini-2.5-flash` first; press
+  `/` to filter.
+- **An OpenAI-compatible endpoint**: OpenAI, Groq, Ollama
   (`http://localhost:11434/v1`), vLLM, llama.cpp, LM Studio, or a model you
   serve with `hi compute serve`. Give the base URL, the key (not asked for
   local addresses), and the model, chosen from the endpoint's list when it
@@ -46,8 +51,12 @@ If none of these are there, a menu opens. Run `hi q --setup` to choose again:
 
 `hi q` tries the choice with one small request before saving it. The key is
 kept in `~/.config/hi/q-key`, readable only by you. `hi q --status` shows
-which model is in use and where it came from. Use `--provider openai|anthropic|claude`
+which model is in use and where it came from. Use
+`--provider openai|openrouter|anthropic|claude`
 or `--model <name>` to change them for one question.
+
+A model that can't call tools, such as some small local ones, is asked for
+its answer as JSON instead, so it still works.
 
 ## What is sent
 

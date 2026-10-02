@@ -351,7 +351,7 @@ func TestQTextReplyReadsJSON(t *testing.T) {
 func TestQSetupSavesEndpoint(t *testing.T) {
 	isolateQ(t)
 	server, _ := fakeOpenAI(t, map[string]any{"content": "ok"})
-	ui := lineUI{in: strings.NewReader("1\n" + server.URL + "/v1\nlocal-model\n"), out: io.Discard}
+	ui := lineUI{in: strings.NewReader("2\n" + server.URL + "/v1\nlocal-model\n"), out: io.Discard}
 	choice, err := runQSetup(ui)
 	if err != nil {
 		t.Fatal(err)
@@ -408,5 +408,66 @@ func TestQActionsAreOptions(t *testing.T) {
 	stderr.Reset()
 	if status := runQ([]string{"-x", "y"}, strings.NewReader(""), &stdout, &stderr); status != 2 || !strings.Contains(stderr.String(), "put -- before") {
 		t.Fatalf("unknown option: %d %q", status, stderr.String())
+	}
+}
+
+func TestQOpenAIFallsBackWithoutTools(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		if _, ok := body["tools"]; ok {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error":{"message":"No endpoints found that support tool use."}}`))
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{
+			"content": `{"kind":"command","command":"ls -la","reason":"Lists.","risk":"read-only"}`}}}})
+	}))
+	defer server.Close()
+	reply, err := qOpenAI{baseURL: server.URL, model: "m"}.ask(context.Background(), "s", "u")
+	if err != nil || reply.Command != "ls -la" || calls != 2 {
+		t.Fatalf("reply = %+v, err = %v, calls = %d", reply, err, calls)
+	}
+}
+
+func TestQOpenAIKeepsOtherErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"message":"No auth credentials found"}}`))
+	}))
+	defer server.Close()
+	_, err := qOpenAI{baseURL: server.URL, model: "m"}.ask(context.Background(), "s", "u")
+	if err == nil || !strings.Contains(err.Error(), "401") || !strings.Contains(err.Error(), "No auth credentials") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestQListModelsKeepsToolModels(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"data":[
+			{"id":"z/plain","supported_parameters":["temperature"]},
+			{"id":"a/tools","supported_parameters":["tools","temperature"]},
+			{"id":"anthropic/claude-haiku-4.5","supported_parameters":["tools"]},
+			{"id":"anthropic/claude-haiku-4.5:batch","supported_parameters":["tools"]}]}`))
+	}))
+	defer server.Close()
+	got := qSuggestedFirst(qListModels(server.URL, ""))
+	if strings.Join(got, ",") != "anthropic/claude-haiku-4.5,a/tools" {
+		t.Fatalf("models = %q", got)
+	}
+}
+
+func TestQOpenRouterFromEnvironment(t *testing.T) {
+	isolateQ(t)
+	t.Setenv("OPENROUTER_API_KEY", "or-key")
+	choice, err := resolveQProvider("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := choice.provider.(qOpenAI)
+	if provider.baseURL != qOpenRouterURL || provider.key != "or-key" || provider.model != qOpenRouterModel {
+		t.Fatalf("provider = %+v", provider)
 	}
 }

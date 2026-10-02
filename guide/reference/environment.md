@@ -17,6 +17,7 @@ description: The environment variables hi reads and the files it writes.
 | `HI_NETBIRD_SETUP_KEY`  | Setup key for `hi net` in scripts                                 |
 | `HI_Q_BASE_URL`, `HI_Q_MODEL`, `HI_Q_API_KEY` | `hi q`: an OpenAI-compatible endpoint, its model, and key |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | `hi q`: OpenAI, or another endpoint with an OpenAI key |
+| `OPENROUTER_API_KEY`    | `hi q`: OpenRouter                                                |
 | `ANTHROPIC_API_KEY`     | `hi q`: the Anthropic API                                         |
 | `SHELL`, `HISTFILE`     | `hi q`: the shell that runs commands, and its history file        |
 | `HI_TEMPLATES_DIR`      | `hi init`: a folder of extra template layers, for template authors |

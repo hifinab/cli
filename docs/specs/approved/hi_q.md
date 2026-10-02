@@ -169,7 +169,8 @@ hi uses the first of these that works, and `hi q --status` names it:
 
 1. `--provider`, or the provider saved by `hi q --setup`.
 2. `HI_Q_BASE_URL` / `HI_Q_API_KEY` / `HI_Q_MODEL`.
-3. `OPENAI_API_KEY` (with `OPENAI_BASE_URL` if set), then `ANTHROPIC_API_KEY`.
+3. `OPENAI_API_KEY` (with `OPENAI_BASE_URL` if set), then
+   `OPENROUTER_API_KEY`, then `ANTHROPIC_API_KEY`.
 4. A local OpenAI-compatible server: `hi model serve`, Ollama on
    `localhost:11434`, or llama.cpp/vLLM on a configured port.
 5. Claude Code, if `claude` is installed and signed in.

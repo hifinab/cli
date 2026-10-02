@@ -151,7 +151,7 @@ device the team's private ones.
 | `<cmd> \| hi q <question>`       | Ask about piped output, up to 32 KB                          |
 | `hi q --explain '<command>'`     | Explain a command without running it                         |
 | `hi q --print <prompt>`          | Print only the command, for scripts                          |
-| `hi q --setup`                   | Choose the model: Claude Code, an OpenAI-compatible endpoint, or an Anthropic key |
+| `hi q --setup`                   | Choose the model: Claude Code, OpenRouter, an OpenAI-compatible endpoint, or an Anthropic key |
 | `hi q --status`                  | The model in use and where it came from                      |
 | `hi q --context`                 | What is sent with each question                              |
 
@@ -159,7 +159,7 @@ Everything after the first word that doesn't start with `-` is the
 question, so `hi q status of the log file` asks the model. hi's own options
 go before it; put `--` before a question that starts with a dash.
 
-Options: `--provider openai|anthropic|claude` and `--model <name>` for one
+Options: `--provider openai|openrouter|anthropic|claude` and `--model <name>` for one
 question, `--no-context` to send only the prompt, and `--yes` to run
 read-only commands without asking. Dangerous commands always need `yes`
 typed. See [Ask for a command](/guide/q/).
