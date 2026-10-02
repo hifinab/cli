@@ -396,8 +396,8 @@ func signRequest(request *http.Request, key ed25519.PrivateKey, body []byte) {
 }
 
 // verifyRequest checks the signature and returns the key and its body.
-func (s *hiServer) verifyRequest(request *http.Request) (ed25519.PublicKey, []byte, error) {
-	body, err := io.ReadAll(io.LimitReader(request.Body, serverMaxBody))
+func (s *hiServer) verifyRequest(request *http.Request, limit int64) (ed25519.PublicKey, []byte, error) {
+	body, err := io.ReadAll(io.LimitReader(request.Body, limit))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -531,14 +531,20 @@ func (s *hiServer) clientHandler() http.Handler {
 	mux.HandleFunc("POST /v1/slack-link", s.device(s.handleSlackLink))
 	mux.HandleFunc("GET /v1/templates", s.device(s.handleTemplateCatalog))
 	mux.HandleFunc("GET /v1/templates/{source}/{commit}", s.device(s.handleTemplateBundle))
+	s.aiRoutes(mux)
 	return mux
 }
 
 type deviceHandler func(w http.ResponseWriter, r *http.Request, device serverDevice, body []byte)
 
 func (s *hiServer) device(next deviceHandler) http.HandlerFunc {
+	return s.deviceLimited(serverMaxBody, next)
+}
+
+// deviceLimited is device with its own limit on the body's size.
+func (s *hiServer) deviceLimited(limit int64, next deviceHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		public, body, err := s.verifyRequest(r)
+		public, body, err := s.verifyRequest(r, limit)
 		if err != nil {
 			writeAPIError(w, http.StatusUnauthorized, err.Error())
 			return
@@ -577,7 +583,7 @@ func (s *hiServer) device(next deviceHandler) http.HandlerFunc {
 }
 
 func (s *hiServer) handleEnroll(w http.ResponseWriter, r *http.Request) {
-	public, body, err := s.verifyRequest(r)
+	public, body, err := s.verifyRequest(r, serverMaxBody)
 	if err != nil {
 		writeAPIError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -1591,6 +1597,7 @@ func (s *hiServer) adminHandler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"removed": name})
 	})
 	s.approversHandler(mux)
+	s.aiAdminRoutes(mux)
 	mux.HandleFunc("GET /admin/live", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, s.liveSnapshot(""))
 	})
@@ -1625,15 +1632,19 @@ func (s *hiServer) spendSummary(from, to time.Time) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	rows, perGroup := s.spendTableLocked(policy, from, to)
+	ai := ""
+	if usage := readAIUsage(s.dir, from, to); len(usage) > 0 {
+		ai = "\n\nModels through hi q: " + describeAIUsage(usage)
+	}
 	if len(rows) == 0 {
-		return fmt.Sprintf("Nothing was spent since %s.", from.Local().Format("2 Jan 15:04"))
+		return fmt.Sprintf("No compute was used since %s.", from.Local().Format("2 Jan 15:04")) + ai
 	}
 	var total float64
 	for _, row := range rows {
 		total += row.Spend
 	}
 	return fmt.Sprintf("Since %s: %s\n\nBy user\n%s\n\nBy group\n%s", from.Local().Format("2 Jan 15:04"),
-		formatDollars(total), describeSpendRows(rows, 50), describeGroupSpend(policy, perGroup))
+		formatDollars(total), describeSpendRows(rows, 50), describeGroupSpend(policy, perGroup)) + ai
 }
 
 // decodeDeviceKey reads a device key as `hi connect key` prints it.
@@ -1785,6 +1796,8 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(serverPolicyCommand(rest, stdin, stdout, stderr), stderr)
 	case "spend":
 		return exitCode(serverSpendCommand(rest, stdout, stderr), stderr)
+	case "ai":
+		return exitCode(serverAICommand(rest, stdin, stdout, stderr), stderr)
 	case "viewer":
 		return exitCode(serverViewerCommand(rest, stdout, stderr), stderr)
 	case "live":
@@ -1827,7 +1840,8 @@ Usage:
   hi server approvers remove <Slack ID> | list
   hi server policy show|edit|example|check
                                           Groups: limits, auto-approve, budgets
-  hi server spend [--since 30d]           Spend per user and group
+  hi server spend [--since 30d]           Spend per user and group, compute and models
+  hi server ai [set|off|remove]           Pass hi q's model requests to OpenRouter with the team's key
   hi server live [--wall]                 Live dashboard; --wall is read-only for a shared screen
   hi server wall setup|add|remove|list    Show the wall dashboard on screens over SSH (needs sudo)
   hi server viewer add <name> --key K     A device that may only watch the dashboard

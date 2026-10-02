@@ -189,6 +189,17 @@ A full-screen view of your managed machines: running time, cost so far, a
 bar towards each time limit, your requests, and your budget. Select a
 machine with the arrow keys and press `s` to stop it, or `q` to quit.
 
+### Use the team's model with hi q
+
+When the server serves a model, [`hi q`](/guide/q/) uses it without a key or
+any setup, and `hi q --setup` lists it first. Your choice of model is
+yours; the server passes requests to the upstream with the team's key.
+`hi q --status` shows "… via <server>".
+
+If the server can't be reached, `hi q` falls back to your own key or Claude
+Code, if you have one, and says so in a dim line. Without one, it stops
+until the server is back.
+
 ### Leave the server
 
 ```sh
@@ -455,6 +466,35 @@ hi server templates remove private
   stored the first time they connected.
 - To keep a group from seeing a source, list the ones it may use in
   `policy.json`: `"template_sources": ["private"]`, or `[]` for none.
+
+### Serve a model to hi q
+
+The server can pass `hi q`'s requests to OpenRouter, or any
+OpenAI-compatible endpoint, with one team key, so nobody needs a key of
+their own:
+
+```sh
+hi server ai set                       # asks for the OpenRouter key, shown as *
+hi server ai set --model google/gemini-2.5-flash   # change the default
+hi server ai set --url http://aiw11:8080/v1        # another endpoint
+hi server ai                           # the setup and this month's use per user
+hi server ai off                       # stop serving; keeps the key
+hi server ai remove                    # stop and delete the key
+```
+
+- It is a plain pass-through: users and agents may ask for any model the
+  upstream has. The default, `anthropic/claude-haiku-4.5` unless you set
+  another, is what `hi q` uses when the user hasn't chosen one.
+- `set` makes one small request with the key and model before saving them.
+  Run it again to change them; Enter at the key prompt keeps the stored key.
+- Each request is recorded in `ai_usage.jsonl` with the user, device, model,
+  tokens, and cost, never the messages or the answer. `hi server spend`
+  shows it under "Models through hi q".
+- Nothing in hi limits spending on models. Set a credit limit on the key at
+  OpenRouter as the backstop.
+- Prompts carry the user's shell history and folder names. The server
+  passes them on and stores none of them, but whoever runs it could read
+  them in transit; tell your users.
 
 ### Watch and stop
 

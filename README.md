@@ -268,7 +268,7 @@ dangerous ones, such as `sudo`, `rm -r` outside the current folder, or
 `curl … | sh`, need `yes` typed, and globs in `mv`, `cp`, and `rm` show what
 they match first.
 
-`hi q --setup` chooses the model (Claude Code, OpenRouter, any
+`hi q --setup` chooses the model (the connected hi server's, Claude Code, OpenRouter, any
 OpenAI-compatible endpoint including Ollama and `hi compute serve`, or an
 Anthropic key) and offers to add shell integration to `~/.bashrc` or
 `~/.zshrc`. With it, `hi q` sees the shell's current history and last exit

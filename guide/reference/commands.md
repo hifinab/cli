@@ -102,7 +102,8 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server slack setup`, `slack manifest`           | Connect a Slack app; print its manifest              |
 | `hi server approvers add <id> --name <user>`        | Let a Slack member approve and stop; `remove`, `list` |
 | `hi server policy show\|edit\|example\|check`       | Group limits, auto-approve, and budgets              |
-| `hi server spend [--since <d>]`                     | Spend per user and group                             |
+| `hi server spend [--since <d>]`                     | Spend per user and group, compute and models         |
+| `hi server ai [set [--url <u>] [--model <m>]\|off\|remove]` | Pass `hi q`'s requests to OpenRouter with the team's key |
 | `hi server live [--wall] [--names full] [--reasons]` | Live dashboard; `--wall` is read-only               |
 | `sudo hi server wall setup\|add\|remove\|list`       | Show the wall on screens over SSH                    |
 | `hi server viewer add <name> --key <k>`             | A device that may only watch                         |
@@ -163,7 +164,7 @@ Everything from the first word that doesn't start with `-` is the
 question, so `hi q status of the log file` asks the model. hi's own options
 go before it; put `--` before a question that starts with a dash.
 
-Options: `--provider openai|openrouter|anthropic|claude` and `--model <name>`
+Options: `--provider server|openai|openrouter|anthropic|claude` and `--model <name>`
 for one question or chat, `--no-context` to send only the question, and
 `--yes` to run read-only commands without asking. Dangerous commands always
 need `yes` typed. See [Ask for a command](/guide/q/).

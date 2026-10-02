@@ -505,25 +505,29 @@ each type starts.
   quotes, and links with their address dimmed. Piped output keeps the
   Markdown. No new dependency.
 
-## Planned
-
 ### v0.21.0 — A team model through `hi server`
 
-- [ ] `hi server ai set|off|remove` stores the team's OpenRouter key on the
+- [x] `hi server ai set|off|remove` stores the team's OpenRouter key on the
   server, and connected devices and agents use it through a signed
   pass-through endpoint, with any model and the server's default first.
-- [ ] `hi q` uses the connected server without setup, lists it first in
+- [x] `hi q` uses the connected server without setup, lists it first in
   `hi q --setup`, and falls back to a personal provider when the server
   can't be used.
-- [ ] Usage per user, device, and model, without prompts, in `hi server ai`
+- [x] Usage per user, device, and model, without prompts, in `hi server ai`
   and `hi server spend`.
+  Tested live against OpenRouter through a local server; the production
+  server still needs `hi update` and `hi server ai set`.
   Approved spec: [hi_server_ai.md](specs/approved/hi_server_ai.md).
+
+## Planned
 
 ### v0.22.0 — `hi q`: more backends and project notes
 
 - [ ] Codex, local models (Ollama, `hi model serve`), and opencode.
 - [ ] Project notes in `.hifin/q.md`, used only after the user allows them
   once.
+- [ ] AI spend from `hi server ai` in `hi server live` and the Slack App
+  Home (release 2 of [hi_server_ai.md](specs/approved/hi_server_ai.md)).
 
 ### v0.23.0 — Containers
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -213,9 +214,16 @@ type qOpenAI struct {
 	key     string
 	model   string
 	client  *http.Client
+	// sign and via are set for a hi server: requests are signed with the
+	// device key instead of carrying an API key.
+	sign ed25519.PrivateKey
+	via  string
 }
 
 func (p qOpenAI) label() string {
+	if p.via != "" {
+		return fmt.Sprintf("%s via %s", firstNonEmpty(p.model, "the server's default model"), p.via)
+	}
 	return fmt.Sprintf("%s at %s", p.model, qHost(p.baseURL))
 }
 
@@ -297,7 +305,7 @@ func (p qOpenAI) request(ctx context.Context, system string, turns []qTurn, tool
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := qPostJSON(ctx, p.client, strings.TrimRight(p.baseURL, "/")+"/chat/completions", headers, body, &response); err != nil {
+	if err := qPostJSON(ctx, p.client, strings.TrimRight(p.baseURL, "/")+"/chat/completions", headers, body, &response, p.sign); err != nil {
 		return qStep{}, err
 	}
 	if len(response.Choices) == 0 {
@@ -355,6 +363,9 @@ type qHTTPError struct {
 	status  string
 	code    int
 	message string
+	// fromServer is set when a hi server itself refused, rather than the
+	// upstream it passes requests to.
+	fromServer bool
 }
 
 func (e *qHTTPError) Error() string {
@@ -435,7 +446,7 @@ func (p qAnthropic) step(ctx context.Context, system string, turns []qTurn, look
 			Input json.RawMessage `json:"input"`
 		} `json:"content"`
 	}
-	if err := qPostJSON(ctx, p.client, strings.TrimRight(p.baseURL, "/")+"/v1/messages", headers, body, &response); err != nil {
+	if err := qPostJSON(ctx, p.client, strings.TrimRight(p.baseURL, "/")+"/v1/messages", headers, body, &response, nil); err != nil {
 		return qStep{}, err
 	}
 	var text strings.Builder
@@ -566,7 +577,7 @@ func qTranscript(turns []qTurn) string {
 // ---------------------------------------------------------------------------
 // shared
 
-func qPostJSON(ctx context.Context, client *http.Client, url string, headers map[string]string, body, out any) error {
+func qPostJSON(ctx context.Context, client *http.Client, url string, headers map[string]string, body, out any, sign ed25519.PrivateKey) error {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -578,6 +589,10 @@ func qPostJSON(ctx context.Context, client *http.Client, url string, headers map
 	request.Header.Set("Content-Type", "application/json")
 	for name, value := range headers {
 		request.Header.Set(name, value)
+	}
+	if sign != nil {
+		request.Header.Set("User-Agent", "hi/"+version)
+		signRequest(request, sign, data)
 	}
 	if client == nil {
 		client = &http.Client{Timeout: qRequestTimeout}
@@ -592,7 +607,8 @@ func qPostJSON(ctx context.Context, client *http.Client, url string, headers map
 		return err
 	}
 	if response.StatusCode/100 != 2 {
-		return &qHTTPError{host: qHost(url), status: response.Status, code: response.StatusCode, message: qErrorMessage(payload)}
+		return &qHTTPError{host: qHost(url), status: response.Status, code: response.StatusCode, message: qErrorMessage(payload),
+			fromServer: response.Header.Get(serverAIErrorHeader) != ""}
 	}
 	if err := json.Unmarshal(payload, out); err != nil {
 		return fmt.Errorf("%s sent a reply hi could not read: %w", qHost(url), err)
@@ -720,6 +736,8 @@ type qChoice struct {
 	provider qProvider
 	source   string
 	saved    bool
+	// note is a one-line message to show, such as a fallback from the server.
+	note string
 }
 
 // resolveQProvider picks the provider in the spec's order: the flag, saved
@@ -744,6 +762,15 @@ func resolveQProvider(name, model string) (qChoice, error) {
 		}
 		return qChoice{provider: qOpenAI{baseURL: base, key: os.Getenv("HI_Q_API_KEY"), model: chosen}, source: "HI_Q_BASE_URL"}, nil
 	}
+	if choice, ok := qConnectedServerChoice(model, false); ok {
+		return choice, nil
+	}
+	return qPersonalProvider(model)
+}
+
+// qPersonalProvider is the user's own key or Claude Code: what hi q uses
+// without a hi server, and falls back to when the server can't be used.
+func qPersonalProvider(model string) (qChoice, error) {
 	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
 		base := firstNonEmpty(os.Getenv("OPENAI_BASE_URL"), qOpenAIURL)
 		chosen := firstNonEmpty(model, os.Getenv("HI_Q_MODEL"), qOpenAIModel)
@@ -800,6 +827,15 @@ func qProviderByName(name, model string, config qConfig, key string) (qChoice, e
 			return qChoice{}, errors.New("no Anthropic key; run hi q --setup or set ANTHROPIC_API_KEY")
 		}
 		return qChoice{provider: qAnthropic{baseURL: base, key: key, model: firstNonEmpty(model, config.Model, qAnthropicModel)}, source: "--provider anthropic"}, nil
+	case "server":
+		saved := ""
+		if config.Provider == "server" {
+			saved = config.Model
+		}
+		if choice, ok := qConnectedServerChoice(firstNonEmpty(model, saved), true); ok {
+			return choice, nil
+		}
+		return qChoice{}, errors.New("this device isn't connected to a hi server that serves a model; run hi connect, or choose another model with hi q --setup")
 	case "claude":
 		binary, err := exec.LookPath("claude")
 		if err != nil {
@@ -811,7 +847,7 @@ func qProviderByName(name, model string, config qConfig, key string) (qChoice, e
 		}
 		return qChoice{provider: qClaudeCode{binary: binary, model: firstNonEmpty(model, chosen)}, source: "--provider claude"}, nil
 	}
-	return qChoice{}, fmt.Errorf("unknown provider %q; use openai, openrouter, anthropic, or claude", name)
+	return qChoice{}, fmt.Errorf("unknown provider %q; use server, openai, openrouter, anthropic, or claude", name)
 }
 
 func firstNonEmpty(values ...string) string {

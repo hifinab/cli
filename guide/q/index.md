@@ -89,13 +89,18 @@ The first time, `hi q` uses what it finds, in this order:
 1. The model saved by `hi q --setup`.
 2. `HI_Q_BASE_URL` and `HI_Q_MODEL`, with `HI_Q_API_KEY` if the endpoint
    needs a key.
-3. `OPENAI_API_KEY` (and `OPENAI_BASE_URL` if set), then
+3. The [hi server](/guide/compute/managed/#use-the-teams-model-with-hi-q)
+   this device is connected to, when it serves a model: no key needed. If
+   it can't be reached, `hi q` falls back to the next of these and says so.
+4. `OPENAI_API_KEY` (and `OPENAI_BASE_URL` if set), then
    `OPENROUTER_API_KEY`, then `ANTHROPIC_API_KEY`.
-4. Claude Code, if it is installed. It uses your Claude sign-in and the Haiku
+5. Claude Code, if it is installed. It uses your Claude sign-in and the Haiku
    model; an answer takes a few seconds, because each one starts Claude Code.
 
 If none of these are there, a menu opens. Run `hi q --setup` to choose again:
 
+- **Your team's hi server**, first and recommended when this device is
+  connected to one that serves a model.
 - **Claude Code**: no key needed.
 - **OpenRouter**: one key from [openrouter.ai/keys](https://openrouter.ai/keys)
   for models from Anthropic, OpenAI, Google, DeepSeek, and others. Only
@@ -114,7 +119,7 @@ kept in `~/.config/hi/q-key`, readable only by you. When you run
 `hi q --setup` again for the same provider, Enter at the key prompt keeps
 the saved key, and the model in use is first in the list. `hi q --status` shows
 which model is in use and where it came from. Use
-`--provider openai|openrouter|anthropic|claude`
+`--provider server|openai|openrouter|anthropic|claude`
 or `--model <name>` to change them for one question.
 
 A model that can't call tools, such as some small local ones, is asked for

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -74,6 +75,37 @@ func runQSetup(ui menuUI) (qChoice, error) {
 			return saved.Model
 		}
 		return ""
+	}
+	if connection, err := loadServerConnection(); err == nil && connection != nil {
+		if deviceKey, err := loadDeviceKey(false); err == nil {
+			name := qServerName(connection.URL)
+			var info apiAI
+			var down string
+			ui.busy("Asking "+name+"…", func() { info, down = qServerAI(connection, deviceKey, true) })
+			switch {
+			case down != "":
+				ui.note(fmt.Sprintf("Your hi server %s %s, so it isn't offered.", name, down))
+			case !info.Enabled:
+				ui.note(fmt.Sprintf("Your hi server %s doesn't serve a model yet; an admin can turn it on with hi server ai set.", name))
+			default:
+				options = append(options, option{fmt.Sprintf("Your team's hi server (%s): no key needed (recommended)", name), func() (qProvider, qConfig, string, error) {
+					base := connection.URL + "/v1/ai"
+					var models []string
+					ui.busy("Listing models…", func() { models = qListModels(base, "", deviceKey) })
+					current := firstNonEmpty(savedModel("server"), info.Model)
+					model := current
+					if len(models) > 0 {
+						models = qSuggestedFirst(models, current)
+						index, err := ui.choose("Model", models, len(models) > 10)
+						if err != nil {
+							return nil, qConfig{}, "", err
+						}
+						model = models[index]
+					}
+					return qServerProvider(connection, deviceKey, model), qConfig{Provider: "server", Model: model}, "", nil
+				}})
+			}
+		}
 	}
 	if binary, err := exec.LookPath("claude"); err == nil {
 		options = append(options, option{"Claude Code: your Claude sign-in, a few seconds per answer", func() (qProvider, qConfig, string, error) {
@@ -209,7 +241,7 @@ var qSuggestedModels = []string{
 // for a name otherwise.
 func qChooseModel(ui menuUI, base, key, current string) (string, error) {
 	var models []string
-	ui.busy("Listing models…", func() { models = qListModels(base, key) })
+	ui.busy("Listing models…", func() { models = qListModels(base, key, nil) })
 	if len(models) == 0 {
 		fallback := current
 		if fallback == "" && strings.TrimRight(base, "/") == qOpenAIURL {
@@ -254,7 +286,7 @@ func qSuggestedFirst(models []string, current string) []string {
 
 // qListModels reads the endpoint's /models list. When the list says which
 // models take tools, as OpenRouter's does, only those are offered.
-func qListModels(base, key string) []string {
+func qListModels(base, key string, sign ed25519.PrivateKey) []string {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(base, "/")+"/models", nil)
@@ -263,6 +295,10 @@ func qListModels(base, key string) []string {
 	}
 	if key != "" {
 		request.Header.Set("Authorization", "Bearer "+key)
+	}
+	if sign != nil {
+		request.Header.Set("User-Agent", "hi/"+version)
+		signRequest(request, sign, nil)
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {

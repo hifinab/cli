@@ -44,6 +44,7 @@ description: The environment variables hi reads and the files it writes.
 | `~/.config/hi/server.json`, `~/.config/hi/device_key` | The hi server this device joined, its stored key, and this device's private key (`hi connect`) |
 | `~/.config/hi/q.json`, `~/.config/hi/q-key` | The model chosen with `hi q --setup`, and its key (mode 0600) |
 | `~/.local/state/hi/q/log.jsonl`             | Commands `hi q` ran: time, folder, prompt, class, exit status; no output |
+| `~/.local/state/hi/q/server.json`           | Whether the connected hi server serves a model, checked at most hourly, and a failure for five minutes |
 | `~/.local/state/hi/q/last.json`             | The last conversation, for `hi q -c`; mode 0600       |
 | `~/.local/state/hi/q/shell-<pid>`           | With shell integration: that shell's last 30 commands and exit status, and commands handed between it and `hi q`; removed after the shell exits |
 | `~/.bashrc`, `~/.zshrc`                     | Two lines for the shell integration, added by `hi q --setup` after asking |
@@ -74,7 +75,9 @@ The server keeps everything in its state folder (`hi server --dir`, default
 |----------------------------|----------------------------------------------------------------|
 | `config.json`              | The listen address and server settings                         |
 | `state.json`               | Users, devices, requests, leases, and template sources         |
-| `keys.json`                | Provider keys and template source tokens                       |
+| `keys.json`                | Provider keys, the model key (`ai`), and template source tokens |
+| `ai.json`                  | `hi server ai`: the upstream URL, default model, and on or off |
+| `ai_usage.jsonl`           | One line per model request: user, device, model, tokens, cost, status; no messages |
 | `server_key`               | The key the server signs template bundles with                 |
 | `policy.json`              | Groups, limits, budgets, and template access                   |
 | `audit.jsonl`              | Every request, decision, start, stop, and template change      |

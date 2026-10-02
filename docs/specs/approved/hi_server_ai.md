@@ -1,6 +1,7 @@
 # `hi server ai` specification
 
-Status: Approved (2026-10-02). Planned as v0.21.0.
+Status: Approved (2026-10-02). Release 1 shipped in v0.21.0; release 2 is
+planned with v0.22.0.
 
 Dependencies: `hi server` and `hi connect` (device keys, users, audit,
 spend), and `hi q` v0.20.

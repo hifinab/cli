@@ -111,6 +111,9 @@ func runQ(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
+	if choice.note != "" {
+		fmt.Fprintln(qNotice, lipgloss.NewStyle().Foreground(colorDim).Render("  "+choice.note))
+	}
 	session := &qSession{
 		options: options,
 		choice:  choice,
@@ -204,7 +207,7 @@ func printQUsage(w io.Writer) {
   hi q --context                 show what is sent with each question
 
 options:
-  --provider openai|openrouter|anthropic|claude
+  --provider server|openai|openrouter|anthropic|claude
                                        use this provider once
   --model <name>                       use this model once
   --no-context                         send only the question

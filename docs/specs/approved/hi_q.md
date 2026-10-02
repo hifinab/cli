@@ -1,7 +1,7 @@
 # `hi q` specification
 
 Status: Approved (2026-10-02). Release 1 shipped in v0.19.0 and release 2
-in v0.20.0; release 3 is planned as v0.21.0.
+in v0.20.0; release 3 is planned as v0.22.0.
 
 Dependencies: none required. It can use `hi context` facts, a model served
 by `hi model serve`, and the bundled skill from `hi skill` if they exist.
