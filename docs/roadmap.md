@@ -464,6 +464,13 @@ each type starts.
 - [x] A local log of commands that ran.
   Approved spec: [hi_q.md](specs/approved/hi_q.md).
 
+### v0.19.1 — Words are always the question
+
+- [x] `hi q`'s own actions are options (`--setup`, `--status`,
+  `--context`), so `hi q status of the log file` asks the model instead of
+  showing the status. Everything from the first word that doesn't start with
+  a dash is the question; `--` ends the options.
+
 ## Planned
 
 ### v0.20.0 — `hi q`: shell integration, tools, and chat
