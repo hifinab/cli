@@ -539,6 +539,14 @@ each type starts.
   service (`sudo systemctl restart`, or `systemctl --user` for a user
   service). `--restart` and `--no-restart` for scripts.
 
+### v0.22.2 — Podman in `hi install`
+
+- [x] `hi install podman`: rootless Podman with `crun`, `uidmap`, and
+  `passt`, and a subordinate ID range for users without one. Tested on aiw11
+  on 2026-10-02: a rootless container with `--group-add keep-groups` sees
+  the gfx1151 GPU through ROCm, which needs `crun` rather than Docker's
+  `runc`. The first step towards `hi box`.
+
 ## Planned
 
 ### v0.23.0 — Containers
@@ -561,9 +569,9 @@ each type starts.
     digests a group may start, and requests show the image, so approvers
     see what will run.
   - `hi install` offers the container runtime and the ROCm container
-    tooling, as a checkbox in the v0.15.0 menu.
-  Drafts: [hi_sandbox.md](specs/ideas/hi_sandbox.md) grows the agent
-  sandbox into a general `hi sandbox` (agents, untrusted code, previews, and
+    tooling, as a checkbox in the v0.15.0 menu. Podman arrived in v0.22.2.
+  Drafts: [hi_box.md](specs/ideas/hi_box.md) grows the agent
+  sandbox into a general `hi box` (agents, untrusted code, previews, and
   remote GPUs); [hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)
   pins `serve` recipes and covers `--image` on Shadeform.
 
@@ -589,7 +597,7 @@ policy extends v0.11.0; project images extend the v0.16.0 templates.
   idle GPU flag and why suspend and resume doesn't fit the current
   providers; [hi_compute_ssh_run.md](specs/ideas/hi_compute_ssh_run.md)
   covers runs on RunPod, Shadeform, and managed providers. The services
-  were compared on 2026-10-01 in [hi_sandbox.md](specs/ideas/hi_sandbox.md#services).
+  were compared on 2026-10-01 in [hi_box.md](specs/ideas/hi_box.md#services).
 
 ### v0.25.0 — skills.sh
 

@@ -1,6 +1,7 @@
-# `hi sandbox` specification
+# `hi box` specification
 
-Status: Draft
+Status: Draft. Decided so far: the name `hi box`, and rootless Podman
+with `crun` as the runtime, with Docker as the fallback.
 
 Dependencies: `hi install` (Podman as a new tool), the v0.1.0 workstation
 setup (ROCm, render and video groups), `hi server` (policy, audit, Slack,
@@ -18,7 +19,7 @@ The first user is an AI agent running unattended: Claude Code or Codex with
 approval prompts off, which is only safe inside a boundary. The same
 primitive also serves people:
 
-- **Agents, unattended.** `hi sandbox claude "fix the flaky test"` runs to
+- **Agents, unattended.** `hi box claude "fix the flaky test"` runs to
   the end and leaves a branch to review.
 - **Agents, in parallel.** Five sandboxes, each on its own worktree, try five
   approaches; you keep the best branch.
@@ -27,7 +28,7 @@ primitive also serves people:
 - **A clean environment.** Reproduce a bug or a CI failure from the
   project's image instead of from your machine's state.
 - **A new teammate's first day.** The project's template defines the
-  sandbox, so `hi sandbox shell` gives a working environment at once.
+  sandbox, so `hi box shell` gives a working environment at once.
 - **A preview for the team.** A port in a sandbox gets a private HTTPS URL
   on NetBird, so a teammate can open the app you or an agent just built.
 - **The same thing on a big GPU.** `--remote h100` starts the sandbox on a
@@ -63,18 +64,18 @@ through the team's server and Slack, which nothing else offers.
 ## Commands
 
 ```text
-hi sandbox claude [prompt]          start Claude Code in a sandbox for this project
-hi sandbox codex [prompt]           the same for Codex
-hi sandbox shell                    a shell in the project's sandbox
-hi sandbox run -- <command>         run one command and exit with its status
-hi sandbox ls                       sandboxes, state, agent, branch, age
-hi sandbox attach <name>            follow or take over a running agent
-hi sandbox diff <name>              what the sandbox changed
-hi sandbox stop|rm <name>
-hi sandbox checkpoint|restore <name> [checkpoint]
-hi sandbox fork <name> [n]
-hi sandbox allow <name> <domain>    widen the network for one sandbox
-hi sandbox url <name> <port>        a private HTTPS URL on NetBird
+hi box claude [prompt]          start Claude Code in a sandbox for this project
+hi box codex [prompt]           the same for Codex
+hi box shell                    a shell in the project's sandbox
+hi box run -- <command>         run one command and exit with its status
+hi box ls                       sandboxes, state, agent, branch, age
+hi box attach <name>            follow or take over a running agent
+hi box diff <name>              what the sandbox changed
+hi box stop|rm <name>
+hi box checkpoint|restore <name> [checkpoint]
+hi box fork <name> [n]
+hi box allow <name> <domain>    widen the network for one sandbox
+hi box url <name> <port>        a private HTTPS URL on NetBird
 ```
 
 Options on start: `--name`, `--worktree` (the default for agents),
@@ -87,7 +88,9 @@ it is interactive. The name defaults to the project and a counter.
 
 ### Runtime
 
-Rootless Podman, added to `hi install` as a tool. It needs no daemon, maps
+Rootless Podman with the `crun` runtime, added to `hi install` as a tool
+(`hi install podman`, from v0.22.2; it also installs `uidmap` and `passt` and
+adds a subordinate ID range when the user has none). It needs no daemon, maps
 the user's UID into the container (`--userns=keep-id`), and an escape lands
 as the user, not root. Docker is the fallback when Podman is missing; the
 `docker` group is root-equivalent, so hi says so.
@@ -125,7 +128,7 @@ definition.
   `CODEX_HOME`).
 - Nothing else from the home folder.
 
-Work comes back as a branch. `hi sandbox diff` shows it, flagging changes to
+Work comes back as a branch. `hi box diff` shows it, flagging changes to
 files that run on the host later: `Makefile`, `package.json` scripts,
 `.envrc`, `.vscode/tasks.json`, CI workflows. Pushing happens on the host,
 after review.
@@ -180,7 +183,7 @@ allowed host.
 - `--idle` stops a sandbox whose agent and GPU have been idle, sharing the
   rule from [hi_compute_idle.md](hi_compute_idle.md); `--max` caps it.
 - Finished agent sandboxes are kept until `rm`, so the work can be checked.
-  `hi sandbox ls` shows what each one changed.
+  `hi box ls` shows what each one changed.
 - With a linked Slack account, the owner gets a message when an agent
   finishes or gets stuck, with the diff summary.
 
@@ -195,7 +198,7 @@ copies on new branches, for trying approaches in parallel.
 
 ### URLs
 
-`hi sandbox url <name> 5173` maps a port to
+`hi box url <name> 5173` maps a port to
 `https://5173-<name>.<machine>.<netbird domain>` through a small reverse
 proxy on the workstation, reachable only over NetBird. Making it public is a
 separate action that goes through approval. Internal TLS and DNS over
@@ -218,7 +221,7 @@ for the workstation and a `cuda` tag for the cloud.
   hardware.
 - Every sandbox start, network decision, and stop goes to the audit log;
   running sandboxes appear in `hi server live` and the Slack App Home.
-- `hi sandbox share <name> <user>` gives a teammate a shell over NetBird SSH,
+- `hi box share <name> <user>` gives a teammate a shell over NetBird SSH,
   removes the sandbox's agent token first, and records it.
 
 ## Releases
@@ -247,9 +250,16 @@ release.
 
 ## Open questions
 
-1. Name: `hi sandbox`, or a shorter `hi box`?
-2. Whether rootless Podman with ROCm works on gfx1151 on aiw11, and which
-   ROCm image version supports it. Needs a live test.
+1. ~~Name.~~ Decided on 2026-10-02: `hi box`.
+2. ~~Whether rootless Podman with ROCm works on gfx1151.~~ Yes, tested on
+   aiw11 on 2026-10-02 with Podman 5.7.0 and
+   `kyuz0/amd-strix-halo-toolboxes:rocm-10.0`: with
+   `--userns=keep-id --device /dev/kfd --device /dev/dri --group-add
+   keep-groups`, `rocminfo` in the container finds the gfx1151 Radeon 8060S,
+   the process runs as the user, and files it writes belong to the user.
+   This needs the `crun` runtime: with `runc`, which Docker's packages
+   install and Podman then picks, `keep-groups` drops the `render` group and
+   ROCm can't open `/dev/kfd`. `hi install podman` installs `crun`.
 3. Whether Codex honours `HTTPS_PROXY`, and which hosts its ChatGPT sign-in
    needs.
 4. Whether a subscription sign-in can be added at the proxy, or only API

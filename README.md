@@ -317,6 +317,7 @@ under the name in brackets for `hi install <tool>` and `hi uninstall <tool>`:
 - [Node.js](https://nodejs.org) and npm [`node`]
 - [GitHub CLI](https://cli.github.com) [`gh`]
 - [Docker Engine](https://docs.docker.com/engine/) and Docker Compose [`docker`]
+- [Podman](https://podman.io), rootless, with `crun` [`podman`]
 - [NetBird](https://netbird.io) [`netbird`]
 - [btop](https://github.com/aristocratos/btop) and
   [tmux](https://github.com/tmux/tmux) [`terminal`]

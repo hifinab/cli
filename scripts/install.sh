@@ -185,6 +185,7 @@ remove_tool() {
       apt_remove docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
       sudo rm -f /etc/apt/sources.list.d/docker.sources /etc/apt/keyrings/docker.asc
       ;;
+    podman) apt_remove podman ;;
     claude)
       rm -f "$HOME/.local/bin/claude"
       rm -rf "$HOME/.local/share/claude"
@@ -268,6 +269,11 @@ if installing docker; then
   add_docker_repo
   packages+=(docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin)
 fi
+# uidmap and passt are what rootless Podman runs on: ID mapping and its
+# default network. crun, not Docker's runc, is the runtime that can pass the
+# user's render and video groups into a container (--group-add keep-groups),
+# which the GPU needs.
+installing podman && packages+=(podman crun uidmap passt)
 if installing strix; then
   log "Configuring the AMD ROCm repository"
   sudo usermod -a -G render,video "$target_user"
@@ -282,6 +288,23 @@ if ((${#packages[@]} > 0)); then
   apt_install "${packages[@]}"
 fi
 
+if installing podman; then
+  # Rootless containers map the user's IDs into a range of subordinate IDs.
+  # Ubuntu gives users created with adduser one; others get the next free
+  # range here.
+  for map in subuid subgid; do
+    if ! grep -q "^$target_user:" "/etc/$map" 2>/dev/null; then
+      start=$(awk -F: '{ end = $2 + $3; if (end > max) max = end } END { print (max > 100000 ? max : 100000) }' "/etc/$map" 2>/dev/null || echo 100000)
+      log "Adding $map range $start-$((start + 65535)) for $target_user"
+      if [[ "$map" == "subuid" ]]; then
+        sudo usermod --add-subuids "$start-$((start + 65535))" "$target_user"
+      else
+        sudo usermod --add-subgids "$start-$((start + 65535))" "$target_user"
+      fi
+    fi
+  done
+  podman system migrate >/dev/null 2>&1 || true
+fi
 if installing strix; then
   log "Installing amd-debug-tools"
   pipx install --force amd-debug-tools

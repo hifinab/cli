@@ -160,7 +160,7 @@ model's own risk label can only raise the class, never lower it:
 
 Commands run in the user's shell with their environment, because the point
 is to act on their machine. They don't run in a sandbox; confirmation is the
-safeguard. [hi_sandbox.md](../ideas/hi_sandbox.md) is the place for anything
+safeguard. [hi_box.md](../ideas/hi_box.md) is the place for anything
 unattended.
 
 ### Shell know-how

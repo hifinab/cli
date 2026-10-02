@@ -35,6 +35,7 @@ hi install
 ┃   [x] GitHub CLI          gh, for repositories, pull requests, and sign-in
 ┃   [ ] Node.js             node and npm from Ubuntu
 ┃   [ ] Docker              Docker Engine, Buildx, and Compose
+┃   [ ] Podman              rootless containers that run as you, for hi box
 ┃   [x] Claude Code         Anthropic's coding agent (claude)                    installed
 ┃   ...
 ┃   [x] Strix Halo support  AMD ROCm, GPU groups, and amd-debug-tools
@@ -81,6 +82,7 @@ Removing Strix Halo support keeps you in the `render` and `video` groups.
 | GitHub CLI         | `gh`       | `gh`                                                      |
 | Node.js            | `node`     | Node.js, npm                                              |
 | Docker             | `docker`   | Docker Engine, Buildx, Docker Compose                     |
+| Podman             | `podman`   | Rootless Podman with `crun`, `uidmap`, and `passt`; a subordinate ID range if the user has none |
 | Claude Code        | `claude`   | `claude`                                                  |
 | Codex CLI          | `codex`    | `codex`                                                   |
 | omp                | `omp`      | `omp`                                                     |

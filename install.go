@@ -50,6 +50,8 @@ var installItems = []installItem{
 		packages: []string{"nodejs", "npm"}},
 	{id: "docker", title: "Docker", description: "Docker Engine, Buildx, and Compose",
 		packages: []string{"docker-ce"}, keeps: "Docker keeps its images and volumes in /var/lib/docker."},
+	{id: "podman", title: "Podman", description: "rootless containers that run as you, for hi box",
+		packages: []string{"podman"}, keeps: "Podman keeps your images and containers in ~/.local/share/containers."},
 	{id: "claude", title: "Claude Code", description: "Anthropic's coding agent (claude)",
 		commands: []string{"claude"}, keeps: "Claude Code keeps its settings in ~/.claude."},
 	{id: "codex", title: "Codex CLI", description: "OpenAI's coding agent (codex)",
