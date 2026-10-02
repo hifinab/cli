@@ -22,6 +22,10 @@ to edit it first, **c** to copy it, **?** to have each part explained, or
 **Esc** to cancel. A question that needs no command gets a short answer
 instead: `hi q how do I see which ports are open`.
 
+Answers are shown with terminal styles: bold, coloured code, and code
+blocks without their Markdown fences. When the output goes to a file or a
+pipe, the Markdown is left as written.
+
 If the command fails, `hi q` offers to ask for a fix: press Enter and the
 model gets the exit status and the end of the error output, and proposes
 something else. It tries up to three times.

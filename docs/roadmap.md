@@ -498,6 +498,13 @@ each type starts.
 - [x] `hi q --setup` for the same provider keeps the saved key when Enter
   is pressed at the key prompt, and lists the model in use first.
 
+### v0.20.2 — Answers in terminal styles
+
+- [x] `hi q` shows the Markdown in answers as terminal styles: bold,
+  coloured inline code and code blocks without fences, headings, bullets,
+  quotes, and links with their address dimmed. Piped output keeps the
+  Markdown. No new dependency.
+
 ## Planned
 
 ### v0.21.0 — `hi q`: more backends and project notes

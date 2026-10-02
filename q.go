@@ -248,8 +248,18 @@ func (s *qSession) explainOnly() int {
 	if err != nil {
 		return exitCode(err, s.stderr)
 	}
-	fmt.Fprintln(s.stdout, strings.TrimSpace(firstNonEmpty(reply.Answer, reply.Reason, reply.Command)))
+	fmt.Fprintln(s.stdout, s.markdown(firstNonEmpty(reply.Answer, reply.Reason, reply.Command)))
 	return 0
+}
+
+// markdown renders an answer's Markdown as terminal styles, and leaves it
+// as written when the output is not a terminal.
+func (s *qSession) markdown(text string) string {
+	text = strings.TrimSpace(text)
+	if !s.styled {
+		return text
+	}
+	return qMarkdown{color: true}.render(text)
 }
 
 func (s *qSession) addUserTurn(text string) {
@@ -320,7 +330,7 @@ func (s *qSession) converse() (qStep, error) {
 func (s *qSession) handle(step qStep) (status int, failed bool) {
 	reply := step.reply
 	if reply.Kind == "answer" {
-		fmt.Fprintln(s.stdout, strings.TrimSpace(reply.Answer))
+		fmt.Fprintln(s.stdout, s.markdown(reply.Answer))
 		return 0, false
 	}
 	outcome := func(text string) {
@@ -395,7 +405,7 @@ func (s *qSession) handle(step qStep) (status int, failed bool) {
 				fmt.Fprintf(s.stderr, "hi: %v\n", err)
 				continue
 			}
-			fmt.Fprintln(s.stdout, qIndent(strings.TrimSpace(firstNonEmpty(explained.Answer, explained.Reason)), "  "))
+			fmt.Fprintln(s.stdout, qIndent(s.markdown(firstNonEmpty(explained.Answer, explained.Reason)), "  "))
 			fmt.Fprintln(s.stdout)
 		case "esc", "q", "n", "ctrl-c":
 			fmt.Fprintln(s.stdout, s.style(colorDim, false).Render("  Not run."))
@@ -479,7 +489,7 @@ func (s *qSession) showProposal(command, reason string, assessment qAssessment) 
 		fmt.Fprintln(s.stdout, qIndent(command, "  $ "))
 	}
 	if reason != "" {
-		fmt.Fprintln(s.stdout, s.style(colorText, false).Render(qIndent(strings.TrimSpace(reason), "  ")))
+		fmt.Fprintln(s.stdout, qIndent(s.markdown(reason), "  "))
 	}
 	for _, match := range assessment.matches {
 		fmt.Fprintln(s.stdout, s.style(colorDim, false).Render("  "+match))
@@ -718,7 +728,9 @@ When they want something done, call the propose tool with:
 - command: the exact command. Prefer one line; use a short script only when one line would be unreadable.
 - reason: one short sentence saying what it does, in plain words.
 - risk: "read-only" if it changes nothing, "changes" if it creates, moves, or edits files, "dangerous" if it deletes data, needs root, or is hard to undo.
-When they ask a question, reply with a short plain-text answer and no command.
+When they ask a question, reply with a short answer and no command.
+
+Answers show in a terminal, which renders only this Markdown: **bold**, *italics*, inline code in backticks, fenced code blocks, "- " lists, numbered lists, and # headings. Don't use tables or HTML. Keep answers short; a few lines is usually enough.
 
 Look before you propose when it matters: list files to get real names, read a config or log, check a flag with help, or run a read-only command such as wc -l or git status. Don't look when the context already answers it; each look takes time. Never look more than a few times for one request.
 

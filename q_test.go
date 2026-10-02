@@ -802,3 +802,16 @@ func TestQSetupKeepsSavedKey(t *testing.T) {
 		t.Fatalf("authorization = %q", keys)
 	}
 }
+
+func TestQMarkdown(t *testing.T) {
+	input := "# Disk\nYou have **1.2 TB free** on `/`.\n\n1. **Install** it:\n   ```bash\n   sudo apt install msmtp\n   ```\n- see [the docs](https://example.com) and *this*\n> quoted\n---\nAn unclosed ` tick and 5 * 3 * 2."
+	got := qMarkdown{}.render(input)
+	want := "Disk\nYou have 1.2 TB free on /.\n\n1. Install it:\n     sudo apt install msmtp\n• see the docs (https://example.com) and this\n│ quoted\n" + strings.Repeat("─", 40) + "\nAn unclosed ` tick and 5 * 3 * 2."
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+	// Code keeps its asterisks and underscores.
+	if got := (qMarkdown{}).render("```\n0 * * * * $HOME/bin/a_b_c.sh\n```"); got != "  0 * * * * $HOME/bin/a_b_c.sh" {
+		t.Fatalf("code block = %q", got)
+	}
+}
