@@ -1,7 +1,9 @@
 # `hi box` specification
 
-Status: Draft. Decided so far: the name `hi box`, and rootless Podman
-with `crun` as the runtime, with Docker as the fallback.
+Status: Draft, with every open question answered (2026-10-02): the name
+`hi box`, rootless Podman with `crun` (Docker as the fallback, no Docker
+Sandboxes), `devcontainer.json` with `customizations.hi`, and credentials
+added at the proxy for both agents. Ready for approval.
 
 Dependencies: `hi install` (Podman as a new tool), the v0.1.0 workstation
 setup (ROCm, render and video groups), `hi server` (policy, audit, Slack,
@@ -144,7 +146,7 @@ sandbox. The agent needs its own sign-in, in two steps:
    hi's proxy adds the real header for the agent's API host only, as Docker
    Sandboxes, Sprites connectors, and boxd's host-bound secrets do. Pointing
    `ANTHROPIC_BASE_URL` at the proxy over plain HTTP avoids a CA inside the
-   sandbox; whether subscription sign-ins work this way is unverified.
+   sandbox. This works with a Claude subscription too (open question 4).
 
 The same proxy can later broker GitHub reads, Hugging Face downloads, and
 `hi compute` itself: a sandboxed agent requests a GPU through a socket to hi
@@ -164,7 +166,8 @@ that ignore `HTTPS_PROXY` fail instead of escaping.
 | `dev`    | Default: `locked` plus package registries for the project's languages and GitHub reads |
 | `open`   | Everything, still logged                                                               |
 
-A repository can ask for more domains in its sandbox file, but cannot grant
+A repository can ask for more domains in `customizations.hi` of its
+`devcontainer.json`, but cannot grant
 them: the first use asks the user once, as direnv does, or the server policy
 allows them per group. When an agent hits a blocked domain, the proxy records
 it and, with a server, posts it to Slack: *"fix-flaky-test (iman via Claude
@@ -260,14 +263,35 @@ release.
    This needs the `crun` runtime: with `runc`, which Docker's packages
    install and Podman then picks, `keep-groups` drops the `render` group and
    ROCm can't open `/dev/kfd`. `hi install podman` installs `crun`.
-3. Whether Codex honours `HTTPS_PROXY`, and which hosts its ChatGPT sign-in
-   needs.
-4. Whether a subscription sign-in can be added at the proxy, or only API
-   keys.
-5. Whether to offer Docker Sandboxes as the tier without the GPU instead of
-   building a stronger one.
-6. Where the sandbox definition lives: `.hifin/sandbox.json`, or the safe
-   subset of `devcontainer.json` only.
+3. ~~Whether Codex honours `HTTPS_PROXY`.~~ Yes, tested on 2026-10-02 with
+   Codex 0.159.3 signed in with ChatGPT: every connection went through the
+   proxy (`chatgpt.com` and `ab.chatgpt.com`), and with an unreachable proxy
+   it failed rather than connecting directly. Token refresh, not seen in
+   the test, likely also needs `auth.openai.com`.
+4. ~~Whether a subscription sign-in can be added at the proxy.~~ Yes for
+   Claude Code, tested on 2026-10-02 with Claude Code 2.1.287 on a Claude
+   subscription: with an empty home folder, `CLAUDE_CODE_OAUTH_TOKEN` set to
+   a placeholder, and `ANTHROPIC_BASE_URL` pointing at a plain-HTTP reverse
+   proxy that replaced the placeholder with the real token for
+   `api.anthropic.com`, it answered and ran tools. Its other connections
+   (straight to `api.anthropic.com`, bypassing the base URL) only ever
+   carried the placeholder, and blocking them all changed nothing. So the
+   real token never enters the box. The proxy must keep its token fresh:
+   access tokens expire, so it either re-reads the host's
+   `~/.claude/.credentials.json` per request or holds a long-lived token
+   from `claude setup-token`.
+5. ~~Docker Sandboxes.~~ Decided on 2026-10-02: not used. Their microVM is
+   stronger than a container, but they have no AMD GPU support and tie the
+   feature to Docker's product. A box without the GPU can later run under
+   gVisor or a microVM behind the same commands.
+6. ~~Where the box definition lives.~~ Decided on 2026-10-02:
+   `devcontainer.json`, the standard that VS Code, Codespaces, JetBrains,
+   and the devcontainer CLI read. hi reads its safe fields (`image`,
+   `build`, `containerEnv`, `postCreateCommand`) and ignores, with a note,
+   the ones that run on the host or widen the box (`initializeCommand`,
+   `runArgs`, `mounts`, `privileged`, `capAdd`). hi's own settings, such as
+   extra domains, the network preset, and the GPU, go under
+   `customizations.hi` in the same file. No `.hifin/box.json`.
 
 ## Findings
 
