@@ -296,6 +296,9 @@ func renderApproverHome(snapshot liveSnapshot, devices []deviceRow, now time.Tim
 	} else {
 		blocks = append(blocks, homeContext(fmt.Sprintf("%s spent; no group budgets are set.", formatDollars(snapshot.Month))))
 	}
+	if line := homeModels(snapshot, true); line != "" {
+		blocks = append(blocks, homeContext(line))
+	}
 	blocks = append(blocks, homeHeader("Devices"))
 	var lines []string
 	for _, device := range devices {
@@ -327,6 +330,9 @@ func renderUserHome(snapshot liveSnapshot, user string, now time.Time) []slack.B
 	blocks := []slack.Block{
 		homeHeader("Your machines"),
 		homeContext(fmt.Sprintf("%s · %s this month · updated %s", slackEscape(user), formatDollars(snapshot.Month), now.Local().Format("15:04"))),
+	}
+	if line := homeModels(snapshot, false); line != "" {
+		blocks = append(blocks, homeContext(line))
 	}
 	if len(snapshot.Running) == 0 {
 		blocks = append(blocks, homeContext("Nothing of yours is running. Start one with `hi compute up`."))
@@ -403,4 +409,29 @@ func (b *slackBridge) unlink(slackUser string) string {
 	b.mu.Unlock()
 	b.server.audit(user, "unlinked Slack", slackUser, "")
 	return "Unlinked. You'll no longer get messages about " + slackEscape(user) + "'s requests."
+}
+
+// homeModels is a line on this month's use of the model through hi q, or
+// "" when nobody used it. For approvers it names the top users.
+func homeModels(snapshot liveSnapshot, everyone bool) string {
+	if len(snapshot.Models) == 0 {
+		return ""
+	}
+	requests := 0
+	for _, use := range snapshot.Models {
+		requests += use.Requests
+	}
+	line := fmt.Sprintf("Models through hi q: %s this month, %d requests", formatDollars(snapshot.ModelsMonth), requests)
+	if everyone {
+		var top []string
+		for i, use := range snapshot.Models {
+			if i == 3 {
+				top = append(top, fmt.Sprintf("%d more", len(snapshot.Models)-3))
+				break
+			}
+			top = append(top, fmt.Sprintf("%s %s", slackEscape(use.User), formatDollars(use.Cost)))
+		}
+		line += " · " + strings.Join(top, ", ")
+	}
+	return line
 }

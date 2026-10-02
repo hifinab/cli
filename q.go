@@ -60,6 +60,10 @@ func runQ(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, "Sent with each question, after redaction:")
 		fmt.Fprintln(stdout)
 		fmt.Fprint(stdout, gatherQContext("").render())
+		if notes := findQProjectNotes(); notes != nil && notes.decision() != "allowed" {
+			fmt.Fprintf(stdout, "\n(%s is not sent: %s)\n", qNotesFile, map[string]string{
+				"": "not allowed yet; hi q asks in a terminal", "refused": "you chose not to use it"}[notes.decision()])
+		}
 		return 0
 	case "help":
 		printQUsage(stdout)
@@ -131,6 +135,9 @@ func runQ(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		session.turns = loadQConversation()
 	}
 	if !options.noContext {
+		if notes := findQProjectNotes(); notes != nil && notes.decision() == "" && keys != nil {
+			askQProjectNotes(notes, keys, stdout)
+		}
 		session.contextText = gatherQContext(piped).render()
 	} else if piped != "" {
 		session.contextText = "piped input:\n" + redactQText(piped)

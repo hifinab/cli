@@ -815,3 +815,45 @@ func TestQMarkdown(t *testing.T) {
 		t.Fatalf("code block = %q", got)
 	}
 }
+
+func TestQProjectNotes(t *testing.T) {
+	isolateQ(t)
+	os.MkdirAll(".hifin", 0o755)
+	os.WriteFile(".hifin/q.md", []byte("Run tests with make check.\nNever run make deploy.\n"), 0o644)
+	_, requests := fakeOpenAISequence(t, map[string]any{"content": "ok"})
+	sent := func() string {
+		return fmt.Sprint(lastMessages((*requests)[len(*requests)-1]))
+	}
+
+	// Asked first: v shows them, n refuses, and they aren't sent.
+	withQTTY(t, "v\nn\n")
+	var stdout, stderr bytes.Buffer
+	runQ([]string{"how", "do", "I", "test"}, strings.NewReader(""), &stdout, &stderr)
+	if !strings.Contains(stdout.String(), "│ Never run make deploy.") || strings.Contains(sent(), "make deploy") {
+		t.Fatalf("refused notes: %s\n%s", stdout.String(), sent())
+	}
+	// Not asked again while the file is unchanged.
+	withQTTY(t, "")
+	stdout.Reset()
+	runQ([]string{"again"}, strings.NewReader(""), &stdout, &stderr)
+	if strings.Contains(stdout.String(), "Send them") {
+		t.Fatalf("asked again: %s", stdout.String())
+	}
+	// A change asks again; allowed, they are sent.
+	os.WriteFile(".hifin/q.md", []byte("Run tests with make check.\nNever run make deploy.\nLogs are in var/log.\n"), 0o644)
+	withQTTY(t, "y\n")
+	stdout.Reset()
+	runQ([]string{"where", "are", "logs"}, strings.NewReader(""), &stdout, &stderr)
+	if !strings.Contains(stdout.String(), "Allowed") || !strings.Contains(sent(), "Logs are in var/log.") || !strings.Contains(sent(), "project notes (.hifin/q.md") {
+		t.Fatalf("allowed notes: %s\n%s", stdout.String(), sent())
+	}
+	// Without a terminal, new notes are neither asked about nor sent.
+	os.WriteFile(".hifin/q.md", []byte("UNAPPROVED-NOTE\n"), 0o644)
+	previous := qOpenTTY
+	qOpenTTY = func() (io.ReadWriteCloser, error) { return nil, os.ErrNotExist }
+	defer func() { qOpenTTY = previous }()
+	runQ([]string{"--print", "x"}, strings.NewReader(""), &stdout, &stderr)
+	if strings.Contains(sent(), "UNAPPROVED-NOTE") {
+		t.Fatal("unapproved notes were sent")
+	}
+}

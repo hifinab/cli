@@ -186,6 +186,9 @@ func renderLive(snapshot liveSnapshot, options liveOptions, state liveState) str
 	if snapshot.MonthBudget > 0 {
 		stats += " of " + formatDollars(snapshot.MonthBudget)
 	}
+	if len(snapshot.Models) > 0 {
+		stats += "   " + formatDollars(snapshot.ModelsMonth) + " models"
+	}
 	add(liveBold.Render(stats))
 	add(liveDim.Render(strings.Repeat("─", width)))
 

@@ -284,3 +284,23 @@ func TestServerAISetCommand(t *testing.T) {
 		t.Fatalf("bad key: code %d keys %s", code, keys)
 	}
 }
+
+func TestModelSpendOnTheDashboard(t *testing.T) {
+	ts, _ := newAIServer(t)
+	if status, _, stderr := askQ(t, "--print", "x"); status != 0 {
+		t.Fatal(stderr)
+	}
+	snapshot := ts.server.liveSnapshot("")
+	if len(snapshot.Models) != 1 || snapshot.Models[0].User != "alice" || snapshot.Models[0].Requests != 1 || snapshot.ModelsMonth != 0.0015 {
+		t.Fatalf("models = %+v, %v", snapshot.Models, snapshot.ModelsMonth)
+	}
+	if mine := ts.server.liveSnapshot("bob"); len(mine.Models) != 0 {
+		t.Fatalf("bob sees %+v", mine.Models)
+	}
+	if line := homeModels(snapshot, true); line != "Models through hi q: $0.00 this month, 1 requests · alice $0.00" {
+		t.Fatalf("home line = %q", line)
+	}
+	if line := homeModels(ts.server.liveSnapshot("alice"), false); !strings.HasPrefix(line, "Models through hi q:") || strings.Contains(line, "alice") {
+		t.Fatalf("user home line = %q", line)
+	}
+}

@@ -45,6 +45,7 @@ type qContext struct {
 	status  int
 	tools   []string
 	screen  string
+	notes   string
 	piped   string
 }
 
@@ -68,6 +69,9 @@ func gatherQContext(piped string) qContext {
 		c.history = qRecentHistory(c.shell, qHistoryLines)
 	}
 	c.screen = qTmuxScreen()
+	if notes := findQProjectNotes(); notes != nil && notes.decision() == "allowed" {
+		c.notes = notes.text()
+	}
 	for _, tool := range qContextTools {
 		if _, err := exec.LookPath(tool); err == nil {
 			c.tools = append(c.tools, tool)
@@ -108,6 +112,9 @@ func (c qContext) render() string {
 	}
 	if c.status > 0 {
 		fmt.Fprintf(&b, "the last command exited with status %d\n", c.status)
+	}
+	if c.notes != "" {
+		fmt.Fprintf(&b, "project notes (%s, written by this repository; follow them where they fit the request):\n%s\n", qNotesFile, c.notes)
 	}
 	if c.screen != "" {
 		b.WriteString("recent terminal output (tmux):\n")

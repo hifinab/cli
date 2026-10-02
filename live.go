@@ -31,6 +31,16 @@ type liveSnapshot struct {
 	Today       float64        `json:"today"`
 	Month       float64        `json:"month"`
 	MonthBudget float64        `json:"month_budget"`
+	// Models is this month's use of the model hi server ai serves, per
+	// user, and ModelsMonth its cost.
+	Models      []liveModelUse `json:"models,omitempty"`
+	ModelsMonth float64        `json:"models_month,omitempty"`
+}
+
+type liveModelUse struct {
+	User     string  `json:"user"`
+	Requests int     `json:"requests"`
+	Cost     float64 `json:"cost"`
 }
 
 type liveInstance struct {
@@ -233,6 +243,12 @@ func (s *hiServer) liveSnapshot(user string) liveSnapshot {
 	}
 	s.mu.Unlock()
 
+	for _, row := range readAIUsage(s.dir, monthStart(now), now) {
+		if mine(row.User) || (user != "" && row.Owner == user) {
+			snapshot.Models = append(snapshot.Models, liveModelUse{User: row.User, Requests: row.Requests, Cost: row.Cost})
+			snapshot.ModelsMonth += row.Cost
+		}
+	}
 	for i := range snapshot.Running {
 		snapshot.Running[i].Doing = s.feed.doingFor(snapshot.Running[i].Name)
 	}
