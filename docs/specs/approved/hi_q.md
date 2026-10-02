@@ -1,6 +1,6 @@
 # `hi q` specification
 
-Status: Draft
+Status: Approved (2026-10-02). Planned as v0.19.0.
 
 Dependencies: none required. It can use `hi context` facts, a model served
 by `hi model serve`, and the bundled skill from `hi skill` if they exist.
@@ -138,7 +138,7 @@ model's own risk label can only raise the class, never lower it:
 
 Commands run in the user's shell with their environment, because the point
 is to act on their machine. They don't run in a sandbox; confirmation is the
-safeguard. [hi_sandbox.md](hi_sandbox.md) is the place for anything
+safeguard. [hi_sandbox.md](../ideas/hi_sandbox.md) is the place for anything
 unattended.
 
 ### Shell know-how
@@ -263,12 +263,13 @@ installs.
 ## Releases
 
 1. `hi q <prompt>`, `--print`, `--explain`, piped input, the OpenAI-compatible
-   and Anthropic backends, env and config providers, the first-run menu,
-   risk classes, and the run/copy/cancel step.
+   and Anthropic backends, the Claude Code backend (so a machine with only a
+   Claude sign-in works from the start), env and config providers, the
+   first-run menu, risk classes, and the run/copy/cancel step.
 2. `hi shell-init` (history, exit status, edit on the command line, the `q`
    function), tmux output, tools, and the interactive chat with `-c`.
-3. Claude Code and Codex backends, local model discovery, and `hi model
-   serve` integration.
+3. The Codex backend, local model discovery, and `hi model serve`
+   integration.
 4. Project notes in `.hifin/q.md`, and opencode.
 
 ## Risks
@@ -283,17 +284,20 @@ installs.
   changes files always needs confirmation, and dangerous commands need `yes`
   to be typed.
 - Using a Claude or ChatGPT subscription through the agent CLIs this way
-  might go against their terms or limits. This needs checking before release
-  3.
+  might go against their terms or limits. `claude -p` is Claude Code's own
+  documented non-interactive mode, run by the signed-in user, so release 1
+  uses it; Codex needs the same check before release 3.
 
 ## Open questions
 
 1. The name: `hi q` alone, or should `hi shell-init` also add a short `q` or
    `??` function? `q` clashes with the `q` text-as-SQL tool on some
    machines.
-2. Whether `claude -p --tools ""` with `--json-schema` gives a step quickly
-   enough to be usable, and whether `--bare` makes it faster. Needs
-   measuring on aiw11.
+2. ~~Whether `claude -p --tools ""` with `--json-schema` is fast enough.~~
+   Measured 2026-10-02 with Claude Code 2.1.287 and Haiku: 4.4 s inside
+   Claude Code, 6.4 s wall time, and the structured output is filled.
+   Usable, but not fast. `--bare` cannot be used: it skips the subscription
+   sign-in and fails with "Not logged in".
 3. Whether Codex's `exec` honours `--output-schema` with tools off, or still
    tries to run commands itself under its read-only sandbox.
 4. Whether to support fish in the first version, or bash and zsh only.

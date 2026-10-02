@@ -447,7 +447,40 @@ each type starts.
 
 ## Planned
 
-### v0.19.0 — Containers
+### v0.19.0 — `hi q`: a command from plain words
+
+- [ ] `hi q <prompt>` sends the prompt with a small, redacted context (OS,
+  shell, folder listing, git state, recent history, piped input) and shows
+  one proposed command to run, copy, explain, or cancel.
+- [ ] hi classifies each command itself (read-only, changes files,
+  dangerous) by parsing it; dangerous commands need `yes` typed, and globs
+  in `mv`, `cp`, and `rm` show what they match first.
+- [ ] `--print` for scripts, `--explain '<command>'`, `--no-context`, and
+  `hi q context` to see exactly what is sent.
+- [ ] Providers: OpenAI-compatible endpoints, the Anthropic API, and a
+  signed-in Claude Code, found from flags, saved config, or the environment;
+  otherwise a first-run menu (`hi q setup`). `hi q status` names the one in
+  use.
+- [ ] A local log of commands that ran.
+  Approved spec: [hi_q.md](specs/approved/hi_q.md).
+
+### v0.20.0 — `hi q`: shell integration, tools, and chat
+
+- [ ] `hi shell-init bash|zsh` for fresh history, the last exit status,
+  editing a proposed command on the command line, run commands in the
+  shell's history, and a `q` function that keeps globs in prompts intact.
+- [ ] The last tmux output as context.
+- [ ] Tools: list, read, help, which, and read-only runs, so the model looks
+  before it proposes; a failed command goes back to the model for a fix.
+- [ ] `hi q` with no prompt opens a chat; `hi q -c` continues the last one.
+
+### v0.21.0 — `hi q`: more backends and project notes
+
+- [ ] Codex, local models (Ollama, `hi model serve`), and opencode.
+- [ ] Project notes in `.hifin/q.md`, used only after the user allows them
+  once.
+
+### v0.22.0 — Containers
 
 - [ ] Explore Docker (or rootless Podman) around `hi`. Ideas to weigh:
   - One image, anywhere: `hi compute run --image` starts the same container
@@ -476,7 +509,7 @@ each type starts.
 Dependency: local GPU containers need the v0.1.0 workstation setup; image
 policy extends v0.11.0; project images extend the v0.16.0 templates.
 
-### v0.20.0 — Learn from agent-machine services
+### v0.23.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -497,7 +530,7 @@ policy extends v0.11.0; project images extend the v0.16.0 templates.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_sandbox.md](specs/ideas/hi_sandbox.md#services).
 
-### v0.21.0 — skills.sh
+### v0.24.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`
