@@ -38,7 +38,7 @@ description: The environment variables hi reads and the files it writes.
 | `.agents/skills/hi/SKILL.md`, `.claude/skills/hi` | The agent skill, from `hi skill`               |
 | `~/.config/hi/shadeform_key`                | The Shadeform API key from `hi login shadeform` (mode 0600) |
 | `~/.config/hi/server.json`, `~/.config/hi/device_key` | The hi server this device joined, its stored key, and this device's private key (`hi connect`) |
-| `~/.config/hi/q.json`, `~/.config/hi/q-key` | The model chosen with `hi q setup`, and its key (mode 0600) |
+| `~/.config/hi/q.json`, `~/.config/hi/q-key` | The model chosen with `hi q --setup`, and its key (mode 0600) |
 | `~/.local/state/hi/q/log.jsonl`             | Commands `hi q` ran: time, folder, prompt, class, exit status; no output |
 | `~/.cache/hi/templates/<source>/<commit>/`  | Server templates, cached after their signature was checked; deleted by `hi disconnect` |
 | `.hifin/template.json` (in a project)       | What `hi init` generated: template, versions or commits, and file hashes; no paths or names |

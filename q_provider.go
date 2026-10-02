@@ -351,7 +351,7 @@ func qFirstLine(text, fallback string) string {
 // ---------------------------------------------------------------------------
 // choosing a provider
 
-// qConfig is what `hi q setup` saves. The key is kept apart, in q-key.
+// qConfig is what `hi q --setup` saves. The key is kept apart, in q-key.
 type qConfig struct {
 	Provider string `json:"provider"`
 	BaseURL  string `json:"base_url,omitempty"`
@@ -415,7 +415,7 @@ func saveQConfig(config qConfig, key string) error {
 	return os.Chmod(keyPath, 0o600)
 }
 
-// qChoice is a resolved provider and where it came from, for `hi q status`.
+// qChoice is a resolved provider and where it came from, for `hi q --status`.
 type qChoice struct {
 	provider qProvider
 	source   string
@@ -434,7 +434,7 @@ func resolveQProvider(name, model string) (qChoice, error) {
 	}
 	if config.Provider != "" {
 		choice, err := qProviderByName(config.Provider, model, config, key)
-		choice.source, choice.saved = "saved by hi q setup", true
+		choice.source, choice.saved = "saved by hi q --setup", true
 		return choice, err
 	}
 	if base := os.Getenv("HI_Q_BASE_URL"); base != "" {
@@ -481,7 +481,7 @@ func qProviderByName(name, model string, config qConfig, key string) (qChoice, e
 			key = os.Getenv("ANTHROPIC_API_KEY")
 		}
 		if key == "" {
-			return qChoice{}, errors.New("no Anthropic key; run hi q setup or set ANTHROPIC_API_KEY")
+			return qChoice{}, errors.New("no Anthropic key; run hi q --setup or set ANTHROPIC_API_KEY")
 		}
 		return qChoice{provider: qAnthropic{baseURL: base, key: key, model: firstNonEmpty(model, config.Model, qAnthropicModel)}, source: "--provider anthropic"}, nil
 	case "claude":

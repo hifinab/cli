@@ -117,7 +117,7 @@ Usage:
   hi server                     Run the server that brokers compute and serves templates for a team
   hi init [<template> <dir>]    Start a project from a template (python, web, service, pipeline, ml)
   hi q <what you want to do>    Ask an AI model for a shell command, then run, copy, or explain it
-  hi q setup                    Choose the model hi q uses
+  hi q --setup                  Choose the model hi q uses
   hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
   hi update [--check]           Update hi to the latest release

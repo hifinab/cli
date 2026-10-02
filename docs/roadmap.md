@@ -454,10 +454,10 @@ each type starts.
   dangerous) by parsing it; dangerous commands need `yes` typed, and globs
   in `mv`, `cp`, and `rm` show what they match first.
 - [x] `--print` for scripts, `--explain '<command>'`, `--no-context`, and
-  `hi q context` to see exactly what is sent.
+  `hi q --context` to see exactly what is sent.
 - [x] Providers: OpenAI-compatible endpoints, the Anthropic API, and a
   signed-in Claude Code, found from flags, saved config, or the
-  environment; otherwise a first-run menu (`hi q setup`). `hi q status`
+  environment; otherwise a first-run menu (`hi q --setup`). `hi q --status`
   names the one in use. Claude Code was tested live with Haiku (about 6
   seconds an answer); the OpenAI-compatible and Anthropic clients only
   against fake servers so far.

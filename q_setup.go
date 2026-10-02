@@ -116,8 +116,8 @@ func runQSetup(ui menuUI) (qChoice, error) {
 		if err := saveQConfig(config, key); err != nil {
 			return qChoice{}, err
 		}
-		ui.note(fmt.Sprintf("hi q uses %s. Change it with hi q setup.", provider.label()))
-		return qChoice{provider: provider, source: "saved by hi q setup", saved: true}, nil
+		ui.note(fmt.Sprintf("hi q uses %s. Change it with hi q --setup.", provider.label()))
+		return qChoice{provider: provider, source: "saved by hi q --setup", saved: true}, nil
 	}
 }
 

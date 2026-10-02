@@ -263,12 +263,12 @@ files, or dangerous; dangerous ones, such as `sudo`, `rm -r` outside the
 current folder, or `curl … | sh`, need `yes` typed, and globs in `mv`, `cp`,
 and `rm` show what they match first.
 
-The model comes from `hi q setup`, `HI_Q_BASE_URL` and `HI_Q_MODEL`,
+The model comes from `hi q --setup`, `HI_Q_BASE_URL` and `HI_Q_MODEL`,
 `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or a signed-in Claude Code, in that
 order. Any OpenAI-compatible endpoint works, including Ollama and
 `hi compute serve`. Each question carries a short, redacted context: the
 system and shell, the folder listing, the git state, recent history, and
-piped input; `hi q context` shows it. Commands that run are logged to
+piped input; `hi q --context` shows it. Commands that run are logged to
 `~/.local/state/hi/q/log.jsonl`, without their output.
 
 ## Agent skill

@@ -32,30 +32,35 @@ type qOptions struct {
 	model     string
 	yes       bool
 	prompt    string
+	action    string // setup, status, context, or help
 }
 
 func runQ(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	if len(args) > 0 {
-		switch args[0] {
-		case "setup":
-			return exitCode(qSetupCommand(stdin, stdout), stderr)
-		case "status":
-			return exitCode(qStatusCommand(stdout), stderr)
-		case "context":
-			fmt.Fprintln(stdout, "Sent with each question, after redaction:")
-			fmt.Fprintln(stdout)
-			fmt.Fprint(stdout, gatherQContext("").render())
-			return 0
-		case "help", "-h", "--help":
-			printQUsage(stdout)
-			return 0
-		}
-	}
+	// Words are always the question; hi's own actions are --options before
+	// it, so "hi q status of the log" asks instead of showing the status.
 	options, err := parseQOptions(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "hi: %v\n\n", err)
 		printQUsage(stderr)
 		return 2
+	}
+	if options.action != "" && options.action != "help" && (options.prompt != "" || options.explain != "") {
+		fmt.Fprintf(stderr, "hi: --%s takes no question\n", options.action)
+		return 2
+	}
+	switch options.action {
+	case "setup":
+		return exitCode(qSetupCommand(stdin, stdout), stderr)
+	case "status":
+		return exitCode(qStatusCommand(stdout), stderr)
+	case "context":
+		fmt.Fprintln(stdout, "Sent with each question, after redaction:")
+		fmt.Fprintln(stdout)
+		fmt.Fprint(stdout, gatherQContext("").render())
+		return 0
+	case "help":
+		printQUsage(stdout)
+		return 0
 	}
 	if options.prompt == "" && options.explain == "" {
 		fmt.Fprintln(stderr, "hi q needs a question for now; the chat that opens without one comes in v0.20.0.")
@@ -90,7 +95,7 @@ func runQ(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if choice.provider == nil {
 		if keys == nil || options.print {
-			fmt.Fprintln(stderr, "hi: no model is set up; run hi q setup, or set OPENAI_API_KEY or HI_Q_BASE_URL and HI_Q_MODEL")
+			fmt.Fprintln(stderr, "hi: no model is set up; run hi q --setup, or set OPENAI_API_KEY or HI_Q_BASE_URL and HI_Q_MODEL")
 			return 1
 		}
 		fmt.Fprintln(stdout, "hi q needs a model first.")
@@ -134,6 +139,10 @@ func parseQOptions(args []string) (qOptions, error) {
 		case arg == "--":
 			options.prompt = strings.Join(args[i+1:], " ")
 			return options, nil
+		case arg == "--setup" || arg == "--status" || arg == "--context":
+			options.action = strings.TrimPrefix(arg, "--")
+		case arg == "--help" || arg == "-h":
+			options.action = "help"
 		case arg == "--print" || arg == "-p":
 			options.print = true
 		case arg == "--no-context":
@@ -146,8 +155,8 @@ func parseQOptions(args []string) (qOptions, error) {
 			options.provider, err = value()
 		case arg == "--model" || strings.HasPrefix(arg, "--model="):
 			options.model, err = value()
-		case strings.HasPrefix(arg, "--"):
-			return options, fmt.Errorf("unknown option %s", arg)
+		case strings.HasPrefix(arg, "-"):
+			return options, fmt.Errorf("unknown option %s; put -- before a question that starts with a dash", arg)
 		default:
 			options.prompt = strings.Join(args[i:], " ")
 			return options, nil
@@ -165,9 +174,9 @@ func printQUsage(w io.Writer) {
   <cmd> 2>&1 | hi q <question>   ask about piped output
   hi q --explain '<command>'     explain a command without running it
   hi q --print <prompt>          print only the command, for scripts
-  hi q setup                     choose the model
-  hi q status                    show the model in use
-  hi q context                   show what is sent with each question
+  hi q --setup                   choose the model
+  hi q --status                  show the model in use
+  hi q --context                 show what is sent with each question
 
 options:
   --provider openai|anthropic|claude   use this provider once
@@ -175,7 +184,9 @@ options:
   --no-context                         send only the prompt
   --yes                                run read-only commands without asking
 
-Quote a prompt with * or ? in it, or the shell expands them first.`)
+Options go before the question; every word after the first one that
+doesn't start with - is the question. Use -- before a question that starts
+with a dash. Quote a question with * or ? in it, or the shell expands them.`)
 }
 
 // ---------------------------------------------------------------------------
@@ -520,7 +531,7 @@ func qStatusCommand(stdout io.Writer) error {
 		return err
 	}
 	if choice.provider == nil {
-		fmt.Fprintln(stdout, "Model: none. Run hi q setup.")
+		fmt.Fprintln(stdout, "Model: none. Run hi q --setup.")
 	} else {
 		fmt.Fprintf(stdout, "Model:   %s\nFrom:    %s\n", choice.provider.label(), choice.source)
 	}

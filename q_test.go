@@ -296,7 +296,7 @@ func TestQNoProvider(t *testing.T) {
 	if status := runQ([]string{"--print", "anything"}, strings.NewReader(""), &stdout, &stderr); status != 1 {
 		t.Fatalf("status %d", status)
 	}
-	if !strings.Contains(stderr.String(), "hi q setup") {
+	if !strings.Contains(stderr.String(), "hi q --setup") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
@@ -366,5 +366,47 @@ func TestQSetupSavesEndpoint(t *testing.T) {
 	again, err := resolveQProvider("", "")
 	if err != nil || again.provider.label() != "local-model at "+strings.TrimPrefix(server.URL, "http://") {
 		t.Fatalf("resolved = %+v, %v", again, err)
+	}
+}
+
+func TestQWordsAreAlwaysTheQuestion(t *testing.T) {
+	isolateQ(t)
+	server, requests := fakeOpenAI(t, map[string]any{"content": "It is 2 MB."})
+	t.Setenv("HI_Q_BASE_URL", server.URL+"/v1")
+	t.Setenv("HI_Q_MODEL", "m")
+	for _, args := range [][]string{
+		{"status", "of", "the", "log", "file?"},
+		{"status"},
+		{"setup", "a", "python", "venv"},
+		{"help", "me", "find", "big", "files"},
+		{"--", "--help", "in", "tar?"},
+	} {
+		var stdout, stderr bytes.Buffer
+		if status := runQ(args, strings.NewReader(""), &stdout, &stderr); status != 0 || stdout.String() != "It is 2 MB.\n" {
+			t.Errorf("%q: status %d stdout %q stderr %q", args, status, stdout.String(), stderr.String())
+		}
+	}
+	if len(*requests) != 5 {
+		t.Fatalf("%d requests, want 5", len(*requests))
+	}
+}
+
+func TestQActionsAreOptions(t *testing.T) {
+	isolateQ(t)
+	var stdout, stderr bytes.Buffer
+	if status := runQ([]string{"--status"}, strings.NewReader(""), &stdout, &stderr); status != 0 || !strings.Contains(stdout.String(), "Model: none") {
+		t.Fatalf("--status: %d %q %q", status, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	if status := runQ([]string{"--context"}, strings.NewReader(""), &stdout, &stderr); status != 0 || !strings.Contains(stdout.String(), "current folder:") {
+		t.Fatalf("--context: %d %q", status, stdout.String())
+	}
+	stderr.Reset()
+	if status := runQ([]string{"--status", "of", "x"}, strings.NewReader(""), &stdout, &stderr); status != 2 || !strings.Contains(stderr.String(), "takes no question") {
+		t.Fatalf("--status with words: %d %q", status, stderr.String())
+	}
+	stderr.Reset()
+	if status := runQ([]string{"-x", "y"}, strings.NewReader(""), &stdout, &stderr); status != 2 || !strings.Contains(stderr.String(), "put -- before") {
+		t.Fatalf("unknown option: %d %q", status, stderr.String())
 	}
 }

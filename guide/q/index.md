@@ -26,7 +26,7 @@ question that needs no command gets a short answer instead:
 
 The first time, `hi q` uses what it finds, in this order:
 
-1. The model saved by `hi q setup`.
+1. The model saved by `hi q --setup`.
 2. `HI_Q_BASE_URL` and `HI_Q_MODEL`, with `HI_Q_API_KEY` if the endpoint
    needs a key.
 3. `OPENAI_API_KEY` (and `OPENAI_BASE_URL` if set), then
@@ -34,7 +34,7 @@ The first time, `hi q` uses what it finds, in this order:
 4. Claude Code, if it is installed. It uses your Claude sign-in and the Haiku
    model; an answer takes a few seconds, because each one starts Claude Code.
 
-If none of these are there, a menu opens. Run `hi q setup` to choose again:
+If none of these are there, a menu opens. Run `hi q --setup` to choose again:
 
 - **Claude Code**: no key needed.
 - **An OpenAI-compatible endpoint**: OpenAI, OpenRouter, Groq, Ollama
@@ -45,7 +45,7 @@ If none of these are there, a menu opens. Run `hi q setup` to choose again:
 - **An Anthropic API key**.
 
 `hi q` tries the choice with one small request before saving it. The key is
-kept in `~/.config/hi/q-key`, readable only by you. `hi q status` shows
+kept in `~/.config/hi/q-key`, readable only by you. `hi q --status` shows
 which model is in use and where it came from. Use `--provider openai|anthropic|claude`
 or `--model <name>` to change them for one question.
 
@@ -61,7 +61,7 @@ With each question, `hi q` sends a short description of where you are:
 
 Values that look like keys, tokens, or passwords are removed first, and
 history lines that mention a password or secret are left out. File contents
-are never sent. Run `hi q context` to see exactly what goes out, or add
+are never sent. Run `hi q --context` to see exactly what goes out, or add
 `--no-context` to send only your question.
 
 History comes from the history file, so the last few commands of the shell
@@ -117,6 +117,14 @@ hi q --explain 'tar -xzvf archive.tar.gz -C /tmp --strip-components=1'
 
 `--yes` runs read-only commands without asking; anything else still waits
 for Enter.
+
+## Options and questions
+
+Words are always the question: `hi q status of the log file` asks the
+model, and so does `hi q setup a python venv`. hi's own options start with
+`--` and go before the question, such as `hi q --status` or
+`hi q --print …`. To ask something that starts with a dash, put `--` first:
+`hi q -- --strip-components in tar?`
 
 ## Quoting
 

@@ -36,11 +36,17 @@ hi q -c [prompt...]           continue the last conversation
 <cmd> 2>&1 | hi q <prompt>    use piped output as context ("why did this fail?")
 hi q --explain '<command>'    explain a command without running anything
 hi q --print <prompt...>      print only the command, for scripts and $(...)
-hi q setup                    choose or change the provider
-hi q status                   provider, model, and whether shell integration is on
-hi q context                  show exactly what would be sent, then exit
+hi q --setup                  choose or change the provider
+hi q --status                 provider, model, and whether shell integration is on
+hi q --context                show exactly what would be sent, then exit
 hi shell-init bash|zsh|fish   shell integration; add eval "$(hi shell-init bash)" to the rc file
 ```
+
+Words are always the question, and hi's own actions are options before it.
+The first argument that doesn't start with `-` begins the question, so
+`hi q status of the log file` asks the model rather than running a
+`status` subcommand; v0.19.0 had `setup`, `status`, and `context` as words
+and caught such questions. `--` ends the options.
 
 Options: `--provider <name>`, `--model <name>`, `--yes` (run without asking,
 but only commands classed as read-only), `--no-context` (send only the
@@ -75,7 +81,7 @@ type anything.
 
 ## Context
 
-Small and on by default. `hi q context` prints all of it, and `--no-context`
+Small and on by default. `hi q --context` prints all of it, and `--no-context`
 sends none of it.
 
 | Fact | Source |
@@ -93,7 +99,7 @@ A separate process can't see the shell's history in memory, so history comes
 from shell integration. `hi shell-init` adds a prompt hook (`PROMPT_COMMAND`
 in bash, `precmd` in zsh) that writes the last command, its exit status, and
 the folder to `~/.local/state/hi/q/shell-<pid>`. Without integration, hi
-reads the end of `$HISTFILE`, which can be stale or empty. `hi q status`
+reads the end of `$HISTFILE`, which can be stale or empty. `hi q --status`
 says which one is in use.
 
 hi can only see the output of earlier commands inside tmux, which `hi
@@ -159,9 +165,9 @@ direnv does, because the repository writes it.
 
 ## Providers
 
-hi uses the first of these that works, and `hi q status` names it:
+hi uses the first of these that works, and `hi q --status` names it:
 
-1. `--provider`, or the provider saved by `hi q setup`.
+1. `--provider`, or the provider saved by `hi q --setup`.
 2. `HI_Q_BASE_URL` / `HI_Q_API_KEY` / `HI_Q_MODEL`.
 3. `OPENAI_API_KEY` (with `OPENAI_BASE_URL` if set), then `ANTHROPIC_API_KEY`.
 4. A local OpenAI-compatible server: `hi model serve`, Ollama on
@@ -214,7 +220,7 @@ Choosing the endpoint asks for the base URL, the key (masked, with
 `readSecret`), and the model, chosen from the endpoint's `/models` list when
 it has one. hi makes one small test call before saving. The choice goes to
 `~/.config/hi/q.json` and the key to `~/.config/hi/q-key`, mode 0600, as the
-compute keys are stored. `hi q setup` reopens the menu.
+compute keys are stored. `hi q --setup` reopens the menu.
 
 ## Interactive chat
 
@@ -279,7 +285,7 @@ installs.
   confirmation reduce this, but they don't make it safe; the user still has
   to read the command.
 - Secrets in history or piped output that the redaction misses go to the
-  provider. `hi q context` and `--no-context` let the user check.
+  provider. `hi q --context` and `--no-context` let the user check.
 - A malicious file, log, or README that the model reads can carry
   instructions. Read-only tools limit what that can do. Anything that
   changes files always needs confirmation, and dangerous commands need `yes`
