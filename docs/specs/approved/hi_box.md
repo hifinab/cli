@@ -184,7 +184,7 @@ allowed host.
 
 ### Lifecycle
 
-- Background agents log to `~/.local/state/hi/sandbox/<name>/`; `attach`
+- Background agents log to the box's container log (`hi box attach`); `attach`
   follows the log or opens the agent's terminal through tmux in the sandbox.
 - `--idle` stops a sandbox whose agent and GPU have been idle, sharing the
   rule from [hi_compute_idle.md](../ideas/hi_compute_idle.md); `--max` caps it.
@@ -229,6 +229,33 @@ for the workstation and a `cuda` tag for the cloud.
   running sandboxes appear in `hi server live` and the Slack App Home.
 - `hi box share <name> <user>` gives a teammate a shell over NetBird SSH,
   removes the sandbox's agent token first, and records it.
+
+## As built in release 1
+
+Where v0.23.0 differs from the design above:
+
+- **Agents come from the host.** The base image (Ubuntu 24.04 with git,
+  Python, uv, Node.js, ripgrep, and build tools, built locally on first use
+  and tagged by its Containerfile's hash) holds no agent. `claude` and
+  Codex's package folder are mounted read-only from the host, so a box runs
+  the versions the user has and nothing is downloaded per box.
+- **The proxy is a second container**, `hi-box-<name>-proxy`, running the hi
+  binary mounted read-only. It sits on the box's `--internal` network at a
+  fixed address and on the engine's normal network. The box gets
+  `--dns 127.0.0.1` and Podman networks `--disable-dns`, so name lookups in
+  the box fail and only the proxy resolves names.
+- **Claude Code's token stays outside from the start.** The proxy's second
+  listener swaps the placeholder for the host's sign-in (re-read per
+  request) or a token from `hi box token claude`. Codex's `auth.json` is
+  copied into the box's home folder.
+- **State** is in `~/.local/state/hi/box/<name>/`: `box.json`, the
+  worktree, the box's home folder, `allow`, and `network.log`.
+- **attach** follows a background agent's output with the engine's logs, and
+  attaches to an interactive box's terminal; tmux inside the box is not used.
+- **postCreateCommand** runs before the box's command each time the box
+  starts, not once.
+- Not in release 1: checkpoints, forks, URLs, `--idle`, `--max`,
+  `--remote`, and anything from `hi server`.
 
 ## Releases
 
