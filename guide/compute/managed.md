@@ -230,6 +230,25 @@ with `--dir` or `HI_SERVER_DIR`.
 It listens only on its NetBird address. Clients sign every request, so a
 forged, altered, or replayed request is refused, even from inside the VPN.
 
+### Update the server
+
+As the account the server runs as:
+
+```sh
+hi update                          # the binary; the running server is unchanged
+sudo systemctl restart hi-server   # runs the new version, a second's interruption
+hi server ai                       # any command works again once it is up
+```
+
+State, keys, and devices carry over; connected devices need no change.
+Devices on an older `hi` keep working, and get new features when they run
+`hi update` themselves.
+
+If systemd warns that `hi-server.service` changed on disk, compare
+`systemctl cat hi-server` with what you meant to change, then run
+`sudo systemctl daemon-reload` and restart. The reload alone doesn't restart
+the server.
+
 ### Approve and deny
 
 Admin commands talk to the running server through a socket that only the
