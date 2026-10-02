@@ -36,4 +36,5 @@ require (
 	golang.org/x/sync v0.15.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
+	mvdan.cc/sh/v3 v3.12.0 // indirect
 )
