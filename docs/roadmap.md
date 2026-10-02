@@ -521,13 +521,16 @@ each type starts.
 
 ## Planned
 
-### v0.22.0 — `hi q`: more backends and project notes
+### v0.22.0 — `hi q`: project notes, team spend, and a local model
 
-- [ ] Codex, local models (Ollama, `hi model serve`), and opencode.
-- [ ] Project notes in `.hifin/q.md`, used only after the user allows them
-  once.
 - [ ] AI spend from `hi server ai` in `hi server live` and the Slack App
   Home (release 2 of [hi_server_ai.md](specs/approved/hi_server_ai.md)).
+- [ ] Project notes in `.hifin/q.md`: how to test, where the logs are, what
+  not to run. `hi q` uses them only after the user allows them once per
+  repository.
+- [ ] A tested recipe for a local model on the Strix Halo as the team's
+  default behind `hi server ai set --url`, with the model chosen for tool
+  calls.
 
 ### v0.23.0 — Containers
 
@@ -657,6 +660,12 @@ going direct is clearly cheaper or more reliable. Left out:
 Dependency: each driver implements the existing `computeProvider` interface.
 Supporting a host and port pair for SSH (Vast.ai, Novita) generalizes the
 RunPod code.
+
+### Deferred — More `hi q` backends
+
+- [ ] Codex and opencode as `hi q` backends. Deferred on 2026-10-02: with the
+  team model through `hi server` and OpenRouter, they add a second, slow
+  path that mainly helps people without a team server.
 
 ### Deferred — Spot instances
 
