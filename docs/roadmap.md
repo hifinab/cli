@@ -547,6 +547,12 @@ each type starts.
   the gfx1151 GPU through ROCm, which needs `crun` rather than Docker's
   `runc`. The first step towards `hi box`.
 
+### v0.23.1 — Remove every box at once
+
+- [x] `hi box rm --all` lists every box and asks once; boxes with
+  uncommitted work are kept unless `--force`, branches with commits are
+  kept, and without a terminal it needs `--yes`.
+
 ## Planned
 
 ### v0.23.0 — `hi box`: local agent boxes

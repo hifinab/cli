@@ -293,3 +293,65 @@ func TestBoxRefusesTheHomeFolder(t *testing.T) {
 		t.Fatalf("status %d: %s", status, stderr.String())
 	}
 }
+
+func TestBoxRemoveAll(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
+	project := filepath.Join(root, "project")
+	os.MkdirAll(project, 0o755)
+	git := func(dir string, args ...string) {
+		if out, err := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %s", args, out)
+		}
+	}
+	git(project, "init", "-q")
+	git(project, "commit", "-q", "--allow-empty", "-m", "init")
+	base := boxGit(project, "rev-parse", "HEAD")
+	// Three boxes: clean, with a commit, and with uncommitted work.
+	for _, name := range []string{"clean", "committed", "dirty"} {
+		work := boxStateFile(name, "work")
+		os.MkdirAll(filepath.Dir(work), 0o700)
+		git(project, "worktree", "add", "-q", "-b", "hi-box/"+name, work, "HEAD")
+		saveBoxMeta(boxMeta{Name: name, Agent: "claude", Root: project, Workdir: work, Worktree: true, Branch: "hi-box/" + name, Base: base, Engine: "podman"})
+	}
+	os.WriteFile(filepath.Join(boxStateFile("committed", "work"), "f"), []byte("x"), 0o644)
+	git(boxStateFile("committed", "work"), "add", "f")
+	git(boxStateFile("committed", "work"), "commit", "-q", "-m", "work")
+	os.WriteFile(filepath.Join(boxStateFile("dirty", "work"), "g"), []byte("x"), 0o644)
+
+	previousCommand, previousLook := boxCommand, boxLookPath
+	boxCommand = func(stdin io.Reader, stdout, stderr io.Writer, name string, args ...string) error {
+		if name == "git" {
+			return previousCommand(stdin, stdout, stderr, name, args...)
+		}
+		return nil
+	}
+	boxLookPath = func(string) (string, error) { return "/usr/bin/podman", nil }
+	defer func() { boxCommand, boxLookPath = previousCommand, previousLook }()
+
+	// Without a terminal or --yes, nothing goes.
+	var stdout, stderr bytes.Buffer
+	if status := runBox([]string{"rm", "--all"}, strings.NewReader(""), &stdout, &stderr); status == 0 || !strings.Contains(stderr.String(), "--yes") {
+		t.Fatalf("status %d: %s", status, stderr.String())
+	}
+	stdout.Reset()
+	if status := runBox([]string{"rm", "--all", "--yes"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s", status, stderr.String())
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "dirty (claude, hi-box/dirty)   kept: uncommitted work") || !strings.Contains(out, "Its branch hi-box/committed is kept") {
+		t.Fatalf("output:\n%s", out)
+	}
+	if fileExists(boxStateFile("clean")) || fileExists(boxStateFile("committed")) || !fileExists(boxStateFile("dirty", "work", "g")) {
+		t.Fatal("wrong boxes removed")
+	}
+	if boxGit(project, "rev-parse", "--verify", "-q", "hi-box/clean") != "" || boxGit(project, "rev-parse", "--verify", "-q", "hi-box/committed") == "" {
+		t.Fatal("branches: the empty one should go, the one with a commit stay")
+	}
+	// --force removes the dirty one too.
+	stdout.Reset()
+	runBox([]string{"rm", "--all", "--yes", "--force"}, strings.NewReader(""), &stdout, &stderr)
+	if fileExists(boxStateFile("dirty")) {
+		t.Fatalf("--force kept the dirty box:\n%s", stdout.String())
+	}
+}

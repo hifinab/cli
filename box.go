@@ -84,6 +84,8 @@ type boxOptions struct {
 	memory   string
 	allow    []string
 	force    bool
+	all      bool
+	yes      bool
 	full     bool
 	words    []string
 }
@@ -124,6 +126,9 @@ func runBox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "stop":
 		return exitCode(withBox(options, func(engine boxEngine, meta boxMeta) error { return stopBox(engine, meta, stdout) }), stderr)
 	case "rm":
+		if options.all {
+			return exitCode(removeAllBoxes(options, stdin, stdout), stderr)
+		}
 		return exitCode(withBox(options, func(engine boxEngine, meta boxMeta) error { return removeBox(engine, meta, options.force, stdout) }), stderr)
 	case "allow":
 		return exitCode(allowBox(options, stdout), stderr)
@@ -151,6 +156,9 @@ usage:
   hi box diff <name> [--full]     what the box changed, flagging files that run on the host
   hi box allow <name> [<domain>]  let a box reach a domain; without one, list what was blocked
   hi box stop|rm <name> [--force]
+  hi box rm --all [--force] [--yes]
+                                  remove every box after one question; boxes with
+                                  uncommitted work are kept unless --force
   hi box token claude             store a long-lived Claude token from claude setup-token
 
 options when starting:
@@ -192,6 +200,10 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 			options.here = true
 		case arg == "--gpu":
 			options.gpu = true
+		case arg == "--all" && command == "rm":
+			options.all = true
+		case (arg == "--yes" || arg == "-y") && command == "rm":
+			options.yes = true
 		case arg == "--force" || arg == "-f":
 			options.force = true
 		case arg == "--full":
@@ -955,4 +967,73 @@ func boxUntracked(dir string) []string {
 		return nil
 	}
 	return strings.Split(out, "\n")
+}
+
+// removeAllBoxes removes every box after one confirmation. Boxes with
+// uncommitted work are kept unless --force; branches with commits are kept
+// as with a single rm.
+func removeAllBoxes(options boxOptions, stdin io.Reader, stdout io.Writer) error {
+	if len(options.words) > 0 {
+		return usageError{"hi box rm --all takes no box names"}
+	}
+	entries, _ := os.ReadDir(boxStateFile())
+	var boxes []boxMeta
+	for _, entry := range entries {
+		if meta, err := loadBoxMeta(entry.Name()); err == nil {
+			boxes = append(boxes, meta)
+		}
+	}
+	if len(boxes) == 0 {
+		fmt.Fprintln(stdout, "No boxes to remove.")
+		return nil
+	}
+	var remove, keep []boxMeta
+	fmt.Fprintln(stdout, "hi box rm --all removes these boxes, with their containers and worktrees:")
+	for _, meta := range boxes {
+		dirty := meta.Worktree && fileExists(meta.Workdir) && boxGit(meta.Workdir, "status", "--porcelain") != ""
+		note := ""
+		switch {
+		case dirty && !options.force:
+			note = "   kept: uncommitted work (use --force to remove it too)"
+			keep = append(keep, meta)
+		case dirty:
+			note = "   ⚠ uncommitted work is lost"
+			remove = append(remove, meta)
+		default:
+			remove = append(remove, meta)
+		}
+		fmt.Fprintf(stdout, "  %s (%s, %s)%s\n", meta.Name, meta.Agent, firstNonEmpty(meta.Branch, meta.Root), note)
+	}
+	if len(remove) == 0 {
+		fmt.Fprintln(stdout, "Nothing to remove.")
+		return nil
+	}
+	if !options.yes {
+		if !isTerminal(stdin) {
+			return errors.New("removing every box needs confirmation; rerun with --yes")
+		}
+		fmt.Fprintf(stdout, "Remove %d boxes? Branches with commits are kept. [y/N] ", len(remove))
+		answer, _ := readLine(stdin)
+		if answer = strings.ToLower(strings.TrimSpace(answer)); answer != "y" && answer != "yes" {
+			fmt.Fprintln(stdout, "Nothing removed.")
+			return nil
+		}
+	}
+	var failed []string
+	for _, meta := range remove {
+		engine := boxEngine{name: meta.Engine}
+		path, err := boxLookPath(meta.Engine)
+		if err != nil {
+			failed = append(failed, meta.Name+" ("+meta.Engine+" is not installed)")
+			continue
+		}
+		engine.bin = path
+		if err := removeBox(engine, meta, options.force, stdout); err != nil {
+			failed = append(failed, meta.Name+" ("+err.Error()+")")
+		}
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("could not remove %s", strings.Join(failed, ", "))
+	}
+	return nil
 }

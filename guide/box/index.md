@@ -123,7 +123,13 @@ hi box ls                    # every box, its state, branch, and changes
 hi box diff myproject-1      # commits and files; --full for the whole diff
 hi box stop myproject-1
 hi box rm myproject-1        # keeps the branch if it has commits
+hi box rm --all              # every box, after one question
 ```
+
+`rm --all` lists what it will remove and asks once. Boxes with uncommitted
+work are kept unless you add `--force`, and branches with commits are kept.
+Without a terminal it needs `--yes`. Use `--all` rather than `*`, which the
+shell would turn into the names of files in the current folder.
 
 `diff` marks files that run on your machine later, such as a `Makefile`,
 `package.json`, `.envrc`, CI workflows, and editor tasks. Read those before

@@ -182,6 +182,7 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 | `hi box diff <name> [--full]`        | Commits and files, flagging files that run on the host   |
 | `hi box allow <name> [<domain>]`     | Allow a domain, or list what was refused                 |
 | `hi box stop\|rm <name> [--force]`   | Stop, or remove the box and its worktree                 |
+| `hi box rm --all [--force] [--yes]`  | Remove every box after one question                      |
 | `hi box token claude`                | Store a long-lived token from `claude setup-token`       |
 
 Options when starting: `--name`, `--network locked|dev|open`, `--allow
