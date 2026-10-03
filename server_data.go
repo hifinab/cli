@@ -37,16 +37,19 @@ const (
 // dataHubURL is the Hugging Face Hub; tests point it at a fake.
 var dataHubURL = "https://huggingface.co"
 
-var dataKinds = []string{"dataset", "model"}
+var dataKinds = []string{"dataset", "model", "bucket"}
 
-// dataItem is one dataset or model a device may download.
+// dataItem is one dataset, model, or bucket a device may download.
 type dataItem struct {
 	Kind    string    `json:"kind"`
 	ID      string    `json:"id"`
 	Private bool      `json:"private,omitempty"`
 	Size    int64     `json:"size,omitempty"`
 	Updated time.Time `json:"updated,omitzero"`
-	Commit  string    `json:"commit,omitempty"`
+	// Commit is a dataset's or model's current commit; buckets have none.
+	Commit string `json:"commit,omitempty"`
+	// Files is a bucket's file count.
+	Files int `json:"files,omitempty"`
 }
 
 // dataListing is an organization's datasets and models, as last fetched.
@@ -60,6 +63,7 @@ type apiDataOrg struct {
 	Name     string `json:"name"`
 	Datasets int    `json:"datasets"`
 	Models   int    `json:"models"`
+	Buckets  int    `json:"buckets"`
 	Problem  string `json:"problem,omitempty"`
 }
 
@@ -84,6 +88,7 @@ type apiDataOrgStatus struct {
 	Role     string `json:"role,omitempty"`
 	Datasets int    `json:"datasets"`
 	Models   int    `json:"models"`
+	Buckets  int    `json:"buckets"`
 	Problem  string `json:"problem,omitempty"`
 }
 
@@ -155,10 +160,10 @@ func hubWhoamiCall(token string) (hubWhoami, error) {
 	return who, err
 }
 
-// hubList fetches an organization's datasets and models.
+// hubList fetches an organization's datasets, models, and buckets.
 func hubList(token, org string) ([]dataItem, error) {
 	var items []dataItem
-	for _, kind := range dataKinds {
+	for _, kind := range []string{"dataset", "model"} {
 		next := "/api/" + kind + "s?author=" + url.QueryEscape(org) +
 			"&limit=1000&expand[]=private&expand[]=lastModified&expand[]=sha"
 		if kind == "dataset" {
@@ -180,6 +185,24 @@ func hubList(token, org string) ([]dataItem, error) {
 				items = append(items, dataItem{Kind: kind, ID: repo.ID, Private: repo.Private,
 					Size: repo.MainSize, Updated: repo.LastModified, Commit: repo.SHA})
 			}
+		}
+	}
+	next := "/api/buckets/" + url.PathEscape(org)
+	for page := 0; next != "" && page < dataListPages; page++ {
+		var buckets []struct {
+			ID         string    `json:"id"`
+			Private    bool      `json:"private"`
+			UpdatedAt  time.Time `json:"updatedAt"`
+			Size       int64     `json:"size"`
+			TotalFiles int       `json:"totalFiles"`
+		}
+		var err error
+		if next, err = hubGet(token, next, &buckets); err != nil {
+			return nil, err
+		}
+		for _, bucket := range buckets {
+			items = append(items, dataItem{Kind: "bucket", ID: bucket.ID, Private: bucket.Private,
+				Size: bucket.Size, Updated: bucket.UpdatedAt, Files: bucket.TotalFiles})
 		}
 	}
 	sortDataItems(items)
@@ -238,19 +261,22 @@ func checkDataOrg(token, org string, who hubWhoami) apiDataOrgStatus {
 		status.Problem = err.Error()
 		return status
 	}
-	status.Datasets, status.Models = countDataKinds(items)
+	status.Datasets, status.Models, status.Buckets = countDataKinds(items)
 	return status
 }
 
-func countDataKinds(items []dataItem) (datasets, models int) {
+func countDataKinds(items []dataItem) (datasets, models, buckets int) {
 	for _, item := range items {
-		if item.Kind == "dataset" {
+		switch item.Kind {
+		case "dataset":
 			datasets++
-		} else {
+		case "model":
 			models++
+		case "bucket":
+			buckets++
 		}
 	}
-	return datasets, models
+	return datasets, models, buckets
 }
 
 // addDataOrgs checks the token for each organization and stores it. Either
@@ -294,8 +320,8 @@ func (s *hiServer) addDataOrgs(orgs []string, token, actor string) ([]apiDataOrg
 	}
 	s.dataMu.Unlock()
 	for _, status := range results {
-		s.audit(actor, "connected data organization", status.Org, fmt.Sprintf("token of %s (%s); %d datasets, %d models",
-			status.Account, status.Role, status.Datasets, status.Models))
+		s.audit(actor, "connected data organization", status.Org, fmt.Sprintf("token of %s (%s); %d datasets, %d models, %d buckets",
+			status.Account, status.Role, status.Datasets, status.Models, status.Buckets))
 	}
 	return results, nil
 }
@@ -464,7 +490,7 @@ func parseDataScope(scope string) (kind, id string, err error) {
 	kind, id, _ = strings.Cut(scope, ":")
 	org, name, found := strings.Cut(id, "/")
 	if !containsString(dataKinds, kind) || !found || !validRepoPart(org) || !validRepoPart(name) {
-		return "", "", fmt.Errorf("invalid scope %q; expected dataset:<org>/<name> or model:<org>/<name>", scope)
+		return "", "", fmt.Errorf("invalid scope %q; expected dataset:, model:, or bucket:<org>/<name>", scope)
 	}
 	return kind, id, nil
 }
@@ -496,16 +522,14 @@ func (s *hiServer) handleDataCatalog(w http.ResponseWriter, _ *http.Request, dev
 	for _, org := range sortedKeys(listings) {
 		listing := listings[org]
 		entry := apiDataOrg{Name: org, Problem: listing.problem}
+		var allowed []dataItem
 		for _, item := range listing.items {
 			if dataAllowed(policy, group, item.ID) {
-				catalog.Items = append(catalog.Items, item)
-				if item.Kind == "dataset" {
-					entry.Datasets++
-				} else {
-					entry.Models++
-				}
+				allowed = append(allowed, item)
 			}
 		}
+		catalog.Items = append(catalog.Items, allowed...)
+		entry.Datasets, entry.Models, entry.Buckets = countDataKinds(allowed)
 		catalog.Orgs = append(catalog.Orgs, entry)
 	}
 	writeJSON(w, http.StatusOK, catalog)
@@ -561,8 +585,9 @@ type dataRoute struct {
 	revision string
 }
 
-// parseDataRoute allows only the Hub's read calls that hf download and
-// huggingface_hub make for one dataset or model.
+// parseDataRoute allows only the Hub's read calls that hf download,
+// hf buckets sync, and huggingface_hub make for one dataset, model, or
+// bucket.
 func parseDataRoute(method, escapedPath string) (dataRoute, bool) {
 	// The Hub encodes a nested file name as one segment (onnx%2Fconfig.json),
 	// so encoded slashes are allowed, but no segment may climb out of the
@@ -590,9 +615,10 @@ func parseDataRoute(method, escapedPath string) (dataRoute, bool) {
 		}
 		return dataRoute{kind: kind, id: org + "/" + name}, true
 	}
-	kindOf := map[string]string{"datasets": "dataset", "models": "model"}
+	kindOf := map[string]string{"datasets": "dataset", "models": "model", "buckets": "bucket"}
 	switch {
-	// /api/datasets/<org>/<name>[/revision|tree|paths-info|xet-read-token/...]
+	// /api/datasets/<org>/<name>[/revision|tree|paths-info|xet-read-token/...],
+	// and the same for models and buckets
 	case len(parts) >= 4 && parts[0] == "api" && kindOf[parts[1]] != "":
 		route, ok := repo(kindOf[parts[1]], parts[2], parts[3])
 		if !ok {
@@ -625,6 +651,11 @@ func parseDataRoute(method, escapedPath string) (dataRoute, bool) {
 		route, ok := repo("dataset", parts[1], parts[2])
 		route.download, route.file = true, strings.Join(parts[5:], "/")
 		return route, ok && read
+	// /buckets/<org>/<name>/resolve/<file>: buckets have no revisions
+	case len(parts) >= 5 && parts[0] == "buckets" && parts[3] == "resolve":
+		route, ok := repo("bucket", parts[1], parts[2])
+		route.download, route.file = true, strings.Join(parts[4:], "/")
+		return route, ok && read
 	// /<org>/<name>/resolve/<rev>/<file>, a model
 	case len(parts) >= 5 && parts[2] == "resolve" && !containsString([]string{"api", "datasets", "spaces", "buckets"}, parts[0]):
 		route, ok := repo("model", parts[0], parts[1])
@@ -651,7 +682,7 @@ func (s *hiServer) handleDataProxy(w http.ResponseWriter, r *http.Request) {
 	escaped := strings.TrimPrefix(r.URL.EscapedPath(), dataProxyPath)
 	route, ok := parseDataRoute(r.Method, escaped)
 	if !ok {
-		writeHubError(w, http.StatusForbidden, fmt.Sprintf("hi data only passes on downloads of datasets and models; %s %s is not one", r.Method, escaped))
+		writeHubError(w, http.StatusForbidden, fmt.Sprintf("hi data only passes on downloads of datasets, models, and buckets; %s %s is not one", r.Method, escaped))
 		return
 	}
 	if claims.Scope != "*" && !strings.EqualFold(claims.Scope, route.kind+":"+route.id) {
@@ -818,7 +849,7 @@ func (s *hiServer) dataOrgList() []apiDataOrgStatus {
 	for _, org := range sortedKeys(s.dataOrgs()) {
 		listing := listings[org]
 		status := apiDataOrgStatus{Org: org, Problem: listing.problem}
-		status.Datasets, status.Models = countDataKinds(listing.items)
+		status.Datasets, status.Models, status.Buckets = countDataKinds(listing.items)
 		list = append(list, status)
 	}
 	return list
@@ -1040,7 +1071,7 @@ func printDataOrgs(list []apiDataOrgStatus, stdout io.Writer) {
 			fmt.Fprintf(stdout, "✗ %s: %s\n", org.Org, org.Problem)
 			continue
 		}
-		line := fmt.Sprintf("✓ %s: %d datasets, %d models", org.Org, org.Datasets, org.Models)
+		line := fmt.Sprintf("✓ %s: %d datasets, %d models, %d buckets", org.Org, org.Datasets, org.Models, org.Buckets)
 		if org.Account != "" {
 			line += fmt.Sprintf(" (token of %s, %s)", org.Account, describeHubRole(org.Role))
 		}

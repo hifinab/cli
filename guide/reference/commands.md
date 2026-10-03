@@ -11,7 +11,7 @@ description: Every hi command and option in one place.
 | `hi login <hf\|colab\|runpod\|shadeform>` | Sign in to a compute provider               |
 | `hi connect <server>`            | Join a hi server; `status`, `key`                      |
 | `hi disconnect`                  | Leave it; use your own keys again                      |
-| `hi data …`                      | Download the team's Hugging Face datasets and models; see below |
+| `hi data …`                      | Download the team's Hugging Face datasets, models, and buckets; see below |
 | `hi server …`                    | Run the server that brokers compute; see below         |
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
 | `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
@@ -113,7 +113,7 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server templates list\|sync\|remove [<name>]`    | Show, fetch now, or stop serving template sources  |
 | `hi server templates rename <name> <new-name>`      | Rename a source; keeps its token and history         |
 | `hi server data`                                    | Menu: Hugging Face organizations for `hi data`       |
-| `hi server data add <org>... [--token-file <f>]`    | Serve organizations' datasets and models; asks for a read token |
+| `hi server data add <org>... [--token-file <f>]`    | Serve organizations' datasets, models, and buckets; asks for a read token |
 | `hi server data list\|test\|remove [<org>]`          | Show, check, or stop serving organizations           |
 
 ## hi data
@@ -125,12 +125,13 @@ server; `hf` runs with `HF_ENDPOINT` pointing to it.
 | Command                                             | Does                                                 |
 |-----------------------------------------------------|------------------------------------------------------|
 | `hi data`                                           | Search by words, pick a dataset or model, and download it |
-| `hi data ls [<org>] [--kind dataset\|model] [--json]` | What you may download                              |
+| `hi data ls [<org>] [--kind dataset\|model\|bucket] [--json]` | What you may download                   |
 | `hi data info <org>/<name>`                         | Size, largest files, and last update                 |
-| `hi data get <org>/<name> [--to <dir>]`             | Download it with `hf`; default folder `./data/<name>` |
+| `hi data get <org>/<name> [--to <dir>]`             | Download it with `hf` (buckets with `hf buckets sync`); default folder `./data/<name>` |
 | `  --revision <rev>`, `--include <glob>`, `--exclude <glob>` | A branch, tag, or commit; filters, repeatable |
 
-Put `dataset:` or `model:` in front when both share a name. A group's
+Put `dataset:`, `model:`, or `bucket:` in front when several share a name.
+Buckets have no revisions. A group's
 `data` patterns in policy (`["hifinab/*"]`) limit what it sees; without
 them it sees everything.
 

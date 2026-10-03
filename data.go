@@ -14,8 +14,8 @@ import (
 	"time"
 )
 
-// hi data lists and downloads the Hugging Face datasets and models a
-// connected hi server serves. The server keeps the Hugging Face tokens; hf
+// hi data lists and downloads the Hugging Face datasets, models, and
+// buckets a connected hi server serves. The server keeps the Hugging Face tokens; hf
 // runs here with HF_ENDPOINT pointing to the server's proxy and a hi data
 // token that lasts an hour (docs/specs/ideas/hi_data.md).
 
@@ -47,19 +47,20 @@ func runData(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printDataUsage(w io.Writer) {
-	fmt.Fprintln(w, `hi data downloads the team's Hugging Face datasets and models through the
-hi server this device is connected to. The server keeps the Hugging Face
+	fmt.Fprintln(w, `hi data downloads the team's Hugging Face datasets, models, and buckets
+through the hi server this device is connected to. The server keeps the Hugging Face
 tokens; hf runs here without one.
 
 Usage:
-  hi data                                 Pick a dataset or model and download it
-  hi data ls [<org>] [--kind dataset|model] [--json]
+  hi data                                 Search, pick one, and download it
+  hi data ls [<org>] [--kind dataset|model|bucket] [--json]
                                           What this device may download
   hi data info <org>/<name>               Size, files, and last update
   hi data get <org>/<name> [--to DIR]     Download it with hf (default: ./data/<name>)
       [--revision REV] [--include GLOB]... [--exclude GLOB]...
 
-When a dataset and a model share a name, put dataset: or model: in front.
+Buckets download with hf buckets sync and have no revisions. When several
+share a name, put dataset:, model:, or bucket: in front.
 Needs hf (pip install -U huggingface_hub) and a server set up with
 hi server data add <org>.`)
 }
@@ -98,14 +99,14 @@ func dataToken(client *serverClient, connection *serverConnection, scope string)
 	return answer.Token, strings.TrimRight(connection.URL, "/") + answer.Path, nil
 }
 
-// resolveDataItem finds <org>/<name>, with an optional dataset: or model:
-// in front, among what this device may read.
+// resolveDataItem finds <org>/<name>, with an optional dataset:, model:,
+// or bucket: in front, among what this device may read.
 func resolveDataItem(catalog apiDataCatalog, ref string) (dataItem, error) {
 	kind, id := "", ref
 	if before, after, found := strings.Cut(ref, ":"); found {
 		kind, id = before, after
 		if !containsString(dataKinds, kind) {
-			return dataItem{}, usageError{fmt.Sprintf("%q: put dataset: or model: in front, or nothing", ref)}
+			return dataItem{}, usageError{fmt.Sprintf("%q: put dataset:, model:, or bucket: in front, or nothing", ref)}
 		}
 	}
 	if _, _, found := strings.Cut(id, "/"); !found {
@@ -123,7 +124,11 @@ func resolveDataItem(catalog apiDataCatalog, ref string) (dataItem, error) {
 	case 1:
 		return matches[0], nil
 	}
-	return dataItem{}, usageError{fmt.Sprintf("%s is both a dataset and a model; say dataset:%s or model:%s", id, id, id)}
+	var kinds []string
+	for _, match := range matches {
+		kinds = append(kinds, match.Kind+":"+id)
+	}
+	return dataItem{}, usageError{fmt.Sprintf("%s is more than one kind; say %s", id, strings.Join(kinds, " or "))}
 }
 
 // ---------------------------------------------------------------------------
@@ -131,14 +136,14 @@ func resolveDataItem(catalog apiDataCatalog, ref string) (dataItem, error) {
 
 func dataListCommand(args []string, stdout, stderr io.Writer) error {
 	flags := &flagSet{newComputeFlags("data ls", stderr)}
-	kind := flags.String("kind", "", "only datasets or only models")
+	kind := flags.String("kind", "", "only datasets, models, or buckets")
 	asJSON := flags.Bool("json", false, "print JSON")
 	positional, err := flags.parse(args)
 	if err != nil || len(positional) > 1 {
-		return usageError{"usage: hi data ls [<org>] [--kind dataset|model] [--json]"}
+		return usageError{"usage: hi data ls [<org>] [--kind dataset|model|bucket] [--json]"}
 	}
 	if *kind != "" && !containsString(dataKinds, *kind) {
-		return usageError{"--kind is dataset or model"}
+		return usageError{"--kind is dataset, model, or bucket"}
 	}
 	client, _, err := dataClient()
 	if err != nil {
@@ -268,13 +273,20 @@ func dataInfoCommand(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	var info struct {
-		Siblings []struct {
-			Name string `json:"rfilename"`
-			Size int64  `json:"size"`
-		} `json:"siblings"`
+	type dataFile struct {
+		Name string `json:"rfilename"`
+		Path string `json:"path"` // a bucket's
+		Type string `json:"type"`
+		Size int64  `json:"size"`
 	}
-	request, err := http.NewRequest(http.MethodGet, endpoint+"/api/"+item.Kind+"s/"+item.ID+"?blobs=true", nil)
+	var info struct {
+		Siblings []dataFile `json:"siblings"`
+	}
+	target := endpoint + "/api/" + item.Kind + "s/" + item.ID + "?blobs=true"
+	if item.Kind == "bucket" {
+		target = endpoint + "/api/buckets/" + item.ID + "/tree?recursive=true"
+	}
+	request, err := http.NewRequest(http.MethodGet, target, nil)
 	if err != nil {
 		return err
 	}
@@ -295,7 +307,18 @@ func dataInfoCommand(args []string, stdout, stderr io.Writer) error {
 		}
 		return fmt.Errorf("the server answered %s", response.Status)
 	}
-	if err := json.Unmarshal(data, &info); err != nil {
+	if item.Kind == "bucket" {
+		var tree []dataFile
+		if err := json.Unmarshal(data, &tree); err != nil {
+			return err
+		}
+		for _, entry := range tree {
+			if entry.Type == "file" {
+				entry.Name = entry.Path
+				info.Siblings = append(info.Siblings, entry)
+			}
+		}
+	} else if err := json.Unmarshal(data, &info); err != nil {
 		return err
 	}
 
@@ -309,7 +332,11 @@ func dataInfoCommand(args []string, stdout, stderr io.Writer) error {
 		fmt.Fprintln(stdout, "  private")
 	}
 	fmt.Fprintf(stdout, "  %d files, %s\n", len(info.Siblings), formatDataSize(total))
-	fmt.Fprintf(stdout, "  updated %s, at %s\n", describeDataAge(item.Updated), shortCommit(item.Commit))
+	if item.Commit != "" {
+		fmt.Fprintf(stdout, "  updated %s, at %s\n", describeDataAge(item.Updated), shortCommit(item.Commit))
+	} else {
+		fmt.Fprintf(stdout, "  updated %s\n", describeDataAge(item.Updated))
+	}
 	shown := min(len(info.Siblings), 15)
 	if shown > 0 {
 		fmt.Fprintln(stdout, "  largest files:")
@@ -369,13 +396,18 @@ func defaultDataFolder(item dataItem) string {
 	return filepath.Join("data", name)
 }
 
-// dataGetArgs is the hf command for an item.
+// dataGetArgs is the hf command for an item: hf download for datasets and
+// models, hf buckets sync for buckets, which hf download refuses.
 func dataGetArgs(item dataItem, options dataGetOptions) []string {
-	args := []string{"download", item.ID}
-	if item.Kind == "dataset" {
-		args = append(args, "--repo-type", "dataset")
+	var args []string
+	switch item.Kind {
+	case "bucket":
+		args = []string{"buckets", "sync", "hf://buckets/" + item.ID, options.to}
+	case "dataset":
+		args = []string{"download", item.ID, "--repo-type", "dataset", "--local-dir", options.to}
+	default:
+		args = []string{"download", item.ID, "--local-dir", options.to}
 	}
-	args = append(args, "--local-dir", options.to)
 	if options.revision != "" {
 		args = append(args, "--revision", options.revision)
 	}
@@ -410,6 +442,9 @@ func downloadData(client *serverClient, connection *serverConnection, item dataI
 	if err != nil {
 		return errors.New("hf isn't installed; install it with `pip install -U huggingface_hub` (or `uv tool install huggingface_hub`) and run this again")
 	}
+	if item.Kind == "bucket" && options.revision != "" {
+		return usageError{"buckets have no revisions; leave out --revision"}
+	}
 	if options.to == "" {
 		options.to = defaultDataFolder(item)
 	}
@@ -425,7 +460,7 @@ func downloadData(client *serverClient, connection *serverConnection, item dataI
 	if err := command.Run(); err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
-			return exitStatusError{code: exit.ExitCode(), message: fmt.Sprintf("hf download of %s failed", item.ID)}
+			return exitStatusError{code: exit.ExitCode(), message: fmt.Sprintf("hf could not download %s", item.ID)}
 		}
 		return err
 	}
@@ -437,7 +472,11 @@ func downloadData(client *serverClient, connection *serverConnection, item dataI
 // the menu
 
 func dataMenuLabel(item dataItem) string {
-	return fmt.Sprintf("%-7s  %s  ·  %s  ·  updated %s", item.Kind, item.ID, formatDataSize(item.Size), describeDataAge(item.Updated))
+	size := formatDataSize(item.Size)
+	if item.Kind == "bucket" {
+		size += fmt.Sprintf(", %d files", item.Files)
+	}
+	return fmt.Sprintf("%-7s  %s  ·  %s  ·  updated %s", item.Kind, item.ID, size, describeDataAge(item.Updated))
 }
 
 func dataMenu(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {

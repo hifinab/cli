@@ -553,6 +553,13 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.24.2 — Buckets in `hi data`
+
+- [x] `hi data` lists the organizations' buckets with their size and file
+  count; `hi data get` syncs one with `hf buckets sync`, and `info` lists
+  its largest files. The proxy passes a bucket's reads and refuses uploads,
+  deletes, and settings. Tested with a public bucket through the proxy.
+
 ### v0.24.1 — Search in `hi data`
 
 - [x] `hi data`'s list has a search field: typing filters at once, every

@@ -43,7 +43,11 @@ func newFakeHub(t *testing.T) *fakeHub {
 		case r.URL.Path == "/api/models" && r.URL.Query().Get("author") == "hifinab":
 			w.Write([]byte(`[{"id":"hifinab/ranker","private":true,` + updated + `,"sha":"0a1b2c"},` +
 				`{"id":"hifinab/bars","private":true,` + updated + `,"sha":"999999"}]`))
-		case r.URL.Path == "/api/datasets" || r.URL.Path == "/api/models":
+		case r.URL.Path == "/api/buckets/hifinab":
+			w.Write([]byte(`[{"id":"hifinab/scratch","private":true,"updatedAt":"2026-09-30T12:00:00.000Z","size":80200000000,"totalFiles":412}]`))
+		case r.URL.Path == "/api/buckets/hifinab/scratch/tree":
+			w.Write([]byte(`[{"type":"directory","path":"runs"},{"type":"file","path":"runs/a.parquet","size":7000},{"type":"file","path":"notes.md","size":12}]`))
+		case r.URL.Path == "/api/datasets" || r.URL.Path == "/api/models" || strings.HasPrefix(r.URL.Path, "/api/buckets/") && strings.Count(r.URL.Path, "/") == 3:
 			w.Write([]byte(`[]`))
 		case r.URL.Path == "/hifinab/ranker/resolve/main/config.json":
 			w.Header().Set("Location", "/api/resolve-cache/models/hifinab/ranker/0a1b2c/config.json")
@@ -125,7 +129,7 @@ func TestAddingADataOrgChecksTheToken(t *testing.T) {
 		t.Fatal("a failed add stored a token")
 	}
 	results, err := ts.server.addDataOrgs([]string{"hifinab"}, "hf_team", "bob")
-	if err != nil || len(results) != 1 || results[0].Datasets != 2 || results[0].Models != 2 || results[0].Account != "svc" {
+	if err != nil || len(results) != 1 || results[0].Datasets != 2 || results[0].Models != 2 || results[0].Buckets != 1 || results[0].Account != "svc" {
 		t.Fatalf("add: %+v, %v", results, err)
 	}
 	keys, _ := os.ReadFile(filepath.Join(ts.dir, "keys.json"))
@@ -142,7 +146,7 @@ func TestHiDataListsWhatTheGroupMayRead(t *testing.T) {
 	ts, _ := newDataServer(t)
 	code, stdout, stderr := runHi("data", "ls")
 	if code != 0 || !strings.Contains(stdout, "dataset  hifinab/bars") || !strings.Contains(stdout, "12.4 GB") ||
-		!strings.Contains(stdout, "model    hifinab/ranker") {
+		!strings.Contains(stdout, "model    hifinab/ranker") || !strings.Contains(stdout, "bucket   hifinab/scratch") || !strings.Contains(stdout, "80.2 GB") {
 		t.Fatalf("ls: code %d\n%s%s", code, stdout, stderr)
 	}
 	code, stdout, _ = runHi("data", "ls", "--kind", "model", "--json")
@@ -309,7 +313,7 @@ func TestHiDataGetRunsHFThroughTheServer(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	code, _, stderr := runHi("data", "get", "hifinab/bars")
-	if code != 2 || !strings.Contains(stderr, "both a dataset and a model") {
+	if code != 2 || !strings.Contains(stderr, "say dataset:hifinab/bars or model:hifinab/bars") {
 		t.Fatalf("an ambiguous name: code %d\n%s", code, stderr)
 	}
 	code, _, stderr = runHi("data", "get", "dataset:hifinab/bars", "--include", "*.parquet", "--include", "README.md", "--exclude", "old/*")
@@ -328,6 +332,15 @@ func TestHiDataGetRunsHFThroughTheServer(t *testing.T) {
 	data, _ = os.ReadFile(record)
 	if code != 0 || !strings.Contains(string(data), "args: download hifinab/ranker --local-dir models/r --revision v2\n") {
 		t.Fatalf("get a model: code %d\n%s%s", code, data, stderr)
+	}
+
+	code, _, stderr = runHi("data", "get", "hifinab/scratch", "--include", "runs/*")
+	data, _ = os.ReadFile(record)
+	if code != 0 || !strings.Contains(string(data), "args: buckets sync hf://buckets/hifinab/scratch data/scratch --include runs/*\n") {
+		t.Fatalf("get a bucket: code %d\n%s%s", code, data, stderr)
+	}
+	if code, _, stderr = runHi("data", "get", "hifinab/scratch", "--revision", "v1"); code != 2 || !strings.Contains(stderr, "no revisions") {
+		t.Fatalf("a bucket with a revision: code %d\n%s", code, stderr)
 	}
 
 	code, _, stderr = runHi("data", "get", "hifinab/missing")
@@ -361,11 +374,11 @@ func TestServerDataCommandWorksWithoutARunningServer(t *testing.T) {
 	writeTestFile(t, tokenFile, "hf_team\n", 0o600)
 
 	code, stdout, stderr := runHi("server", "data", "add", "hifinab", "--token-file", tokenFile, "--dir", ts.dir)
-	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models (token of svc, read-only)") {
+	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 buckets (token of svc, read-only)") {
 		t.Fatalf("add: code %d\n%s%s", code, stdout, stderr)
 	}
 	code, stdout, _ = runHi("server", "data", "list", "--dir", ts.dir)
-	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models") {
+	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 buckets") {
 		t.Fatalf("list: code %d\n%s", code, stdout)
 	}
 	code, stdout, _ = runHi("server", "data", "test", "--dir", ts.dir)
@@ -397,5 +410,46 @@ func TestPolicyRejectsBadDataPatterns(t *testing.T) {
 	}
 	if !dataAllowed(policy, "students", "any/thing") {
 		t.Error("a group without a data field should read everything")
+	}
+}
+
+func TestDataProxyPassesBucketReadsOnly(t *testing.T) {
+	ts, hub := newDataServer(t)
+	device := ts.aliceDevice(t)
+	token := ts.server.issueDataToken(dataClaims{Device: device.Fingerprint, User: "alice", Scope: "bucket:hifinab/scratch",
+		Expires: computeNow().Add(time.Hour).Unix()})
+	for _, c := range []struct {
+		method, path string
+		status       int
+	}{
+		{http.MethodGet, "/hf/api/buckets/hifinab/scratch", http.StatusOK},
+		{http.MethodGet, "/hf/api/buckets/hifinab/scratch/tree?recursive=true", http.StatusOK},
+		{http.MethodGet, "/hf/api/buckets/hifinab/scratch/xet-read-token", http.StatusOK},
+		{http.MethodHead, "/hf/buckets/hifinab/scratch/resolve/runs/a.parquet", http.StatusOK},
+		{http.MethodPost, "/hf/api/buckets/hifinab/scratch/paths-info", http.StatusOK},
+		// Uploads, deletes, and settings are refused.
+		{http.MethodPost, "/hf/api/buckets/hifinab/scratch/batch", http.StatusForbidden},
+		{http.MethodGet, "/hf/api/buckets/hifinab/scratch/xet-write-token", http.StatusForbidden},
+		{http.MethodDelete, "/hf/api/buckets/hifinab/scratch", http.StatusForbidden},
+		{http.MethodPut, "/hf/api/buckets/hifinab/scratch/settings", http.StatusForbidden},
+		{http.MethodPost, "/hf/api/buckets/hifinab/new", http.StatusForbidden},
+		// The bucket list of the organization and other buckets are not for this token.
+		{http.MethodGet, "/hf/api/buckets/hifinab", http.StatusForbidden},
+		{http.MethodGet, "/hf/api/buckets/hifinab/other", http.StatusForbidden},
+	} {
+		if response := proxyCall(t, ts, c.method, c.path, token); response.StatusCode != c.status {
+			t.Errorf("%s %s: %d, want %d", c.method, c.path, response.StatusCode, c.status)
+		}
+	}
+	for _, call := range hub.passed() {
+		if strings.Contains(call, "batch") || strings.Contains(call, "write") || strings.HasPrefix(call, "DELETE") {
+			t.Fatalf("a write reached the hub: %s", call)
+		}
+	}
+
+	code, stdout, stderr := runHi("data", "info", "hifinab/scratch")
+	if code != 0 || !strings.Contains(stdout, "bucket hifinab/scratch") || !strings.Contains(stdout, "2 files, 7.0 KB") ||
+		!strings.Contains(stdout, "runs/a.parquet") || strings.Contains(stdout, " at ") {
+		t.Fatalf("info: code %d\n%s%s", code, stdout, stderr)
 	}
 }

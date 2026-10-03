@@ -1859,7 +1859,7 @@ Usage:
   hi server templates rename <name> <new> Rename a source; keeps its token and history
   hi server data                          Hugging Face organizations for hi data (menu)
   hi server data add <org>... [--token-file F]
-                                          Serve an organization's datasets and models to devices
+                                          Serve an organization's datasets, models, and buckets
   hi server data list|test|remove         Show, check, or stop serving organizations
 
 Commands other than init and run talk to the running server through its

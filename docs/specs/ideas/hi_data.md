@@ -1,6 +1,7 @@
 # `hi data` specification
 
-Status: Draft; release 1 (datasets and models) implemented
+Status: Draft; release 1 (datasets and models) shipped in v0.24.0, buckets
+in v0.24.2
 
 Dependencies: `hi server` (keys kept on the server, devices, groups,
 `policy.json`, audit, Slack, signed client API inside NetBird), and the
@@ -257,9 +258,9 @@ The client API is plain HTTP inside NetBird, so `HF_ENDPOINT` is
 
 ## Releases
 
-1. Datasets and models: `hi data`, `ls`, `info`, `get`; `hi server data add|list|test|
+1. Datasets and models (v0.24.0), then buckets (v0.24.2): `hi data`, `ls`, `info`, `get`; `hi server data add|list|test|
    remove`; the proxy; `data` in policy; audit.
-2. Buckets; `hi data run` and `env`; `.hifin/data.json` and `hi data get`
+2. `hi data run` and `env`; `.hifin/data.json` and `hi data get`
    with no arguments; the `hi box` allowlist.
 3. Compute: `hi compute run --data <org>/<name>` gives the instance a hi
    data token for the run's lifetime, so a job downloads on the instance
@@ -304,8 +305,10 @@ server:
 6. `hf download` takes `--include` once per pattern; with several patterns
    after one flag, the rest are read as file names.
 
-Still to check for release 2: which calls `hf buckets sync` makes beyond
-the ones in the table.
+7. `hf buckets sync hf://buckets/<org>/<name> <dir>` makes these calls: the
+   bucket's info, its `tree?recursive=true`, a `HEAD` on one file's
+   `resolve`, and a Xet read token; the files come from Xet storage. A
+   19-file public bucket synced through the proxy on 2026-10-03.
 
 ## Later: uploads
 
