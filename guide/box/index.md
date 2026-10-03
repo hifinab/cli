@@ -136,3 +136,105 @@ you run anything from the branch. Merge the work in the project with
 from the box lands as you, not as root. Without Podman it uses Docker and
 says that Docker's daemon runs as root, so an escape would be root on the
 machine.
+
+## How it works, step by step
+
+This follows one run from start to finish:
+
+```sh
+cd ~/projects/myproject
+hi box claude "make the flaky test in tests/test_sync.py reliable"
+hi box ls
+hi box diff myproject-1
+```
+
+### Starting the box
+
+`hi box claude` sets the box up, starts Claude Code in it, and returns at
+once:
+
+1. **It picks the engine**: rootless Podman, or Docker with a warning when
+   Podman is missing.
+2. **It reads the project's settings** from `devcontainer.json`, if there is
+   one: the image, environment, `postCreateCommand`, and
+   `customizations.hi`. Without one, the defaults are the `dev` network, no
+   GPU, and hi's image.
+3. **It names the box** after the folder and a number, `myproject-1`, and
+   keeps its state in `~/.local/state/hi/box/myproject-1/`.
+4. **It gives the agent its own copy of the code.** `git worktree add -b
+   hi-box/myproject-1 … HEAD` checks out your last commit into a new folder
+   on a new branch. Your own working folder isn't touched, and uncommitted
+   changes aren't in the box; hi says so when there are some.
+5. **It writes the allowlist**, the hosts the box may reach, from the
+   network preset, `--allow`, and the project's domains if you allowed them.
+6. **It makes sure the image exists.** hi's image is built once per machine
+   and tagged by a hash of its definition, so a change to it builds a new
+   one. It contains no agent.
+7. **It creates a private network**, `hi-box-myproject-1`, with no route out
+   and no name lookups.
+8. **It starts the proxy**, `hi-box-myproject-1-proxy`, the box's only way
+   out. It is a second container on both the private network and a normal
+   one, running your `hi` binary read-only. It allows connections only to
+   the allowlist and writes every decision to `network.log`. It is the only
+   container that can read your Claude sign-in, on a port of its own for
+   Claude's requests.
+9. **It starts the box**, `hi-box-myproject-1`, in the background:
+   - It runs as you, without extra privileges (`--cap-drop=ALL`,
+     `no-new-privileges`), at most 4,096 processes, and 16 GB of memory.
+   - It sees the worktree; your repository's `.git`, so it can commit, with
+     `hooks` and `config` read-only; an empty home folder of its own; and
+     the `claude` binary from your machine, read-only. Nothing else from
+     your home folder.
+   - `HTTPS_PROXY` points at the proxy. The Claude token in the box is the
+     word `hi-box-placeholder`, and `ANTHROPIC_BASE_URL` points at the
+     proxy's Claude port. Your git name and email are passed in, so its
+     commits carry them.
+   - The command is `claude -p "<your prompt>"
+     --dangerously-skip-permissions`: Claude Code works without asking for
+     permission, which the box is there to make safe.
+
+### While the agent works
+
+Claude Code reads and edits files in the worktree and runs commands there,
+such as the tests. Its requests to the model go to the proxy, which puts
+your real token in place of the placeholder on the way to Anthropic.
+Anything else on the internet goes through the allowlist, and what it
+refuses shows up in `hi box allow myproject-1`. Its commits land on the
+branch `hi-box/myproject-1` in your repository.
+
+### Checking on it
+
+`hi box ls` lists every box: whether it is running or has exited, its
+branch, its changes against the commit it started from (committed,
+uncommitted, and new files), and its age. It also stops the proxies of boxes
+that have finished.
+
+`hi box attach myproject-1` shows a background agent's output. With a
+prompt, Claude Code only prints its final answer, so there is nothing to see
+until it is done. To watch an agent work, start it without a prompt and work
+with it in your terminal.
+
+### Reviewing the work
+
+`hi box diff myproject-1` changes nothing. It shows the commits on
+`hi-box/myproject-1` since the start, and the files changed, including
+uncommitted and new ones. Files that run on your machine later get a ⚠:
+`Makefile`, `package.json`, `.envrc`, CI workflows, and editor tasks. Read
+those before you run anything from the branch. `--full` adds the whole diff.
+
+To keep the work, merge it in the project:
+
+```sh
+git merge hi-box/myproject-1
+```
+
+`hi box rm myproject-1` then removes the containers, the network, and the
+worktree. It keeps the branch if it has commits, and refuses while the
+worktree has uncommitted work, unless you add `--force`.
+
+### Giving it a good task
+
+A box runs unattended, so give it a task it can finish and check on its own:
+"make `make check` pass", "add tests for `parse_config` and fix what they
+find", or "upgrade FastAPI and fix what breaks". A vague task such as "fix
+something" gives a vague result.
