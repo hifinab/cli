@@ -11,6 +11,7 @@ description: Every hi command and option in one place.
 | `hi login <hf\|colab\|runpod\|shadeform>` | Sign in to a compute provider               |
 | `hi connect <server>`            | Join a hi server; `status`, `key`                      |
 | `hi disconnect`                  | Leave it; use your own keys again                      |
+| `hi data …`                      | Download the team's Hugging Face datasets and models; see below |
 | `hi server …`                    | Run the server that brokers compute; see below         |
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
 | `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
@@ -111,6 +112,27 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server templates add <name> <git-url> [--ref <r>]` | Serve a private repository's templates and skills |
 | `hi server templates list\|sync\|remove [<name>]`    | Show, fetch now, or stop serving template sources  |
 | `hi server templates rename <name> <new-name>`      | Rename a source; keeps its token and history         |
+| `hi server data`                                    | Menu: Hugging Face organizations for `hi data`       |
+| `hi server data add <org>... [--token-file <f>]`    | Serve organizations' datasets and models; asks for a read token |
+| `hi server data list\|test\|remove [<org>]`          | Show, check, or stop serving organizations           |
+
+## hi data
+
+Needs a connected server with organizations added, and `hf`
+(`pip install -U huggingface_hub`). The Hugging Face token stays on the
+server; `hf` runs with `HF_ENDPOINT` pointing to it.
+
+| Command                                             | Does                                                 |
+|-----------------------------------------------------|------------------------------------------------------|
+| `hi data`                                           | Pick a dataset or model and download it              |
+| `hi data ls [<org>] [--kind dataset\|model] [--json]` | What you may download                              |
+| `hi data info <org>/<name>`                         | Size, largest files, and last update                 |
+| `hi data get <org>/<name> [--to <dir>]`             | Download it with `hf`; default folder `./data/<name>` |
+| `  --revision <rev>`, `--include <glob>`, `--exclude <glob>` | A branch, tag, or commit; filters, repeatable |
+
+Put `dataset:` or `model:` in front when both share a name. A group's
+`data` patterns in policy (`["hifinab/*"]`) limit what it sees; without
+them it sees everything.
 
 ## hi login
 

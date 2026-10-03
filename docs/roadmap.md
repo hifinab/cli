@@ -553,6 +553,22 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.24.0 — `hi data`: the team's Hugging Face datasets and models
+
+- [x] `hi server data add <org>...` stores a read token per organization
+  after checking it with the Hub; `list`, `test`, `remove`, and a menu.
+- [x] A proxy under `/hf` passes only a repository's read calls on with the
+  organization's token, so devices run the official `hf` with
+  `HF_ENDPOINT` pointing to the server and a hi data token that lasts an
+  hour. The Hugging Face token never reaches a device; file bytes come from
+  the CDN and Xet storage directly.
+- [x] `hi data` (a picker), `ls`, `info`, and `get`; `data` patterns per
+  group in policy, everything when unset; token grants in the audit log,
+  downloads in `data_usage.jsonl`.
+  Tested on 2026-10-03 with `hf` 1.32.0 against the real Hub.
+  Spec: [hi_data.md](specs/ideas/hi_data.md). Next: buckets, `hi data run`,
+  and `.hifin/data.json`.
+
 ## Planned
 
 ### v0.23.0 — `hi box`: local agent boxes
@@ -580,7 +596,7 @@ images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
-### v0.24.0 — Learn from agent-machine services
+### v0.25.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -601,7 +617,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
 
-### v0.25.0 — skills.sh
+### v0.26.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`
