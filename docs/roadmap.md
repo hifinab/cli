@@ -553,12 +553,23 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.24.3 — Day-long data tokens, and `hi data` in the docs
+
+- [x] A hi data token lasts a day instead of an hour, so long downloads
+  don't stop when `hf` asks for its next Xet token; it still works only
+  from its device, while the device and user are enrolled.
+- [x] Laptops older than v0.24.2 don't see buckets, which they would try
+  to download as models; counts say "1 bucket".
+- [x] The guide (Download the team's data), README, website, llms.txt, and
+  the agent skill cover `hi data`.
+
 ### v0.24.2 — Buckets in `hi data`
 
 - [x] `hi data` lists the organizations' buckets with their size and file
   count; `hi data get` syncs one with `hf buckets sync`, and `info` lists
   its largest files. The proxy passes a bucket's reads and refuses uploads,
-  deletes, and settings. Tested with a public bucket through the proxy.
+  deletes, and settings. Tested with a public bucket through the proxy,
+  and with a private 36 GB bucket from the team's server on 2026-10-03.
 
 ### v0.24.1 — Search in `hi data`
 

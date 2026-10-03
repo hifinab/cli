@@ -44,6 +44,7 @@ hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Fa
 hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute
 hi disconnect               Leave it; hi compute uses your own keys again
+hi data            Download the team's Hugging Face datasets, models, and buckets through it (hi data help)
 hi server          Run the server that brokers compute and serves templates for a team (hi server help)
 hi box claude      Run an agent, a shell, or a command in a rootless box (hi box help)
 hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
@@ -298,6 +299,23 @@ by default, GitHub and package registries (`--network locked|dev|open`,
 placeholder for it. Git hooks and config are read-only, `--gpu` passes the
 Strix Halo in, and `devcontainer.json`'s image, environment, and
 `postCreateCommand` are used, with hi's settings under `customizations.hi`.
+
+## Team data
+
+`hi data` downloads the private Hugging Face datasets, models, and buckets
+of the team's organizations through the hi server, with the official `hf`
+tool and no Hugging Face token on the machine:
+
+```sh
+hi data                        # search by words, pick one, download it
+hi data ls                     # what you may download
+hi data get hifinab/bars-1d    # into ./data/bars-1d (--to, --revision, --include, --exclude)
+```
+
+The server keeps one read token per organization (`hi server data add
+<org>`) and passes on only the read calls of one repository or bucket; file
+contents come straight from Hugging Face's CDN. See
+[Download the team's data](https://hifin.sh/guide/data/).
 
 ## Agent skill
 

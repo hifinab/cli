@@ -374,11 +374,11 @@ func TestServerDataCommandWorksWithoutARunningServer(t *testing.T) {
 	writeTestFile(t, tokenFile, "hf_team\n", 0o600)
 
 	code, stdout, stderr := runHi("server", "data", "add", "hifinab", "--token-file", tokenFile, "--dir", ts.dir)
-	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 buckets (token of svc, read-only)") {
+	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 bucket (token of svc, read-only)") {
 		t.Fatalf("add: code %d\n%s%s", code, stdout, stderr)
 	}
 	code, stdout, _ = runHi("server", "data", "list", "--dir", ts.dir)
-	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 buckets") {
+	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 bucket") {
 		t.Fatalf("list: code %d\n%s", code, stdout)
 	}
 	code, stdout, _ = runHi("server", "data", "test", "--dir", ts.dir)
@@ -451,5 +451,14 @@ func TestDataProxyPassesBucketReadsOnly(t *testing.T) {
 	if code != 0 || !strings.Contains(stdout, "bucket hifinab/scratch") || !strings.Contains(stdout, "2 files, 7.0 KB") ||
 		!strings.Contains(stdout, "runs/a.parquet") || strings.Contains(stdout, " at ") {
 		t.Fatalf("info: code %d\n%s%s", code, stdout, stderr)
+	}
+}
+
+func TestOldClientsDontSeeBuckets(t *testing.T) {
+	for agent, want := range map[string]bool{"hi/v0.24.1": false, "hi/v0.24.0": false, "hi/v0.23.9": false,
+		"hi/v0.24.2": true, "hi/v0.25.0": true, "hi/v1.0.0": true, "hi/dev": true, "curl/8": true} {
+		if clientKnowsBuckets(agent) != want {
+			t.Errorf("%s: want %v", agent, want)
+		}
 	}
 }

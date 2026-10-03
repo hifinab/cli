@@ -1,6 +1,6 @@
 ---
 name: hi
-description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform) - run a Python script or container to completion on a GPU, start an SSH-able GPU box, forward its ports to localhost, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers starting a new project from a template (hi init), Hifin workstation setup (hi install, hi verify strix), and NetBird (hi net). Use when the user wants to train, evaluate, or test something on a GPU they do not have locally, try or serve an LLM remotely, see or stop running remote compute, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
+description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform) - run a Python script or container to completion on a GPU, start an SSH-able GPU box, forward its ports to localhost, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers starting a new project from a template (hi init), Hifin workstation setup (hi install, hi verify strix), NetBird (hi net), and downloading the team's private Hugging Face datasets, models, and buckets through a hi server (hi data). Use when the user wants to train, evaluate, or test something on a GPU they do not have locally, try or serve an LLM remotely, see or stop running remote compute, get the team's data or models, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
 ---
 
 # hi
@@ -162,6 +162,30 @@ hi compute requests r-9b41e0 --wait --timeout 10m
 
 Stopping never needs approval, and you can stop only the user's own
 machines.
+
+## Team data (hi data)
+
+On a machine connected to a hi server, the team's private Hugging Face
+datasets, models, and buckets come through `hi data`. Never look for, ask
+for, or use a Hugging Face token for them: the server keeps it, and `hf`
+runs without one.
+
+```sh
+hi data ls --json                    # what the user may download: kind, id, size, updated
+hi data ls hifinab --kind dataset    # one organization, one kind
+hi data info hifinab/bars-1d         # size, file count, and the largest files
+hi data get hifinab/bars-1d          # into ./data/bars-1d with hf
+hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
+```
+
+1. Check the size with `hi data info` before a download, and tell the user
+   before anything over a few GB. Use `--include` to fetch only what the
+   task needs.
+2. Put `dataset:`, `model:`, or `bucket:` in front when a name is more than
+   one kind; the error says which.
+3. A "may not read" error is the team's policy: tell the user, and don't
+   try another way to reach the data.
+4. If `hf` is missing, `pip install -U huggingface_hub` installs it.
 
 ## Check and clean up
 

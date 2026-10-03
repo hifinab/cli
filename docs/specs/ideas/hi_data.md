@@ -42,7 +42,7 @@ sends them to a device. It runs a small Hugging Face proxy instead:
  ──────                                ─────────                          ──────────────
  hi data get hifinab/daily-bars
    │ signed POST /v1/data/token ─────▶ checks group policy
-   │ ◀── hi data token (1 h, this device)
+   │ ◀── hi data token (24 h, this device)
    │
    │ runs: hf download --repo-type dataset hifinab/daily-bars
    │       HF_ENDPOINT=http://<server>/hf   HF_TOKEN=<hi data token>
@@ -83,8 +83,12 @@ user. It is simpler, but the hiding isn't real:
 - A token on a laptop works outside `hi`, with no policy and no record.
 
 What does reach the device is limited: a hi data token that works only
-against this server, for one hour, and Xet read tokens that last 15
-minutes and cover one repository.
+against this server, from this device, for 24 hours, and Xet read tokens
+that last 15 minutes and cover one repository. A day is long because `hf`
+uses the same hi data token for the whole download, asking for a new Xet
+token every 15 minutes; with one hour, a large download stopped partway.
+Removing the device or the user ends its tokens at once, and policy is
+checked on every call.
 
 ## Commands
 
@@ -155,7 +159,7 @@ a fresh hi data token, so `load_dataset`, `hf_hub_download`, and
 `hf://datasets/...` paths in pandas or Polars read the team's private data
 directly, and `from_pretrained("hifinab/...")` loads the team's models.
 `hi data env` prints the two variables for `eval` in a shell; the
-token lasts an hour.
+token lasts a day.
 
 Inside `hi box`, both work the same way. The box's egress allowlist needs
 the server, plus the Hugging Face CDN and Xet storage hosts the downloads
@@ -238,7 +242,8 @@ Signed client API, for enrolled user devices:
   for datasets and models the current commit.
 - `POST /v1/data/token` with `{scope}` (one `<org>/<name>`, or `*` for
   `hi data run`): a hi data token bound to this device and the group's
-  policy, valid for one hour.
+  policy, valid for 24 hours. Laptops older than v0.24.2 don't get buckets
+  in the list, since they would download them as models.
 
 The proxy, under `/hf/`, takes a hi data token as `Authorization: Bearer`.
 It passes on, with the organization's real token:
@@ -308,7 +313,8 @@ server:
 7. `hf buckets sync hf://buckets/<org>/<name> <dir>` makes these calls: the
    bucket's info, its `tree?recursive=true`, a `HEAD` on one file's
    `resolve`, and a Xet read token; the files come from Xet storage. A
-   19-file public bucket synced through the proxy on 2026-10-03.
+   19-file public bucket synced through the proxy on 2026-10-03, and a
+   private 36 GB bucket (`hifinab/fdb`) from the team's server.
 
 ## Later: uploads
 

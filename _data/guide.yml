@@ -49,6 +49,8 @@
       url: /guide/q/
     - title: Run agents in a box
       url: /guide/box/
+    - title: Download the team's data
+      url: /guide/data/
 - section: Projects
   pages:
     - title: Start a project

@@ -26,9 +26,12 @@ import (
 // (docs/specs/ideas/hi_data.md).
 
 const (
-	dataKeyPrefix     = "data:" // in keys.json: data:<org>
-	dataTokenPrefix   = "hidata_"
-	dataTokenLifetime = time.Hour
+	dataKeyPrefix   = "data:" // in keys.json: data:<org>
+	dataTokenPrefix = "hidata_"
+	// dataTokenLifetime covers long downloads: hf asks the proxy for a new
+	// Xet token every 15 minutes with the same hi data token. A token works
+	// only for its device, and only while the device and user are enrolled.
+	dataTokenLifetime = 24 * time.Hour
 	dataListEvery     = 5 * time.Minute
 	dataProxyPath     = "/hf"
 	dataListPages     = 20
@@ -320,8 +323,8 @@ func (s *hiServer) addDataOrgs(orgs []string, token, actor string) ([]apiDataOrg
 	}
 	s.dataMu.Unlock()
 	for _, status := range results {
-		s.audit(actor, "connected data organization", status.Org, fmt.Sprintf("token of %s (%s); %d datasets, %d models, %d buckets",
-			status.Account, status.Role, status.Datasets, status.Models, status.Buckets))
+		s.audit(actor, "connected data organization", status.Org, fmt.Sprintf("token of %s (%s); %s, %s, %s",
+			status.Account, status.Role, countNoun(status.Datasets, "dataset"), countNoun(status.Models, "model"), countNoun(status.Buckets, "bucket")))
 	}
 	return results, nil
 }
@@ -510,7 +513,35 @@ func (s *hiServer) dataRoutes(mux *http.ServeMux) {
 	mux.Handle(dataProxyPath+"/", http.HandlerFunc(s.handleDataProxy))
 }
 
-func (s *hiServer) handleDataCatalog(w http.ResponseWriter, _ *http.Request, device serverDevice, _ []byte) {
+// dataBucketsFrom is the first hi version that downloads buckets; earlier
+// ones would ask hf download for a model of the same name.
+var dataBucketsFrom = [3]int{0, 24, 2}
+
+// clientKnowsBuckets reads the version from the User-Agent. Development
+// builds and unknown agents get everything.
+func clientKnowsBuckets(agent string) bool {
+	text, ok := strings.CutPrefix(agent, "hi/v")
+	if !ok {
+		return true
+	}
+	parts := strings.SplitN(text, ".", 3)
+	if len(parts) != 3 {
+		return true
+	}
+	for i, part := range parts {
+		digits, _, _ := strings.Cut(part, "-")
+		number, err := strconv.Atoi(digits)
+		if err != nil {
+			return true
+		}
+		if number != dataBucketsFrom[i] {
+			return number > dataBucketsFrom[i]
+		}
+	}
+	return true
+}
+
+func (s *hiServer) handleDataCatalog(w http.ResponseWriter, r *http.Request, device serverDevice, _ []byte) {
 	group, ok := s.userGroup(device.User)
 	if !ok {
 		writeAPIError(w, http.StatusForbidden, "a dashboard viewer can't use hi data")
@@ -523,7 +554,11 @@ func (s *hiServer) handleDataCatalog(w http.ResponseWriter, _ *http.Request, dev
 		listing := listings[org]
 		entry := apiDataOrg{Name: org, Problem: listing.problem}
 		var allowed []dataItem
+		buckets := clientKnowsBuckets(r.UserAgent())
 		for _, item := range listing.items {
+			if item.Kind == "bucket" && !buckets {
+				continue
+			}
 			if dataAllowed(policy, group, item.ID) {
 				allowed = append(allowed, item)
 			}
@@ -1071,7 +1106,7 @@ func printDataOrgs(list []apiDataOrgStatus, stdout io.Writer) {
 			fmt.Fprintf(stdout, "✗ %s: %s\n", org.Org, org.Problem)
 			continue
 		}
-		line := fmt.Sprintf("✓ %s: %d datasets, %d models, %d buckets", org.Org, org.Datasets, org.Models, org.Buckets)
+		line := fmt.Sprintf("✓ %s: %s, %s, %s", org.Org, countNoun(org.Datasets, "dataset"), countNoun(org.Models, "model"), countNoun(org.Buckets, "bucket"))
 		if org.Account != "" {
 			line += fmt.Sprintf(" (token of %s, %s)", org.Account, describeHubRole(org.Role))
 		}
@@ -1081,6 +1116,14 @@ func printDataOrgs(list []apiDataOrgStatus, stdout io.Writer) {
 			fmt.Fprintln(stdout, "  read-only token limited to these organizations is safer if the server box is compromised.")
 		}
 	}
+}
+
+// countNoun is "1 bucket" or "3 buckets".
+func countNoun(count int, noun string) string {
+	if count == 1 {
+		return "1 " + noun
+	}
+	return fmt.Sprintf("%d %ss", count, noun)
 }
 
 func describeHubRole(role string) string {

@@ -17,7 +17,7 @@ import (
 // hi data lists and downloads the Hugging Face datasets, models, and
 // buckets a connected hi server serves. The server keeps the Hugging Face tokens; hf
 // runs here with HF_ENDPOINT pointing to the server's proxy and a hi data
-// token that lasts an hour (docs/specs/ideas/hi_data.md).
+// token that lasts a day (docs/specs/ideas/hi_data.md).
 
 // dataHFCommand is the hf CLI; tests replace it.
 var dataHFCommand = "hf"
