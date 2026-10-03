@@ -1,7 +1,10 @@
 # `hi data` specification
 
-Status: Draft; release 1 (datasets and models) shipped in v0.24.0, buckets
-in v0.24.2
+Status: Approved (2026-10-03). Datasets and models shipped in v0.24.0,
+buckets in v0.24.2, and `hi data run`, `env`, `.hifin/data.json`, and
+`hi box --data` in v0.25.0. Decided: groups with no `data` policy read
+everything, models are included, uploads wait. Open: data on compute
+instances (release 3).
 
 Dependencies: `hi server` (keys kept on the server, devices, groups,
 `policy.json`, audit, Slack, signed client API inside NetBird), and the
@@ -14,7 +17,8 @@ A device connected to a hi server can list and download the private
 Hugging Face datasets, models, and buckets of the team's organizations,
 with the official `hf` tools, without a Hugging Face token on the device.
 Downloading is what people need most of the time; uploading is left for
-later (see [Later: uploads](#later-uploads)).
+later (see [Later: uploads](#later-uploads)). The design choice below follows
+[hi_server.md](hi_server.md#design-choice-broker-dont-distribute).
 
 ```text
 $ hi data
@@ -78,7 +82,7 @@ user. It is simpler, but the hiding isn't real:
   `hi data` can get it.
 - It is a long-lived organization token. Taking access away from one person
   means rotating it for everyone, the same reason
-  [hi_server.md](../approved/hi_server.md#design-choice-broker-dont-distribute)
+  [hi_server.md](hi_server.md#design-choice-broker-dont-distribute)
   keeps provider keys on the server.
 - A token on a laptop works outside `hi`, with no policy and no record.
 
@@ -95,15 +99,16 @@ checked on every call.
 On a device:
 
 ```text
-hi data                                  interactive list; pick one to download
+hi data                                  search, pick one, and download it
 hi data ls [<org>] [--json]              datasets, models, and buckets this device may read
     [--kind dataset|model|bucket]
 hi data info <org>/<name>                size, files, last update, description
 hi data get <org>/<name> [--to <dir>]    download a dataset, model, or bucket
-    [--revision <rev>] [--include <glob>]... [--exclude <glob>]...
+    [--revision <rev>] [--include <glob>]... [--exclude <glob>]... [--no-record]
 hi data get                              in a project: everything recorded in .hifin/data.json
 hi data run -- <command> [args]          run a command that can read the team's data
 hi data env                              print HF_ENDPOINT and HF_TOKEN for a shell
+hi box claude|codex|shell|run --data     a box whose hf and huggingface_hub reach the data
 ```
 
 On the server box:
@@ -142,12 +147,30 @@ for example when an agent runs it, it prints the same as `hi data ls`.
    - a model: the same without `--repo-type`
    - a bucket: `hf buckets sync hf://buckets/<org>/<name> <dir>
      [--include] [--exclude]` (`hf download` doesn't do buckets)
-3. In a project (a folder with `.hifin/`), records the repository, the commit it
-   resolved to, the folder, and the filters in `.hifin/data.json`. `hi data
-   get` with no arguments fetches everything recorded, at the recorded
-   commit, so a teammate or a compute instance gets the same files. Buckets
-   have no history, so their entries record the time of the download and
-   the file list's hash, and a later `get` says when the bucket has changed.
+3. Before downloading a dataset or model, resolves the branch or tag (the
+   default branch when none is given) to a commit and downloads that
+   commit, so what is recorded is exactly what was fetched.
+4. In a project (the nearest folder upwards with `.hifin/`), records the
+   repository, the commit, the folder relative to the project, and the
+   filters in `.hifin/data.json`, replacing an earlier entry for the same
+   repository and folder. `--no-record` skips it, and a folder outside the
+   project isn't recorded. `hi data get` with no arguments fetches
+   everything recorded, at the recorded commits, without changing the
+   record, so a teammate gets the same files. Buckets have no history, so
+   their entries record the time of the download and a hash of the file
+   list (path, size, and content hash of each file); a later `get` warns
+   when the bucket has changed and fetches the current files.
+
+```json
+{
+  "data": [
+    { "kind": "dataset", "id": "hifinab/bars-1d", "revision": "9981174…",
+      "to": "data/bars-1d", "include": ["2026/*"], "fetched": "2026-10-03T21:03:50Z" },
+    { "kind": "bucket", "id": "hifinab/fdb", "to": "data/fdb",
+      "files_hash": "5c1e…", "files": 412, "fetched": "2026-10-03T21:04:10Z" }
+  ]
+}
+```
 
 If `hf` isn't installed, `hi data get` says so and how to install it. `hi`
 doesn't bundle it.
@@ -155,15 +178,26 @@ doesn't bundle it.
 ### `hi data run` and `hi data env`
 
 `hi data run -- python backtest.py` runs the command with `HF_ENDPOINT` and
-a fresh hi data token, so `load_dataset`, `hf_hub_download`, and
-`hf://datasets/...` paths in pandas or Polars read the team's private data
-directly, and `from_pretrained("hifinab/...")` loads the team's models.
-`hi data env` prints the two variables for `eval` in a shell; the
-token lasts a day.
+a fresh hi data token for every repository the group may read (scope
+`*`), so `load_dataset`, `hf_hub_download`, and `hf://datasets/...` paths
+in pandas or Polars read the team's private data directly, and
+`from_pretrained("hifinab/...")` loads the team's models. The command's
+exit status is passed on. `hi data env` prints the two variables for
+`eval "$(hi data env)"` in a shell; the token lasts a day.
 
-Inside `hi box`, both work the same way. The box's egress allowlist needs
-the server, plus the Hugging Face CDN and Xet storage hosts the downloads
-are sent to. hi adds them while `hi data` is in use.
+### `hi box --data`
+
+A box has no hi device key, so it can't ask the server itself. With
+`--data` (or `"data": true` under `customizations.hi` in
+`devcontainer.json`), hi asks for a hi data token on the host before the
+box starts and keeps it in the box's state folder, mounted only into hi's
+box proxy. The box gets `HF_ENDPOINT` pointing at a third listener on that
+proxy and `HF_TOKEN` set to a placeholder; the listener passes the calls on
+to the server's `/hf` with the real token, the way Claude Code's token is
+added. The box's allowlist gains `cdn.hf.co` and `xethub.hf.co` for the
+file contents, and the server's name is resolved on the host, since it may
+resolve only through NetBird. A box running longer than a day needs a
+restart for a new token.
 
 ## Policy
 
@@ -263,13 +297,15 @@ The client API is plain HTTP inside NetBird, so `HF_ENDPOINT` is
 
 ## Releases
 
-1. Datasets and models (v0.24.0), then buckets (v0.24.2): `hi data`, `ls`, `info`, `get`; `hi server data add|list|test|
-   remove`; the proxy; `data` in policy; audit.
-2. `hi data run` and `env`; `.hifin/data.json` and `hi data get`
-   with no arguments; the `hi box` allowlist.
-3. Compute: `hi compute run --data <org>/<name>` gives the instance a hi
-   data token for the run's lifetime, so a job downloads on the instance
-   instead of the laptop.
+1. Datasets and models (v0.24.0), then buckets (v0.24.2): `hi data`, `ls`,
+   `info`, `get`; `hi server data add|list|test|remove`; the proxy; `data`
+   in policy; audit. Day-long tokens in v0.24.3.
+2. v0.25.0: `hi data run` and `env`; `.hifin/data.json` and `hi data get`
+   with no arguments; `hi box --data`.
+3. Compute: `hi compute run --data <org>/<name>`, so a job downloads on the
+   instance instead of the laptop. Not decided: rented instances can't
+   reach the hi server, which listens only inside NetBird, so the
+   instance can't use the proxy the way a laptop does.
 
 ## Risks
 
@@ -309,12 +345,17 @@ server:
    refuses it and `hf` carries on.
 6. `hf download` takes `--include` once per pattern; with several patterns
    after one flag, the rest are read as file names.
-
 7. `hf buckets sync hf://buckets/<org>/<name> <dir>` makes these calls: the
    bucket's info, its `tree?recursive=true`, a `HEAD` on one file's
    `resolve`, and a Xet read token; the files come from Xet storage. A
    19-file public bucket synced through the proxy on 2026-10-03, and a
    private 36 GB bucket (`hifinab/fdb`) from the team's server.
+8. In `hi data run`, `datasets.load_dataset` (datasets 5.0.1), pandas
+   `read_parquet("hf://datasets/...")`, and `hf_hub_download` all read
+   through the proxy with no other Hub calls needed.
+9. In `hi box run --data` (rootless Podman), `hf_hub_download` of a 548 MB
+   Xet file worked with only the placeholder token in the box; the box
+   reached `cas-server.xethub.hf.co` and `us.aws.cdn.hf.co`.
 
 ## Later: uploads
 

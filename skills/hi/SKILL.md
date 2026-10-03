@@ -186,6 +186,16 @@ hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
 3. A "may not read" error is the team's policy: tell the user, and don't
    try another way to reach the data.
 4. If `hf` is missing, `pip install -U huggingface_hub` installs it.
+5. In a project, `hi data get` records what it fetched, at which commit, in
+   `.hifin/data.json`; keep that file in the commit that uses the data.
+   `hi data get` with no name fetches everything recorded.
+6. For code that reads the data itself (`load_dataset`, `from_pretrained`,
+   `hf://` paths in pandas), run it with `hi data run -- <command>`
+   instead of downloading first. Don't set `HF_TOKEN` yourself.
+7. Inside a hi box (`$HI_BOX` is set), `HF_ENDPOINT` and a placeholder
+   `HF_TOKEN` are already set when the box was started with `--data`; use
+   `hf` or Python directly. Without them, ask the user to start the box
+   with `--data`.
 
 ## Check and clean up
 

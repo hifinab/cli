@@ -553,6 +553,20 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.25.0 — `hi data` in code, projects, and boxes
+
+- [x] `hi data run -- <command>` and `eval "$(hi data env)"`: `load_dataset`,
+  `from_pretrained`, `hf_hub_download`, and `hf://` paths in pandas read
+  the team's repositories directly. Tested with datasets 5.0.1 and pandas.
+- [x] `hi data get` pins a branch or tag to its commit and records the
+  download in the project's `.hifin/data.json`; `hi data get` with no name
+  fetches everything recorded, and warns when a bucket changed since.
+- [x] `hi box --data`: the box gets a placeholder token and hi's proxy adds
+  a hi data token on the way to the server, and allows Hugging Face's
+  download hosts. Tested with rootless Podman and a 548 MB Xet file.
+- [x] The spec is approved: [hi_data.md](specs/approved/hi_data.md). Still
+  open: data on rented compute instances, which can't reach the server.
+
 ### v0.24.3 — Day-long data tokens, and `hi data` in the docs
 
 - [x] A hi data token lasts a day instead of an hour, so long downloads
@@ -590,8 +604,7 @@ each type starts.
   group in policy, everything when unset; token grants in the audit log,
   downloads in `data_usage.jsonl`.
   Tested on 2026-10-03 with `hf` 1.32.0 against the real Hub.
-  Spec: [hi_data.md](specs/ideas/hi_data.md). Next: buckets, `hi data run`,
-  and `.hifin/data.json`.
+  Spec: [hi_data.md](specs/approved/hi_data.md).
 
 ## Planned
 
@@ -620,7 +633,7 @@ images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
-### v0.25.0 — Learn from agent-machine services
+### v0.26.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -641,7 +654,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
 
-### v0.26.0 — skills.sh
+### v0.27.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`

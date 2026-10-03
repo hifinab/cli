@@ -17,7 +17,7 @@ import (
 // hi data lists and downloads the Hugging Face datasets, models, and
 // buckets a connected hi server serves. The server keeps the Hugging Face tokens; hf
 // runs here with HF_ENDPOINT pointing to the server's proxy and a hi data
-// token that lasts a day (docs/specs/ideas/hi_data.md).
+// token that lasts a day (docs/specs/approved/hi_data.md).
 
 // dataHFCommand is the hf CLI; tests replace it.
 var dataHFCommand = "hf"
@@ -34,6 +34,10 @@ func runData(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return exitCode(dataInfoCommand(args[1:], stdout, stderr), stderr)
 		case "get":
 			return exitCode(dataGetCommand(args[1:], stdin, stdout, stderr), stderr)
+		case "run":
+			return exitCode(dataRunCommand(args[1:], stdin, stdout, stderr), stderr)
+		case "env":
+			return exitCode(dataEnvCommand(args[1:], stdout, stderr), stderr)
 		default:
 			fmt.Fprintf(stderr, "hi: unknown data command %q\n\n", args[0])
 			printDataUsage(stderr)
@@ -57,7 +61,15 @@ Usage:
                                           What this device may download
   hi data info <org>/<name>               Size, files, and last update
   hi data get <org>/<name> [--to DIR]     Download it with hf (default: ./data/<name>)
-      [--revision REV] [--include GLOB]... [--exclude GLOB]...
+      [--revision REV] [--include GLOB]... [--exclude GLOB]... [--no-record]
+  hi data get                             In a project: everything .hifin/data.json records
+  hi data run -- <command> [args]         Run a command that reads the team's data directly
+                                          (load_dataset, from_pretrained, hf:// paths)
+  hi data env                             HF_ENDPOINT and HF_TOKEN for a shell:
+                                          eval "$(hi data env)"
+
+In a project (a folder with .hifin/), hi data get records the repository,
+the commit it downloaded, and the folder in .hifin/data.json.
 
 Buckets download with hf buckets sync and have no revisions. When several
 share a name, put dataset:, model:, or bucket: in front.
@@ -361,6 +373,10 @@ type dataGetOptions struct {
 	revision string
 	include  []string
 	exclude  []string
+	noRecord bool
+	// restore is the record being fetched again by hi data get with no
+	// arguments; it is not recorded again.
+	restore *dataRecord
 }
 
 func dataGetCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -371,14 +387,18 @@ func dataGetCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) er
 	flags.StringVar(&options.revision, "revision", "", "branch, tag, or commit")
 	flags.Var(&include, "include", "only files matching this pattern")
 	flags.Var(&exclude, "exclude", "skip files matching this pattern")
+	flags.BoolVar(&options.noRecord, "no-record", false, "don't record it in .hifin/data.json")
 	positional, err := flags.parse(args)
-	if err != nil || len(positional) != 1 {
-		return usageError{"usage: hi data get <org>/<name> [--to DIR] [--revision REV] [--include GLOB]... [--exclude GLOB]..."}
+	if err != nil || len(positional) > 1 || (len(positional) == 0 && len(args) > 0) {
+		return usageError{"usage: hi data get <org>/<name> [--to DIR] [--revision REV] [--include GLOB]... [--exclude GLOB]... [--no-record]"}
 	}
 	options.include, options.exclude = include, exclude
 	client, connection, err := dataClient()
 	if err != nil {
 		return err
+	}
+	if len(positional) == 0 {
+		return dataRestore(client, connection, stdin, stdout, stderr)
 	}
 	catalog, err := fetchDataCatalog(client)
 	if err != nil {
@@ -452,8 +472,29 @@ func downloadData(client *serverClient, connection *serverConnection, item dataI
 	if err != nil {
 		return err
 	}
+	// Pin a dataset or model to a commit, so what is recorded is exactly
+	// what was fetched; note a bucket's files to tell later if they change.
+	record := dataRecord{Kind: item.Kind, ID: item.ID, Include: options.include, Exclude: options.exclude}
+	if item.Kind == "bucket" {
+		if record.FilesHash, record.Files, err = dataBucketState(endpoint, token, item.ID); err != nil {
+			return err
+		}
+		if previous := options.restore; previous != nil && previous.FilesHash != "" && previous.FilesHash != record.FilesHash {
+			fmt.Fprintf(stderr, "hi: warning: bucket %s has changed since it was recorded on %s (%d files then, %d now); buckets keep no history, so this gets the current files\n",
+				item.ID, previous.Fetched.Local().Format("2006-01-02 15:04"), previous.Files, record.Files)
+		}
+	} else {
+		if record.Revision, err = dataResolveCommit(endpoint, token, item, options.revision); err != nil {
+			return err
+		}
+		options.revision = record.Revision
+	}
 	args := dataGetArgs(item, options)
-	fmt.Fprintf(stderr, "Downloading %s %s into %s through %s\n", item.Kind, item.ID, options.to, connection.URL)
+	at := ""
+	if record.Revision != "" {
+		at = " at " + shortCommit(record.Revision)
+	}
+	fmt.Fprintf(stderr, "Downloading %s %s%s into %s through %s\n", item.Kind, item.ID, at, options.to, connection.URL)
 	command := exec.Command(hf, args...)
 	command.Env = dataEnvironment(endpoint, token)
 	command.Stdin, command.Stdout, command.Stderr = stdin, stdout, stderr
@@ -465,6 +506,27 @@ func downloadData(client *serverClient, connection *serverConnection, item dataI
 		return err
 	}
 	fmt.Fprintf(stderr, "Downloaded %s into %s\n", item.ID, options.to)
+	if options.noRecord || options.restore != nil {
+		return nil
+	}
+	root, ok := dataProjectRoot()
+	if !ok {
+		return nil
+	}
+	absolute, err := filepath.Abs(options.to)
+	if err != nil {
+		return err
+	}
+	relative, err := filepath.Rel(root, absolute)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		fmt.Fprintf(stderr, "hi: not recorded in .hifin/data.json: %s is outside the project\n", options.to)
+		return nil
+	}
+	record.To, record.Fetched = filepath.ToSlash(relative), computeNow().UTC()
+	if err := saveDataRecord(root, record); err != nil {
+		return fmt.Errorf("downloaded, but not recorded: %w", err)
+	}
+	fmt.Fprintf(stderr, "Recorded in .hifin/%s; `hi data get` there fetches the same files again.\n", dataRecordFile)
 	return nil
 }
 

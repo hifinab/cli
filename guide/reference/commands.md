@@ -129,6 +129,10 @@ server; `hf` runs with `HF_ENDPOINT` pointing to it.
 | `hi data info <org>/<name>`                         | Size, largest files, and last update                 |
 | `hi data get <org>/<name> [--to <dir>]`             | Download it with `hf` (buckets with `hf buckets sync`); default folder `./data/<name>` |
 | `  --revision <rev>`, `--include <glob>`, `--exclude <glob>` | A branch, tag, or commit; filters, repeatable |
+| `  --no-record`                                     | Don't record it in the project's `.hifin/data.json`  |
+| `hi data get`                                       | In a project: everything `.hifin/data.json` records, at the recorded commits |
+| `hi data run -- <command>`                          | Run a command that reads the team's data directly    |
+| `hi data env`                                       | `HF_ENDPOINT` and `HF_TOKEN` for `eval` in a shell    |
 
 Put `dataset:`, `model:`, or `bucket:` in front when several share a name.
 Buckets have no revisions. A group's
@@ -209,7 +213,8 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 | `hi box token claude`                | Store a long-lived token from `claude setup-token`       |
 
 Options when starting: `--name`, `--network locked|dev|open`, `--allow
-<domain>`, `--gpu`, `--worktree`, `--here`, `--image`, and `--memory`. See
+<domain>`, `--gpu`, `--data` (the team's data through the hi server),
+`--worktree`, `--here`, `--image`, and `--memory`. See
 [Run agents in a box](/guide/box/).
 
 ## hi skill

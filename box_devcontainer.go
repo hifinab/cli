@@ -36,6 +36,7 @@ type boxCustomizations struct {
 	Domains []string `json:"domains"`
 	Network string   `json:"network"`
 	GPU     bool     `json:"gpu"`
+	Data    bool     `json:"data"`
 }
 
 // boxIgnoredFields would run on the host or widen the box.

@@ -109,6 +109,15 @@ Settings for hi go under `customizations.hi`:
 The repository writes `domains`, so `hi box` asks once before allowing them,
 and again when the list changes.
 
+## The team's data
+
+`--data`, or `"data": true`, lets `hf` and Python code in the box download
+the team's Hugging Face datasets, models, and buckets through the hi server
+(see [Download the team's data](/guide/data/)). The box gets
+`HF_ENDPOINT` and a placeholder `HF_TOKEN`; hi's proxy adds a hi data token,
+which stays on the host, and allows Hugging Face's download hosts. The
+machine must be connected to a hi server.
+
 ## The GPU
 
 `--gpu`, or `"gpu": true`, passes the Strix Halo's GPU into the box. Tested

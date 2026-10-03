@@ -314,7 +314,10 @@ hi data get hifinab/bars-1d    # into ./data/bars-1d (--to, --revision, --includ
 
 The server keeps one read token per organization (`hi server data add
 <org>`) and passes on only the read calls of one repository or bucket; file
-contents come straight from Hugging Face's CDN. See
+contents come straight from Hugging Face's CDN. In a project, `hi data get`
+records the commit it fetched in `.hifin/data.json`; `hi data run --
+python train.py` lets `load_dataset` and `from_pretrained` read the team's
+repositories directly, and `hi box --data` gives a box the same. See
 [Download the team's data](https://hifin.sh/guide/data/).
 
 ## Agent skill

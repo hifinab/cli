@@ -355,3 +355,51 @@ func TestBoxRemoveAll(t *testing.T) {
 		t.Fatalf("--force kept the dirty box:\n%s", stdout.String())
 	}
 }
+
+func TestBoxDataInjectorSwapsTheToken(t *testing.T) {
+	var seen []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.EscapedPath()+" "+r.Header.Get("Authorization"))
+		base := "http://" + r.Host + "/hf"
+		w.Header().Set("Location", base+"/api/resolve-cache/models/o/n/abc/onnx%2Fconfig.json")
+		w.Header().Set("Link", "<"+base+"/api/models/o/n/xet-read-token/abc>; rel=\"xet-auth\"")
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	}))
+	defer upstream.Close()
+	tokenFile := filepath.Join(t.TempDir(), "token")
+	writeTestFile(t, tokenFile, "hidata_real\n", 0o600)
+	var logged strings.Builder
+	injector := httptest.NewServer(newBoxDataInjector(tokenFile, upstream.URL+"/hf", &boxNetworkLog{file: &logged}))
+	defer injector.Close()
+
+	request, _ := http.NewRequest(http.MethodHead, injector.URL+"/o/n/resolve/main/onnx%2Fconfig.json", nil)
+	request.Header.Set("Authorization", "Bearer "+boxClaudePlacehold)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if len(seen) != 1 || seen[0] != "/hf/o/n/resolve/main/onnx%2Fconfig.json Bearer hidata_real" {
+		t.Fatalf("the server saw %q", seen)
+	}
+	if location := response.Header.Get("Location"); location != injector.URL+"/api/resolve-cache/models/o/n/abc/onnx%2Fconfig.json" {
+		t.Fatalf("Location = %q", location)
+	}
+	if link := response.Header.Get("Link"); !strings.Contains(link, "<"+injector.URL+"/api/models/o/n/xet-read-token/abc>") {
+		t.Fatalf("Link = %q", link)
+	}
+	if !strings.Contains(logged.String(), "data") {
+		t.Fatalf("not logged: %s", logged.String())
+	}
+}
+
+func TestBoxDataOption(t *testing.T) {
+	options, err := parseBoxOptions("shell", []string{"--data"})
+	if err != nil || !options.data {
+		t.Fatalf("--data: %+v, %v", options, err)
+	}
+	if !boxHostAllowed(boxDataHosts, "us.aws.cdn.hf.co") || !boxHostAllowed(boxDataHosts, "cas-server.xethub.hf.co") || boxHostAllowed(boxDataHosts, "huggingface.co") {
+		t.Fatal("the data hosts should cover the CDN and Xet storage only")
+	}
+}

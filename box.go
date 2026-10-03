@@ -66,6 +66,7 @@ type boxMeta struct {
 	Base       string    `json:"base,omitempty"`
 	Network    string    `json:"network"`
 	GPU        bool      `json:"gpu,omitempty"`
+	Data       bool      `json:"data,omitempty"`
 	Image      string    `json:"image"`
 	Engine     string    `json:"engine"`
 	ProxyIP    string    `json:"proxy_ip"`
@@ -79,6 +80,7 @@ type boxOptions struct {
 	worktree bool
 	here     bool
 	gpu      bool
+	data     bool
 	network  string
 	image    string
 	memory   string
@@ -168,6 +170,8 @@ options when starting:
                          package registries; open: everything, still logged
   --allow <domain>       one more domain (repeat it)
   --gpu                  the AMD GPU (Strix Halo)
+  --data                 the team's Hugging Face data through the hi server (hi data);
+                         the box gets a placeholder token, the proxy the real one
   --worktree             a new git worktree for shell and run (agents always get one)
   --here                 work in the project folder itself, not a worktree
   --image <image>        another image; devcontainer.json's image or Dockerfile is used too
@@ -200,6 +204,8 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 			options.here = true
 		case arg == "--gpu":
 			options.gpu = true
+		case arg == "--data":
+			options.data = true
 		case arg == "--all" && command == "rm":
 			options.all = true
 		case (arg == "--yes" || arg == "-y") && command == "rm":
@@ -310,7 +316,15 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	cleanup := func() { os.RemoveAll(stateDir) }
 
-	meta := boxMeta{Name: name, Agent: kind, Root: root, Network: network, GPU: gpu, Engine: engine.name,
+	data := options.data || custom.Data
+	var dataSetup *boxData
+	if data {
+		if dataSetup, err = prepareBoxData(stateDir); err != nil {
+			cleanup()
+			return err
+		}
+	}
+	meta := boxMeta{Name: name, Agent: kind, Root: root, Network: network, GPU: gpu, Data: data, Engine: engine.name,
 		Created: time.Now().UTC(), Background: agent && prompt != "", Prompt: qClip(prompt)}
 	useWorktree := (agent && !options.here) || options.worktree
 	var mounts []string
@@ -358,6 +372,9 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		hosts = append(hosts, custom.Domains...)
 	}
 	hosts = append(hosts, options.allow...)
+	if data {
+		hosts = append(hosts, boxDataHosts...)
+	}
 	if err := os.WriteFile(filepath.Join(stateDir, "allow"), []byte(strings.Join(hosts, "\n")+"\n"), 0o600); err != nil {
 		cleanup()
 		return err
@@ -391,7 +408,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		cleanup()
 		return err
 	}
-	if err := startBoxNetwork(engine, &meta, stateDir, kind == "claude"); err != nil {
+	if err := startBoxNetwork(engine, &meta, stateDir, kind == "claude", dataSetup); err != nil {
 		return fail(err)
 	}
 
@@ -419,6 +436,12 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		"HTTPS_PROXY": proxy, "HTTP_PROXY": proxy, "https_proxy": proxy, "http_proxy": proxy,
 		"NO_PROXY": "localhost,127.0.0.1," + meta.ProxyIP, "no_proxy": "localhost,127.0.0.1," + meta.ProxyIP,
 		"HI_BOX": name, "PATH": "/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	}
+	if data {
+		// hf and huggingface_hub reach the server through the proxy's data
+		// listener, which puts the hi data token in place of this one.
+		env["HF_ENDPOINT"] = fmt.Sprintf("http://%s:%d", meta.ProxyIP, boxDataPort)
+		env["HF_TOKEN"] = boxClaudePlacehold
 	}
 	for _, key := range []string{"name", "email"} {
 		if value := boxGit(root, "config", "user."+key); value != "" {
@@ -557,7 +580,7 @@ func boxHostBinary(name string) (string, error) {
 
 // startBoxNetwork creates the box's internal network and starts its proxy,
 // which is also on a normal network.
-func startBoxNetwork(engine boxEngine, meta *boxMeta, stateDir string, claude bool) error {
+func startBoxNetwork(engine boxEngine, meta *boxMeta, stateDir string, claude bool, data *boxData) error {
 	network := "hi-box-" + meta.Name
 	hash := fnv.New32a()
 	hash.Write([]byte(meta.Name))
@@ -598,7 +621,14 @@ func startBoxNetwork(engine boxEngine, meta *boxMeta, stateDir string, claude bo
 		args = append(args, "-v", source+":/secrets/claude:ro")
 		secret = "/secrets/claude"
 	}
+	if data != nil && data.address != "" {
+		// The server's name may resolve only on the host, through NetBird.
+		args = append(args, "--add-host", data.host+":"+data.address)
+	}
 	args = append(args, boxBaseImage(), "/usr/local/bin/hi", "box", "__proxy", "/state/allow", "/state/network.log", secret)
+	if data != nil {
+		args = append(args, "/state/"+boxDataTokenFile, data.upstream)
+	}
 	if _, err := engine.output(args...); err != nil {
 		return err
 	}
@@ -636,6 +666,9 @@ func describeBox(meta boxMeta, gpu bool, stdout io.Writer) {
 		where = fmt.Sprintf("%s (branch %s)", meta.Workdir, meta.Branch)
 	}
 	parts := []string{fmt.Sprintf("network %s", meta.Network)}
+	if meta.Data {
+		parts = append(parts, "hi data through the server")
+	}
 	if gpu {
 		parts = append(parts, "GPU: shares the host kernel and GPU driver")
 	}

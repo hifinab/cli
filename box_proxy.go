@@ -28,6 +28,7 @@ import (
 const (
 	boxProxyPort       = 3128
 	boxInjectPort      = 3129
+	boxDataPort        = 3130
 	boxClaudePlacehold = "hi-box-placeholder"
 )
 
@@ -100,8 +101,8 @@ func (l *boxNetworkLog) record(decision, host string) {
 
 // runBoxProxy is `hi box __proxy`, run inside the proxy container.
 func runBoxProxy(args []string, stderr io.Writer) int {
-	if len(args) != 3 {
-		fmt.Fprintln(stderr, "usage: hi box __proxy <allowlist> <log> <claude credentials or ->")
+	if len(args) != 3 && len(args) != 5 {
+		fmt.Fprintln(stderr, "usage: hi box __proxy <allowlist> <log> <claude credentials or -> [<data token> <server's /hf URL>]")
 		return 2
 	}
 	allow := &boxAllowlist{path: args[0]}
@@ -118,6 +119,11 @@ func runBoxProxy(args []string, stderr io.Writer) int {
 	if args[2] != "-" {
 		go func() {
 			errs <- http.ListenAndServe(fmt.Sprintf(":%d", boxInjectPort), newBoxClaudeInjector(args[2], "https://api.anthropic.com", log))
+		}()
+	}
+	if len(args) == 5 {
+		go func() {
+			errs <- http.ListenAndServe(fmt.Sprintf(":%d", boxDataPort), newBoxDataInjector(args[3], args[4], log))
 		}()
 	}
 	fmt.Fprintf(stderr, "hi box proxy listening on :%d\n", boxProxyPort)

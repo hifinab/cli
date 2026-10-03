@@ -6,11 +6,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
+
+var repoInfoPath = regexp.MustCompile(`^/api/(datasets|models)/hifinab/[^/]+(/revision/[^/]+)?$`)
 
 // fakeHub is a Hugging Face Hub that knows one organization, hifinab, and
 // records the calls the proxy passes on.
@@ -35,6 +38,12 @@ func newFakeHub(t *testing.T) *fakeHub {
 		}
 		updated := `"lastModified":"2026-09-30T12:00:00.000Z"`
 		switch {
+		case repoInfoPath.MatchString(r.URL.Path):
+			sha := strings.Repeat("a1", 20)
+			if strings.HasSuffix(r.URL.Path, "/revision/v2") {
+				sha = strings.Repeat("b2", 20)
+			}
+			w.Write([]byte(`{"sha":"` + sha + `"}`))
 		case r.URL.Path == "/api/whoami-v2":
 			w.Write([]byte(`{"name":"svc","orgs":[{"name":"hifinab"}],"auth":{"accessToken":{"role":"read"}}}`))
 		case r.URL.Path == "/api/datasets" && r.URL.Query().Get("author") == "hifinab":
@@ -298,7 +307,7 @@ func fakeHFCommand(t *testing.T) string {
 	dir := t.TempDir()
 	record := filepath.Join(dir, "record")
 	script := filepath.Join(dir, "hf")
-	writeTestFile(t, script, "#!/bin/sh\n{ echo \"args: $*\"; echo \"endpoint: $HF_ENDPOINT\"; echo \"token: $HF_TOKEN\"; echo \"hub token: $HUGGING_FACE_HUB_TOKEN\"; } > "+record+"\n", 0o755)
+	writeTestFile(t, script, "#!/bin/sh\n{ echo \"args: $*\"; echo \"endpoint: $HF_ENDPOINT\"; echo \"token: $HF_TOKEN\"; echo \"hub token: $HUGGING_FACE_HUB_TOKEN\"; } >> "+record+"\n", 0o755)
 	previous := dataHFCommand
 	dataHFCommand = script
 	t.Cleanup(func() { dataHFCommand = previous })
@@ -322,7 +331,7 @@ func TestHiDataGetRunsHFThroughTheServer(t *testing.T) {
 	}
 	data, _ := os.ReadFile(record)
 	got := string(data)
-	if !strings.Contains(got, "args: download hifinab/bars --repo-type dataset --local-dir data/bars --include *.parquet --include README.md --exclude old/*") ||
+	if !strings.Contains(got, "args: download hifinab/bars --repo-type dataset --local-dir data/bars --revision "+strings.Repeat("a1", 20)+" --include *.parquet --include README.md --exclude old/*") ||
 		!strings.Contains(got, "endpoint: "+ts.url+"/hf\n") || !strings.Contains(got, "token: "+dataTokenPrefix) ||
 		strings.Contains(got, "hf_personal") {
 		t.Fatalf("hf ran with:\n%s", got)
@@ -330,7 +339,7 @@ func TestHiDataGetRunsHFThroughTheServer(t *testing.T) {
 
 	code, _, stderr = runHi("data", "get", "hifinab/ranker", "--to", "models/r", "--revision", "v2")
 	data, _ = os.ReadFile(record)
-	if code != 0 || !strings.Contains(string(data), "args: download hifinab/ranker --local-dir models/r --revision v2\n") {
+	if code != 0 || !strings.Contains(string(data), "args: download hifinab/ranker --local-dir models/r --revision "+strings.Repeat("b2", 20)+"\n") {
 		t.Fatalf("get a model: code %d\n%s%s", code, data, stderr)
 	}
 
@@ -460,5 +469,87 @@ func TestOldClientsDontSeeBuckets(t *testing.T) {
 		if clientKnowsBuckets(agent) != want {
 			t.Errorf("%s: want %v", agent, want)
 		}
+	}
+}
+
+func TestHiDataGetRecordsAndRestoresInAProject(t *testing.T) {
+	newDataServer(t)
+	record := fakeHFCommand(t)
+	project := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(project, ".hifin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(project, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(filepath.Join(project, "src"))
+
+	if code, _, stderr := runHi("data", "get", "dataset:hifinab/bars", "--to", "../data/bars", "--include", "*.parquet"); code != 0 || !strings.Contains(stderr, "Recorded in .hifin/data.json") {
+		t.Fatalf("get: code %d\n%s", code, stderr)
+	}
+	if code, _, stderr := runHi("data", "get", "hifinab/scratch", "--to", "../data/scratch"); code != 0 {
+		t.Fatalf("get a bucket: code %d\n%s", code, stderr)
+	}
+	if code, _, stderr := runHi("data", "get", "hifinab/ranker", "--to", "/tmp/elsewhere"); code != 0 || !strings.Contains(stderr, "outside the project") {
+		t.Fatalf("get outside the project: code %d\n%s", code, stderr)
+	}
+	if code, _, _ := runHi("data", "get", "hifinab/fills", "--no-record"); code != 0 {
+		t.Fatal("get --no-record failed")
+	}
+	records, err := loadDataRecords(project)
+	if err != nil || len(records.Data) != 2 {
+		t.Fatalf("records: %+v, %v", records, err)
+	}
+	bars, scratch := records.Data[0], records.Data[1]
+	if bars.ID != "hifinab/bars" || bars.Revision != strings.Repeat("a1", 20) || bars.To != "data/bars" || len(bars.Include) != 1 {
+		t.Fatalf("dataset record: %+v", bars)
+	}
+	if scratch.Kind != "bucket" || scratch.FilesHash == "" || scratch.Files != 2 || scratch.To != "data/scratch" {
+		t.Fatalf("bucket record: %+v", scratch)
+	}
+
+	// Fetching again uses the recorded commit and folders, and says when a
+	// bucket changed since.
+	scratch.FilesHash = "older"
+	data, _ := json.Marshal(dataRecords{Data: []dataRecord{bars, scratch}})
+	writeTestFile(t, filepath.Join(project, ".hifin", "data.json"), string(data), 0o644)
+	os.Remove(record)
+	code, _, stderr := runHi("data", "get")
+	calls, _ := os.ReadFile(record)
+	if code != 0 || !strings.Contains(string(calls), "args: download hifinab/bars --repo-type dataset --local-dir ../data/bars --revision "+strings.Repeat("a1", 20)+" --include *.parquet") ||
+		!strings.Contains(string(calls), "args: buckets sync hf://buckets/hifinab/scratch ../data/scratch") ||
+		!strings.Contains(stderr, "bucket hifinab/scratch has changed since it was recorded") {
+		t.Fatalf("restore: code %d\n%s%s", code, calls, stderr)
+	}
+	if after, _ := loadDataRecords(project); after.Data[1].FilesHash != "older" {
+		t.Fatal("fetching again changed the record")
+	}
+
+	t.Chdir(t.TempDir())
+	if code, _, stderr := runHi("data", "get"); code != 2 || !strings.Contains(stderr, "no .hifin folder") {
+		t.Fatalf("get with no name outside a project: code %d\n%s", code, stderr)
+	}
+}
+
+func TestHiDataRunAndEnv(t *testing.T) {
+	ts, _ := newDataServer(t)
+	t.Setenv("HF_TOKEN", "hf_personal")
+	code, stdout, stderr := runHi("data", "run", "--", "sh", "-c", `echo "$HF_ENDPOINT $HF_TOKEN"`)
+	if code != 0 || !strings.HasPrefix(stdout, ts.url+"/hf "+dataTokenPrefix) || strings.Contains(stdout, "hf_personal") {
+		t.Fatalf("run: code %d\n%s%s", code, stdout, stderr)
+	}
+	if code, _, _ := runHi("data", "run", "sh", "-c", "exit 7"); code != 7 {
+		t.Fatalf("run passes the exit status on: %d", code)
+	}
+	code, stdout, _ = runHi("data", "env")
+	if code != 0 || !strings.Contains(stdout, "export HF_ENDPOINT='"+ts.url+"/hf'\n") || !strings.Contains(stdout, "export HF_TOKEN="+dataTokenPrefix) {
+		t.Fatalf("env: code %d\n%s", code, stdout)
+	}
+	audit, _ := os.ReadFile(filepath.Join(ts.dir, "audit.jsonl"))
+	if !strings.Contains(string(audit), `"action":"data token","subject":"*"`) {
+		t.Fatalf("audit = %s", audit)
+	}
+	if code, _, stderr := runHi("data", "run"); code != 2 || !strings.Contains(stderr, "usage") {
+		t.Fatalf("run without a command: %d %s", code, stderr)
 	}
 }

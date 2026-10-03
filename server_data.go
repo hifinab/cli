@@ -23,7 +23,7 @@ import (
 // hi data: the server holds a Hugging Face token per organization and
 // runs a proxy for the Hub's read calls, so devices use the official hf
 // tools with HF_ENDPOINT pointing here and never hold a Hugging Face token
-// (docs/specs/ideas/hi_data.md).
+// (docs/specs/approved/hi_data.md).
 
 const (
 	dataKeyPrefix   = "data:" // in keys.json: data:<org>

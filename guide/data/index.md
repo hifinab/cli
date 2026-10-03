@@ -51,6 +51,63 @@ Datasets and models download with `hf download`, buckets with
 fetches only what is missing or changed, so an interrupted download
 continues where it stopped.
 
+## Keep track in a project
+
+In a project made with `hi init` (any folder with a `.hifin` folder), `hi
+data get` records what it downloaded in `.hifin/data.json`: the repository,
+the exact commit, the folder, and the filters. Commit the file, and a
+teammate gets the same files with:
+
+```sh
+hi data get        # no name: everything .hifin/data.json records, at the recorded commits
+```
+
+A branch or tag is pinned to the commit it pointed to at the time, so a
+backtest can always be traced to its data. Buckets keep no history; their
+entry records the file list, and `hi data get` warns when the bucket has
+changed since. `--no-record` downloads without recording.
+
+## Use the data in code
+
+`hi data run` runs a command that reads the team's data directly, without
+a download step first:
+
+```sh
+hi data run -- python backtest.py
+hi data run -- jupyter lab
+```
+
+In it, the usual Hugging Face code works with private repositories:
+
+```python
+from datasets import load_dataset
+bars = load_dataset("hifinab/bars-1d", split="train")
+
+import pandas as pd
+fills = pd.read_parquet("hf://datasets/hifinab/fills/2026-09.parquet")
+
+from transformers import AutoModel
+model = AutoModel.from_pretrained("hifinab/ranker")
+```
+
+For a whole shell session:
+
+```sh
+eval "$(hi data env)"   # sets HF_ENDPOINT and HF_TOKEN; the token lasts a day
+```
+
+## In a box
+
+Agents in [`hi box`](/guide/box/) hold no credentials. With `--data`, the
+box's own `hf` and Python code can still read the team's data:
+
+```sh
+hi box claude --data "train the ranker on hifinab/bars-1d"
+```
+
+The box gets a placeholder token; hi's proxy outside the box adds the real
+one on the way to the server, and allows Hugging Face's download hosts.
+
 ## What the server does
 
 ```text
@@ -64,8 +121,9 @@ hf download ──── with the token ─▶ swaps in the team's token ──�
 
 - The server passes on only calls that read one repository or bucket:
   nothing that uploads, deletes, or changes settings.
-- The hi data token works only against your server, from your machine, for
-  one repository, for a day. Removing your machine or user ends it at once.
+- The hi data token works only against your server and from your machine,
+  for a day; `hi data get` asks for one limited to a single repository.
+  Removing your machine or user ends it at once.
 - File contents come straight from Hugging Face's storage, so large
   downloads don't go through the server.
 - The server records who downloaded what. It never sees the files.
