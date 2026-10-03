@@ -551,19 +551,21 @@ each type starts.
 
 ### v0.23.0 — `hi box`: local agent boxes
 
-- [ ] `hi box claude|codex [prompt]`, `shell`, and `run -- <command>`
+- [x] `hi box claude|codex [prompt]`, `shell`, and `run -- <command>`
   start a rootless container with the project, or a new git worktree of it,
   and nothing else from the home folder; with a prompt the agent runs on its
   own, without permission prompts.
-- [ ] No route out but hi's proxy, with `locked`, `dev`, and `open`
+- [x] No route out but hi's proxy, with `locked`, `dev`, and `open`
   presets, domains from `customizations.hi` in `devcontainer.json` after
   asking once, and `hi box allow`.
-- [ ] Claude Code's token is added at the proxy; the box only holds a
+- [x] Claude Code's token is added at the proxy; the box only holds a
   placeholder. Codex's sign-in goes in for now.
-- [ ] `ls`, `attach`, `diff` (flagging files that run on the host), `stop`,
+- [x] `ls`, `attach`, `diff` (flagging files that run on the host), `stop`,
   and `rm`; `--gpu` for the Strix Halo; read-only git hooks and config.
-- [ ] The safe parts of `devcontainer.json`: `image`, `build.dockerfile`,
+- [x] The safe parts of `devcontainer.json`: `image`, `build.dockerfile`,
   `containerEnv`, and `postCreateCommand`.
+  Tested on 2026-10-03: Claude Code and Codex with Docker, and Claude Code
+  with rootless Podman on aiw9; `--gpu` with Podman on aiw11 (gfx1151).
   Approved spec: [hi_box.md](specs/approved/hi_box.md).
 
 Still open from the container ideas, for later releases: one image on the

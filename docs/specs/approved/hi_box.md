@@ -1,6 +1,6 @@
 # `hi box` specification
 
-Status: Approved (2026-10-02). Release 1 is planned as v0.23.0. Decided
+Status: Approved (2026-10-02). Release 1 shipped in v0.23.0. Decided
 before approval: the name `hi box`, rootless Podman with `crun` (Docker as
 the fallback, no Docker Sandboxes), `devcontainer.json` with
 `customizations.hi`, and Claude Code's token added at the proxy outside the
