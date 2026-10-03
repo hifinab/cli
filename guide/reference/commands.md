@@ -124,7 +124,7 @@ server; `hf` runs with `HF_ENDPOINT` pointing to it.
 
 | Command                                             | Does                                                 |
 |-----------------------------------------------------|------------------------------------------------------|
-| `hi data`                                           | Pick a dataset or model and download it              |
+| `hi data`                                           | Search by words, pick a dataset or model, and download it |
 | `hi data ls [<org>] [--kind dataset\|model] [--json]` | What you may download                              |
 | `hi data info <org>/<name>`                         | Size, largest files, and last update                 |
 | `hi data get <org>/<name> [--to <dir>]`             | Download it with `hf`; default folder `./data/<name>` |

@@ -22,6 +22,8 @@ func press(m *listSelect, keys ...string) {
 			msg = tea.KeyMsg{Type: tea.KeyEsc}
 		case "backspace":
 			msg = tea.KeyMsg{Type: tea.KeyBackspace}
+		case " ":
+			msg = tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}}
 		default:
 			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
 		}
@@ -97,5 +99,50 @@ func TestListSelectFiltersAndChooses(t *testing.T) {
 	press(m, "esc")
 	if !m.aborted {
 		t.Fatal("esc did not go back")
+	}
+}
+
+func TestSearchSelectTakesEveryKeyAsASearch(t *testing.T) {
+	options := []string{"model    hifinab/gemma-3-27b_experiment_1", "model    hifinab/gemma-3-4b_experiment_1",
+		"dataset  hifinab/bars-1d", "model    hifinab/qwen-9b"}
+	for i := 0; i < 40; i++ {
+		options = append(options, fmt.Sprintf("model    hifinab/run-%02d", i))
+	}
+	m := newSearchSelect("Which one?", "", options)
+	m.Update(tea.WindowSizeMsg{Height: 60})
+	if view := m.View(); !strings.Contains(view, "Search:") || !strings.Contains(view, "44 of 44") || !strings.Contains(view, "↓ 29 more") {
+		t.Fatalf("a search list should show the field, the count, and 15 rows:\n%s", view)
+	}
+	// j, k, g, and q are letters here, not keys that move or quit.
+	press(m, "g", "e", "m", "m", "a", " ", "2", "7", "b")
+	if m.aborted || m.filter != "gemma 27b" || len(m.visible) != 1 || m.visible[0] != 0 {
+		t.Fatalf("filter %q matched %v", m.filter, m.visible)
+	}
+	press(m, "backspace", "backspace", "backspace", "4")
+	if len(m.visible) != 1 || m.visible[0] != 1 {
+		t.Fatalf("filter %q matched %v", m.filter, m.visible)
+	}
+	// esc clears the field first, then goes back.
+	press(m, "esc")
+	if m.aborted || m.filter != "" || len(m.visible) != len(options) {
+		t.Fatalf("esc with a search: aborted %v, filter %q", m.aborted, m.filter)
+	}
+	press(m, "b", "a", "r", "s", "down", "enter")
+	if !m.done || m.visible[m.cursor] != 2 {
+		t.Fatalf("chose %v", m.visible)
+	}
+}
+
+func TestLineUISearchesLongLists(t *testing.T) {
+	var options []string
+	for i := 0; i < 20; i++ {
+		options = append(options, fmt.Sprintf("model hifinab/run-%02d", i))
+	}
+	options = append(options, "dataset hifinab/bars-1d")
+	var out strings.Builder
+	ui := lineUI{in: strings.NewReader("nothing here\nbars\n1\n"), out: &out}
+	choice, err := ui.choose("Which one?", options, true)
+	if err != nil || choice != 20 || !strings.Contains(out.String(), `Nothing matches "nothing here"`) || strings.Contains(out.String(), "run-03") {
+		t.Fatalf("choice %d, err %v\n%s", choice, err, out.String())
 	}
 }

@@ -117,8 +117,11 @@ bucket share a name, `dataset:`, `model:`, or `bucket:` in front picks one.
 
 ### `hi data`
 
-With a terminal, it opens a list grouped by organization, filtered as you
-type, and shows for each entry its kind, size, file count, and last update.
+With a terminal, it opens a list with a search field: typing filters at
+once, every word must match (`gemma 27b`), and at most 15 rows show, with
+the number of matches. Each entry shows its kind, size, and last update.
+Without a styled terminal it asks for search words first and numbers only
+the matches.
 Enter shows the destination (default `./data/<name>`, or `--to`) and the
 size, and starts the download after a confirmation. Without a terminal,
 for example when an agent runs it, it prints the same as `hi data ls`.

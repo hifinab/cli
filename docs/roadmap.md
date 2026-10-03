@@ -553,6 +553,12 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.24.1 — Search in `hi data`
+
+- [x] `hi data`'s list has a search field: typing filters at once, every
+  word must match (`gemma 27b`), and at most 15 rows show, with a count.
+  Without a terminal it asks for words first and numbers only the matches.
+
 ### v0.24.0 — `hi data`: the team's Hugging Face datasets and models
 
 - [x] `hi server data add <org>...` stores a read token per organization

@@ -49,7 +49,33 @@ func (u lineUI) header(listed []listedInstance) {
 }
 
 func (u lineUI) choose(title string, options []string, filter bool) (int, error) {
-	return menuChoice(u.in, u.out, title, options)
+	if !filter || len(options) <= 9 {
+		return menuChoice(u.in, u.out, title, options)
+	}
+	// A long list: ask for words first, then number only what matches.
+	for {
+		words, err := ask(u.in, u.out, fmt.Sprintf("Search %d options (words; empty for all)", len(options)), "")
+		if err != nil {
+			return 0, err
+		}
+		var matches []int
+		var labels []string
+		for i, option := range options {
+			if matchesWords(option, words) {
+				matches = append(matches, i)
+				labels = append(labels, option)
+			}
+		}
+		if len(matches) == 0 {
+			fmt.Fprintf(u.out, "Nothing matches %q.\n", words)
+			continue
+		}
+		choice, err := menuChoice(u.in, u.out, title, labels)
+		if err != nil {
+			return 0, err
+		}
+		return matches[choice], nil
+	}
 }
 
 func (u lineUI) input(title, fallback string, validate func(string) error) (string, error) {
@@ -217,11 +243,7 @@ func providerBadge(provider string) string {
 }
 
 func (u *styledUI) choose(title string, options []string, filter bool) (int, error) {
-	description := ""
-	if filter {
-		description = "Press / and type to filter, for example /a10"
-	}
-	choice, err := runListSelect(u.in, u.out, title, description, options)
+	choice, err := runListSelect(u.in, u.out, title, "", options, filter)
 	if err != nil {
 		return 0, err
 	}

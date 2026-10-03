@@ -23,8 +23,32 @@ type listSelect struct {
 	rows        int   // how many rows fit
 	filter      string
 	filtering   bool
-	done        bool
-	aborted     bool
+	// search shows a search field that takes every key typed, for long
+	// lists; the list stays short and filters as you type.
+	search  bool
+	done    bool
+	aborted bool
+}
+
+// searchRows is how many options a search list shows at once.
+const searchRows = 15
+
+func newSearchSelect(title, description string, options []string) *listSelect {
+	model := &listSelect{title: title, description: description, options: options, rows: searchRows, search: true}
+	model.applyFilter()
+	return model
+}
+
+// matchesWords reports whether option contains every word of filter, in any
+// order and case.
+func matchesWords(option, filter string) bool {
+	option = strings.ToLower(option)
+	for _, word := range strings.Fields(strings.ToLower(filter)) {
+		if !strings.Contains(option, word) {
+			return false
+		}
+	}
+	return true
 }
 
 func newListSelect(title, description string, options []string) *listSelect {
@@ -37,13 +61,15 @@ func (m *listSelect) Init() tea.Cmd { return nil }
 
 func (m *listSelect) applyFilter() {
 	m.visible = m.visible[:0]
-	needle := strings.ToLower(m.filter)
 	for i, option := range m.options {
-		if needle == "" || strings.Contains(strings.ToLower(option), needle) {
+		if matchesWords(option, m.filter) {
 			m.visible = append(m.visible, i)
 		}
 	}
 	m.cursor = min(m.cursor, max(len(m.visible)-1, 0))
+	if m.search {
+		m.cursor = 0
+	}
 	m.offset = 0
 	m.keepCursorVisible()
 }
@@ -76,9 +102,15 @@ func (m *listSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		// Leave room for the title, description, hints, and the lines above.
 		m.rows = max(5, msg.Height-8)
+		if m.search {
+			m.rows = max(3, min(searchRows, msg.Height-9))
+		}
 		m.keepCursorVisible()
 	case tea.KeyMsg:
 		key := msg.String()
+		if m.search {
+			return m.updateSearch(msg)
+		}
 		if m.filtering {
 			switch key {
 			case "enter":
@@ -148,6 +180,55 @@ func (m *listSelect) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateSearch handles keys in a search list: letters go to the field,
+// arrows move, enter chooses, and esc clears the field or goes back.
+func (m *listSelect) updateSearch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch key := msg.String(); key {
+	case "up", "ctrl+p", "shift+tab":
+		m.move(-1)
+	case "down", "ctrl+n", "tab":
+		m.move(1)
+	case "pgup":
+		m.move(-m.visibleRows())
+	case "pgdown":
+		m.move(m.visibleRows())
+	case "enter":
+		if len(m.visible) > 0 {
+			m.done = true
+			return m, tea.Quit
+		}
+	case "esc":
+		if m.filter == "" {
+			m.aborted = true
+			return m, tea.Quit
+		}
+		m.filter = ""
+		m.applyFilter()
+	case "ctrl+c":
+		m.aborted = true
+		return m, tea.Quit
+	case "backspace":
+		if m.filter != "" {
+			runes := []rune(m.filter)
+			m.filter = string(runes[:len(runes)-1])
+			m.applyFilter()
+		}
+	case "ctrl+u", "ctrl+w":
+		m.filter = ""
+		m.applyFilter()
+	default:
+		switch msg.Type {
+		case tea.KeyRunes: // typed or pasted
+			m.filter += string(msg.Runes)
+			m.applyFilter()
+		case tea.KeySpace:
+			m.filter += " "
+			m.applyFilter()
+		}
+	}
+	return m, nil
+}
+
 func (m *listSelect) View() string {
 	if m.done || m.aborted {
 		return ""
@@ -158,7 +239,15 @@ func (m *listSelect) View() string {
 	plain := lipgloss.NewStyle().Foreground(colorText)
 
 	var lines []string
-	if m.filtering || m.filter != "" {
+	if m.search {
+		lines = append(lines, title.Render(m.title))
+		field := m.filter + lipgloss.NewStyle().Foreground(colorMint).Render("▏")
+		if m.filter == "" {
+			field = lipgloss.NewStyle().Foreground(colorMint).Render("▏") + dim.Render("type words to search, for example gemma 4b")
+		}
+		count := fmt.Sprintf("%d of %d", len(m.visible), len(m.options))
+		lines = append(lines, dim.Render("Search: ")+field+"  "+dim.Render(count))
+	} else if m.filtering || m.filter != "" {
 		cursor := ""
 		if m.filtering {
 			cursor = lipgloss.NewStyle().Foreground(colorMint).Render("▏")
@@ -167,7 +256,7 @@ func (m *listSelect) View() string {
 	} else {
 		lines = append(lines, title.Render(m.title))
 	}
-	if m.description != "" {
+	if m.description != "" && !m.search {
 		lines = append(lines, dim.Render(m.description))
 	}
 
@@ -176,7 +265,7 @@ func (m *listSelect) View() string {
 		lines = append(lines, dim.Render(fmt.Sprintf("  ↑ %d more", m.offset)))
 	}
 	if len(m.visible) == 0 {
-		lines = append(lines, dim.Render("  nothing matches; backspace to change the filter"))
+		lines = append(lines, dim.Render("  nothing matches; backspace to change the search"))
 	}
 	for row := m.offset; row < m.offset+rows && row < len(m.visible); row++ {
 		option := m.options[m.visible[row]]
@@ -195,15 +284,20 @@ func (m *listSelect) View() string {
 		BorderForeground(colorAccent).PaddingLeft(1).
 		Render(strings.Join(lines, "\n"))
 	help := "↑/↓ move • enter choose • / filter • esc back"
-	if m.filtering {
+	if m.search {
+		help = "type to search • ↑/↓ move • enter choose • esc clear, then back"
+	} else if m.filtering {
 		help = "type to filter • enter done • esc clear"
 	}
 	return body + "\n" + dim.Render(help) + "\n"
 }
 
 // runListSelect shows the list and returns the chosen option's index.
-func runListSelect(in io.Reader, out io.Writer, title, description string, options []string) (int, error) {
+func runListSelect(in io.Reader, out io.Writer, title, description string, options []string, search bool) (int, error) {
 	model := newListSelect(title, description, options)
+	if search {
+		model = newSearchSelect(title, description, options)
+	}
 	result, err := tea.NewProgram(model, tea.WithInput(in), tea.WithOutput(out)).Run()
 	if err != nil {
 		return 0, err

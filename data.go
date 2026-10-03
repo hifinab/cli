@@ -463,7 +463,7 @@ func dataMenu(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
 	for i, item := range catalog.Items {
 		labels[i] = dataMenuLabel(item)
 	}
-	choice, err := ui.choose("Which one do you want to download? (type to filter)", labels, true)
+	choice, err := ui.choose("Which one do you want to download?", labels, true)
 	if err != nil {
 		return nil
 	}
