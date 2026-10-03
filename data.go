@@ -1,0 +1,485 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+// hi data lists and downloads the Hugging Face datasets and models a
+// connected hi server serves. The server keeps the Hugging Face tokens; hf
+// runs here with HF_ENDPOINT pointing to the server's proxy and a hi data
+// token that lasts an hour (docs/specs/ideas/hi_data.md).
+
+// dataHFCommand is the hf CLI; tests replace it.
+var dataHFCommand = "hf"
+
+func runData(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "help", "-h", "--help":
+			printDataUsage(stdout)
+			return 0
+		case "ls", "list":
+			return exitCode(dataListCommand(args[1:], stdout, stderr), stderr)
+		case "info":
+			return exitCode(dataInfoCommand(args[1:], stdout, stderr), stderr)
+		case "get":
+			return exitCode(dataGetCommand(args[1:], stdin, stdout, stderr), stderr)
+		default:
+			fmt.Fprintf(stderr, "hi: unknown data command %q\n\n", args[0])
+			printDataUsage(stderr)
+			return 2
+		}
+	}
+	if file, ok := stdout.(*os.File); ok && isTerminal(stdin) && isTerminal(file) {
+		return exitCode(dataMenu(newMenuUI(stdin, stdout), stdin, stdout, stderr), stderr)
+	}
+	return exitCode(dataListCommand(nil, stdout, stderr), stderr)
+}
+
+func printDataUsage(w io.Writer) {
+	fmt.Fprintln(w, `hi data downloads the team's Hugging Face datasets and models through the
+hi server this device is connected to. The server keeps the Hugging Face
+tokens; hf runs here without one.
+
+Usage:
+  hi data                                 Pick a dataset or model and download it
+  hi data ls [<org>] [--kind dataset|model] [--json]
+                                          What this device may download
+  hi data info <org>/<name>               Size, files, and last update
+  hi data get <org>/<name> [--to DIR]     Download it with hf (default: ./data/<name>)
+      [--revision REV] [--include GLOB]... [--exclude GLOB]...
+
+When a dataset and a model share a name, put dataset: or model: in front.
+Needs hf (pip install -U huggingface_hub) and a server set up with
+hi server data add <org>.`)
+}
+
+// ---------------------------------------------------------------------------
+// talking to the server
+
+func dataClient() (*serverClient, *serverConnection, error) {
+	connection, err := loadServerConnection()
+	if err != nil {
+		return nil, nil, err
+	}
+	if connection == nil {
+		return nil, nil, errors.New("hi data needs a hi server; connect this device with `hi connect <server>`")
+	}
+	key, err := loadDeviceKey(false)
+	if err != nil {
+		return nil, nil, err
+	}
+	return newServerClient(connection.URL, key), connection, nil
+}
+
+func fetchDataCatalog(client *serverClient) (apiDataCatalog, error) {
+	var catalog apiDataCatalog
+	err := client.call(http.MethodGet, "/v1/data", nil, &catalog)
+	return catalog, err
+}
+
+// dataToken asks the server for a hi data token and returns it with the
+// HF_ENDPOINT to use it on.
+func dataToken(client *serverClient, connection *serverConnection, scope string) (token, endpoint string, err error) {
+	var answer apiDataToken
+	if err := client.call(http.MethodPost, "/v1/data/token", map[string]string{"scope": scope}, &answer); err != nil {
+		return "", "", err
+	}
+	return answer.Token, strings.TrimRight(connection.URL, "/") + answer.Path, nil
+}
+
+// resolveDataItem finds <org>/<name>, with an optional dataset: or model:
+// in front, among what this device may read.
+func resolveDataItem(catalog apiDataCatalog, ref string) (dataItem, error) {
+	kind, id := "", ref
+	if before, after, found := strings.Cut(ref, ":"); found {
+		kind, id = before, after
+		if !containsString(dataKinds, kind) {
+			return dataItem{}, usageError{fmt.Sprintf("%q: put dataset: or model: in front, or nothing", ref)}
+		}
+	}
+	if _, _, found := strings.Cut(id, "/"); !found {
+		return dataItem{}, usageError{fmt.Sprintf("%q: name it as <org>/<name>, as on Hugging Face", ref)}
+	}
+	var matches []dataItem
+	for _, item := range catalog.Items {
+		if strings.EqualFold(item.ID, id) && (kind == "" || item.Kind == kind) {
+			matches = append(matches, item)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return dataItem{}, fmt.Errorf("%s is not among what you may download; `hi data ls` shows the list", ref)
+	case 1:
+		return matches[0], nil
+	}
+	return dataItem{}, usageError{fmt.Sprintf("%s is both a dataset and a model; say dataset:%s or model:%s", id, id, id)}
+}
+
+// ---------------------------------------------------------------------------
+// hi data ls
+
+func dataListCommand(args []string, stdout, stderr io.Writer) error {
+	flags := &flagSet{newComputeFlags("data ls", stderr)}
+	kind := flags.String("kind", "", "only datasets or only models")
+	asJSON := flags.Bool("json", false, "print JSON")
+	positional, err := flags.parse(args)
+	if err != nil || len(positional) > 1 {
+		return usageError{"usage: hi data ls [<org>] [--kind dataset|model] [--json]"}
+	}
+	if *kind != "" && !containsString(dataKinds, *kind) {
+		return usageError{"--kind is dataset or model"}
+	}
+	client, _, err := dataClient()
+	if err != nil {
+		return err
+	}
+	catalog, err := fetchDataCatalog(client)
+	if err != nil {
+		return err
+	}
+	org := ""
+	if len(positional) == 1 {
+		org = positional[0]
+	}
+	catalog = filterDataCatalog(catalog, org, *kind)
+	if *asJSON {
+		encoder := json.NewEncoder(stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(catalog)
+	}
+	printDataCatalog(catalog, stdout, stderr)
+	return nil
+}
+
+func filterDataCatalog(catalog apiDataCatalog, org, kind string) apiDataCatalog {
+	filtered := apiDataCatalog{Orgs: []apiDataOrg{}, Items: []dataItem{}}
+	for _, entry := range catalog.Orgs {
+		if org == "" || strings.EqualFold(entry.Name, org) {
+			filtered.Orgs = append(filtered.Orgs, entry)
+		}
+	}
+	for _, item := range catalog.Items {
+		itemOrg, _, _ := strings.Cut(item.ID, "/")
+		if (org == "" || strings.EqualFold(itemOrg, org)) && (kind == "" || item.Kind == kind) {
+			filtered.Items = append(filtered.Items, item)
+		}
+	}
+	return filtered
+}
+
+func printDataCatalog(catalog apiDataCatalog, stdout, stderr io.Writer) {
+	for _, org := range catalog.Orgs {
+		if org.Problem != "" {
+			fmt.Fprintf(stderr, "hi: warning: %s: %s\n", org.Name, org.Problem)
+		}
+	}
+	if len(catalog.Orgs) == 0 {
+		fmt.Fprintln(stdout, "This server serves no Hugging Face organizations yet; an admin adds one with `hi server data add <org>`.")
+		return
+	}
+	if len(catalog.Items) == 0 {
+		fmt.Fprintln(stdout, "Nothing for you to download here.")
+		return
+	}
+	table := newTable(stdout)
+	fmt.Fprintln(table, "KIND\tNAME\tSIZE\tUPDATED")
+	for _, item := range catalog.Items {
+		fmt.Fprintf(table, "%s\t%s\t%s\t%s\n", item.Kind, item.ID, formatDataSize(item.Size), describeDataAge(item.Updated))
+	}
+	table.Flush()
+}
+
+func formatDataSize(size int64) string {
+	if size <= 0 {
+		return "-"
+	}
+	units := []string{"B", "KB", "MB", "GB", "TB", "PB"}
+	value, unit := float64(size), 0
+	for value >= 1000 && unit < len(units)-1 {
+		value /= 1000
+		unit++
+	}
+	if unit == 0 {
+		return fmt.Sprintf("%d B", size)
+	}
+	return fmt.Sprintf("%.1f %s", value, units[unit])
+}
+
+func describeDataAge(updated time.Time) string {
+	if updated.IsZero() {
+		return "-"
+	}
+	elapsed := computeNow().Sub(updated)
+	day := 24 * time.Hour
+	plural := func(n int, unit string) string {
+		if n == 1 {
+			return "1 " + unit + " ago"
+		}
+		return fmt.Sprintf("%d %ss ago", n, unit)
+	}
+	switch {
+	case elapsed < time.Minute:
+		return "just now"
+	case elapsed < time.Hour:
+		return plural(int(elapsed/time.Minute), "minute")
+	case elapsed < day:
+		return plural(int(elapsed/time.Hour), "hour")
+	case elapsed < 60*day:
+		return plural(int(elapsed/day), "day")
+	case elapsed < 730*day:
+		return plural(int(elapsed/(30*day)), "month")
+	}
+	return plural(int(elapsed/(365*day)), "year")
+}
+
+// ---------------------------------------------------------------------------
+// hi data info
+
+func dataInfoCommand(args []string, stdout, stderr io.Writer) error {
+	flags := &flagSet{newComputeFlags("data info", stderr)}
+	positional, err := flags.parse(args)
+	if err != nil || len(positional) != 1 {
+		return usageError{"usage: hi data info <org>/<name>"}
+	}
+	client, connection, err := dataClient()
+	if err != nil {
+		return err
+	}
+	catalog, err := fetchDataCatalog(client)
+	if err != nil {
+		return err
+	}
+	item, err := resolveDataItem(catalog, positional[0])
+	if err != nil {
+		return err
+	}
+	token, endpoint, err := dataToken(client, connection, item.Kind+":"+item.ID)
+	if err != nil {
+		return err
+	}
+	var info struct {
+		Siblings []struct {
+			Name string `json:"rfilename"`
+			Size int64  `json:"size"`
+		} `json:"siblings"`
+	}
+	request, err := http.NewRequest(http.MethodGet, endpoint+"/api/"+item.Kind+"s/"+item.ID+"?blobs=true", nil)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("User-Agent", "hi/"+version)
+	response, err := client.http.Do(request)
+	if err != nil {
+		return fmt.Errorf("can't reach the hi server at %s: %w", connection.URL, err)
+	}
+	defer response.Body.Close()
+	data, _ := io.ReadAll(io.LimitReader(response.Body, 32<<20))
+	if response.StatusCode != http.StatusOK {
+		var problem struct {
+			Error string `json:"error"`
+		}
+		if json.Unmarshal(data, &problem) == nil && problem.Error != "" {
+			return errors.New(problem.Error)
+		}
+		return fmt.Errorf("the server answered %s", response.Status)
+	}
+	if err := json.Unmarshal(data, &info); err != nil {
+		return err
+	}
+
+	sort.Slice(info.Siblings, func(i, j int) bool { return info.Siblings[i].Size > info.Siblings[j].Size })
+	var total int64
+	for _, file := range info.Siblings {
+		total += file.Size
+	}
+	fmt.Fprintf(stdout, "%s %s\n", item.Kind, item.ID)
+	if item.Private {
+		fmt.Fprintln(stdout, "  private")
+	}
+	fmt.Fprintf(stdout, "  %d files, %s\n", len(info.Siblings), formatDataSize(total))
+	fmt.Fprintf(stdout, "  updated %s, at %s\n", describeDataAge(item.Updated), shortCommit(item.Commit))
+	shown := min(len(info.Siblings), 15)
+	if shown > 0 {
+		fmt.Fprintln(stdout, "  largest files:")
+		table := newTable(stdout)
+		for _, file := range info.Siblings[:shown] {
+			fmt.Fprintf(table, "    %s\t%s\n", file.Name, formatDataSize(file.Size))
+		}
+		table.Flush()
+		if len(info.Siblings) > shown {
+			fmt.Fprintf(stdout, "    … and %d more\n", len(info.Siblings)-shown)
+		}
+	}
+	fmt.Fprintf(stdout, "Download it with `hi data get %s`.\n", item.ID)
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// hi data get
+
+type dataGetOptions struct {
+	to       string
+	revision string
+	include  []string
+	exclude  []string
+}
+
+func dataGetCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	flags := &flagSet{newComputeFlags("data get", stderr)}
+	var options dataGetOptions
+	var include, exclude repeatedFlag
+	flags.StringVar(&options.to, "to", "", "folder to download into")
+	flags.StringVar(&options.revision, "revision", "", "branch, tag, or commit")
+	flags.Var(&include, "include", "only files matching this pattern")
+	flags.Var(&exclude, "exclude", "skip files matching this pattern")
+	positional, err := flags.parse(args)
+	if err != nil || len(positional) != 1 {
+		return usageError{"usage: hi data get <org>/<name> [--to DIR] [--revision REV] [--include GLOB]... [--exclude GLOB]..."}
+	}
+	options.include, options.exclude = include, exclude
+	client, connection, err := dataClient()
+	if err != nil {
+		return err
+	}
+	catalog, err := fetchDataCatalog(client)
+	if err != nil {
+		return err
+	}
+	item, err := resolveDataItem(catalog, positional[0])
+	if err != nil {
+		return err
+	}
+	return downloadData(client, connection, item, options, stdin, stdout, stderr)
+}
+
+func defaultDataFolder(item dataItem) string {
+	_, name, _ := strings.Cut(item.ID, "/")
+	return filepath.Join("data", name)
+}
+
+// dataGetArgs is the hf command for an item.
+func dataGetArgs(item dataItem, options dataGetOptions) []string {
+	args := []string{"download", item.ID}
+	if item.Kind == "dataset" {
+		args = append(args, "--repo-type", "dataset")
+	}
+	args = append(args, "--local-dir", options.to)
+	if options.revision != "" {
+		args = append(args, "--revision", options.revision)
+	}
+	// hf takes --include and --exclude once per pattern; after a single
+	// flag, the next patterns would be read as file names.
+	for _, pattern := range options.include {
+		args = append(args, "--include", pattern)
+	}
+	for _, pattern := range options.exclude {
+		args = append(args, "--exclude", pattern)
+	}
+	return args
+}
+
+// dataEnvironment is this process's environment with the device's own
+// Hugging Face settings replaced by the server's endpoint and token.
+func dataEnvironment(endpoint, token string) []string {
+	var environment []string
+	for _, entry := range os.Environ() {
+		name, _, _ := strings.Cut(entry, "=")
+		switch name {
+		case "HF_ENDPOINT", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HF_TOKEN_PATH", "HF_HUB_OFFLINE":
+			continue
+		}
+		environment = append(environment, entry)
+	}
+	return append(environment, "HF_ENDPOINT="+endpoint, "HF_TOKEN="+token)
+}
+
+func downloadData(client *serverClient, connection *serverConnection, item dataItem, options dataGetOptions, stdin io.Reader, stdout, stderr io.Writer) error {
+	hf, err := exec.LookPath(dataHFCommand)
+	if err != nil {
+		return errors.New("hf isn't installed; install it with `pip install -U huggingface_hub` (or `uv tool install huggingface_hub`) and run this again")
+	}
+	if options.to == "" {
+		options.to = defaultDataFolder(item)
+	}
+	token, endpoint, err := dataToken(client, connection, item.Kind+":"+item.ID)
+	if err != nil {
+		return err
+	}
+	args := dataGetArgs(item, options)
+	fmt.Fprintf(stderr, "Downloading %s %s into %s through %s\n", item.Kind, item.ID, options.to, connection.URL)
+	command := exec.Command(hf, args...)
+	command.Env = dataEnvironment(endpoint, token)
+	command.Stdin, command.Stdout, command.Stderr = stdin, stdout, stderr
+	if err := command.Run(); err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return exitStatusError{code: exit.ExitCode(), message: fmt.Sprintf("hf download of %s failed", item.ID)}
+		}
+		return err
+	}
+	fmt.Fprintf(stderr, "Downloaded %s into %s\n", item.ID, options.to)
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// the menu
+
+func dataMenuLabel(item dataItem) string {
+	return fmt.Sprintf("%-7s  %s  ·  %s  ·  updated %s", item.Kind, item.ID, formatDataSize(item.Size), describeDataAge(item.Updated))
+}
+
+func dataMenu(ui menuUI, stdin io.Reader, stdout, stderr io.Writer) error {
+	client, connection, err := dataClient()
+	if err != nil {
+		return err
+	}
+	var catalog apiDataCatalog
+	ui.busy("Asking "+connection.URL+" what you may download…", func() { catalog, err = fetchDataCatalog(client) })
+	if err != nil {
+		return err
+	}
+	for _, org := range catalog.Orgs {
+		if org.Problem != "" {
+			ui.note(fmt.Sprintf("%s: %s", org.Name, org.Problem))
+		}
+	}
+	if len(catalog.Items) == 0 {
+		printDataCatalog(catalog, stdout, stderr)
+		return nil
+	}
+	labels := make([]string, len(catalog.Items))
+	for i, item := range catalog.Items {
+		labels[i] = dataMenuLabel(item)
+	}
+	choice, err := ui.choose("Which one do you want to download? (type to filter)", labels, true)
+	if err != nil {
+		return nil
+	}
+	item := catalog.Items[choice]
+	folder, err := ui.input("Download into", defaultDataFolder(item), nil)
+	if err != nil {
+		return nil
+	}
+	card := fmt.Sprintf("%s %s\n%s into %s", item.Kind, item.ID, formatDataSize(item.Size), folder)
+	if ok, err := ui.confirm("Download it?", card, false); err != nil || !ok {
+		return nil
+	}
+	command := "hi data get " + item.ID
+	if folder != defaultDataFolder(item) {
+		command += " --to " + folder
+	}
+	ui.command(command)
+	return downloadData(client, connection, item, dataGetOptions{to: folder}, stdin, stdout, stderr)
+}

@@ -176,6 +176,9 @@ type hiServer struct {
 	serverKey ed25519.PrivateKey
 	// templateMu serializes git work on the template mirrors.
 	templateMu sync.Mutex
+	// dataMu guards the hi data listings and data_usage.jsonl.
+	dataMu    sync.Mutex
+	dataLists map[string]*dataListing
 }
 
 func serverDirectory(flagValue string) (string, error) {
@@ -532,6 +535,7 @@ func (s *hiServer) clientHandler() http.Handler {
 	mux.HandleFunc("GET /v1/templates", s.device(s.handleTemplateCatalog))
 	mux.HandleFunc("GET /v1/templates/{source}/{commit}", s.device(s.handleTemplateBundle))
 	s.aiRoutes(mux)
+	s.dataRoutes(mux)
 	return mux
 }
 
@@ -1378,6 +1382,7 @@ func (s *hiServer) reconcile() {
 func (s *hiServer) adminHandler() http.Handler {
 	mux := http.NewServeMux()
 	s.templateAdminRoutes(mux)
+	s.dataAdminRoutes(mux)
 	mux.HandleFunc("GET /admin/requests", func(w http.ResponseWriter, r *http.Request) {
 		all := r.URL.Query().Get("all") == "1"
 		s.mu.Lock()
@@ -1806,6 +1811,8 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(serverWallCommand(rest, stdout, stderr), stderr)
 	case "templates":
 		return exitCode(serverTemplatesCommand(rest, stdin, stdout, stderr), stderr)
+	case "data":
+		return exitCode(serverDataCommand(rest, stdin, stdout, stderr), stderr)
 	default:
 		fmt.Fprintf(stderr, "hi: unknown server command %q\n\n", command)
 		printServerUsage(stderr)
@@ -1816,7 +1823,8 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 func printServerUsage(w io.Writer) {
 	fmt.Fprintln(w, `hi server brokers compute for connected devices: it holds the provider keys,
 and nothing starts without an approval. It also serves the team's private
-project templates to hi init.
+project templates to hi init, and the team's Hugging Face datasets and
+models to hi data.
 
 Usage:
   hi server init [--listen ADDR]          Create the server's state here
@@ -1849,6 +1857,10 @@ Usage:
                                           Serve a private repository's templates and skills
   hi server templates list|sync|remove    Show, fetch now, or stop serving template sources
   hi server templates rename <name> <new> Rename a source; keeps its token and history
+  hi server data                          Hugging Face organizations for hi data (menu)
+  hi server data add <org>... [--token-file F]
+                                          Serve an organization's datasets and models to devices
+  hi server data list|test|remove         Show, check, or stop serving organizations
 
 Commands other than init and run talk to the running server through its
 admin socket, so they work only on the server box. Decisions are recorded

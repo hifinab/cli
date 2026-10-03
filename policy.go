@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -39,6 +40,10 @@ type groupPolicy struct {
 	// TemplateSources, when set, are the only template sources the group's
 	// devices see; an empty list hides them all.
 	TemplateSources *[]string `json:"template_sources,omitempty"`
+	// Data, when set, lists the Hugging Face repositories the group may
+	// download with hi data, as <org>/<name> patterns; an empty list allows
+	// none.
+	Data *[]string `json:"data,omitempty"`
 }
 
 type autoApprove struct {
@@ -96,6 +101,13 @@ func parsePolicy(data []byte) (serverPolicy, error) {
 			return policy, fmt.Errorf("policy: group %s's auto_approve needs max_price_per_hour and max_hours above 0", name)
 		case group.AutoApprove != nil && group.MaxHours > 0 && group.AutoApprove.MaxHours > group.MaxHours:
 			return policy, fmt.Errorf("policy: group %s auto-approves longer than its max_hours", name)
+		}
+		if group.Data != nil {
+			for _, pattern := range *group.Data {
+				if _, err := path.Match(pattern, ""); err != nil || pattern == "" {
+					return policy, fmt.Errorf("policy: group %s has an invalid data pattern %q", name, pattern)
+				}
+			}
 		}
 	}
 	if policy.Groups == nil {

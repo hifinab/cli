@@ -1,6 +1,6 @@
 # `hi data` specification
 
-Status: Draft
+Status: Draft; release 1 (datasets and models) implemented
 
 Dependencies: `hi server` (keys kept on the server, devices, groups,
 `policy.json`, audit, Slack, signed client API inside NetBird), and the
@@ -210,10 +210,19 @@ and the `/v1/data` answer show the same.
 
 ### Records
 
-Each token issued and each proxied call is written to the audit log with the
-user, device, repository or bucket, revision, files, and their sizes from the
-Hub's headers. The server sees which files were resolved, not the bytes
-downloaded. The weekly report gets a line per organization: downloads, data
+Each hi data token issued is written to the audit log with the user,
+device, and repository. Downloads go to `data_usage.jsonl`, one line per
+call, with the user, device, repository, file, and size from the Hub's
+headers:
+
+- Files served by `resolve` (small files, and Xet files for older clients)
+  are recorded by name.
+- Recent `hf` versions fetch Xet files without a `resolve` call: they list
+  the repository and ask for a Xet read token, then read from Hugging Face's
+  storage directly. The server records the token grant (repository and
+  revision), not which files were read.
+
+The server never sees the bytes downloaded. The weekly report gets a line per organization: downloads, data
 size, and the most used repositories.
 
 ## Protocol
@@ -272,13 +281,28 @@ The client API is plain HTTP inside NetBird, so `HF_ENDPOINT` is
   release fails with a 403 until the proxy allows it. `hi server data test`
   runs a real small download, so a change shows up there first.
 
-## To check in a prototype
+## Checked in a prototype
 
-1. That `hf download` and `hf buckets sync` accept a token that doesn't look
-   like a Hugging Face token (`hf_...`), with no format check on the device.
-2. That `HF_ENDPOINT` over plain `http://` works for every call, including
-   Xet token refresh.
-3. Which calls `hf buckets sync` makes beyond the ones in the table.
+On 2026-10-03, with `hf` 1.32.0 against the real Hub through a local hi
+server:
+
+1. `hf download` accepts a hi data token (`hidata_…`); there's no format
+   check on the device.
+2. `HF_ENDPOINT=http://<server>/hf` works for every call, including Xet
+   downloads (a 548 MB `model.safetensors` came from Xet storage directly).
+3. The Hub answers `resolve` for small files with a relative redirect to
+   `/api/resolve-cache/<kind>s/<org>/<name>/<commit>/<file>`, with nested
+   names encoded as one segment (`onnx%2Fconfig.json`). The proxy allows
+   it and rewrites relative redirects to stay on the proxy.
+4. Recent `hf` downloads Xet files with `tree` and `xet-read-token` only,
+   with no `resolve` call per file (see [Records](#records)).
+5. `hf` also calls `GET /api/agent-harnesses` without a token; the proxy
+   refuses it and `hf` carries on.
+6. `hf download` takes `--include` once per pattern; with several patterns
+   after one flag, the rest are read as file names.
+
+Still to check for release 2: which calls `hf buckets sync` makes beyond
+the ones in the table.
 
 ## Later: uploads
 

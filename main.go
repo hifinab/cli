@@ -78,6 +78,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(login(args[1], stdin, stdout, stderr), stderr)
 	case "compute":
 		return runCompute(args[1:], stdin, stdout, stderr)
+	case "data":
+		return runData(args[1:], stdin, stdout, stderr)
 	case "connect":
 		return runConnect(args[1:], stdin, stdout, stderr)
 	case "disconnect":
@@ -117,6 +119,7 @@ Usage:
   hi login <hf|colab|runpod|shadeform>
                                 Sign in to a compute provider
   hi connect <server>           Join a hi server that approves and pays for compute
+  hi data                       Download the team's Hugging Face datasets and models through it
   hi disconnect                 Leave it; hi compute uses your own keys again
   hi server                     Run the server that brokers compute and serves templates for a team
   hi init [<template> <dir>]    Start a project from a template (python, web, service, pipeline, ml)
