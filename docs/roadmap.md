@@ -553,6 +553,20 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.26.0 — The team's data in cloud jobs, through `netbird expose`
+
+- [x] The server opens a second listener with only the `hi data` proxy and
+  publishes it with `netbird expose` while cloud runs need it, closing it
+  when no run token is valid and nothing has called for 10 minutes.
+- [x] Run tokens: for the repositories named with `--data`, until the
+  run's time limit, accepted only through the public address.
+- [x] `hi compute run --data` on Hugging Face Jobs uses it: the token goes
+  as an encrypted job secret, there is no size limit or one-hour expiry,
+  and the script can call `load_dataset` itself. Signed links remain for
+  Colab and when the server can't expose. `hi server expose [stop]`.
+  Tested on a real Hugging Face job through a server on vmhiserver.
+  Spec: [hi_server_expose.md](specs/ideas/hi_server_expose.md).
+
 ### v0.25.2 — A clear message from an older server
 
 - [x] `hi compute run --data` against a server older than v0.25.1 says to
@@ -646,7 +660,7 @@ images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
-### v0.26.0 — Learn from agent-machine services
+### v0.27.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -667,7 +681,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
 
-### v0.27.0 — skills.sh
+### v0.28.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`

@@ -117,7 +117,9 @@ the script starts, through signed links that need no token:
 hi compute run --gpu a10g-small --data hifinab/bars-1d train.py
 ```
 
-See [Run a script](/guide/compute/run/#the-teams-data) for the limits.
+On Hugging Face Jobs, the server opens a narrow public address with
+NetBird for the run, so the script can also call `load_dataset` for the
+repositories you named. See [Run a script](/guide/compute/run/#the-teams-data).
 
 ## What the server does
 

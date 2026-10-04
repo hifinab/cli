@@ -1,8 +1,7 @@
 # `hi server expose` specification
 
 Status: Draft (2026-10-04). Release 1 (the team's data on cloud machines)
-is prototyped and was tested end to end on a real Hugging Face job; not
-released. Not yet built from the spec: `hi server expose revoke`, and the
+shipped in v0.26.0, tested end to end on a real Hugging Face job. Not yet built from the spec: `hi server expose revoke`, and the
 `on|off` command (`expose_listen: "off"` in `config.json` does it).
 
 Dependencies: `hi server` (signed client API inside NetBird, server key,

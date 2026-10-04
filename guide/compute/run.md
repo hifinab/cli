@@ -86,13 +86,30 @@ Each repository lands in `data/<name>` next to where the script runs, as
 with `hi data get`. A folder or pattern after the name (`/runs/2026-09`,
 `/*.parquet`) downloads only those files.
 
-The instance can't reach the hi server, so hi asks it for a signed
-download link per file when the run starts, and sends the links with the
-script; the instance never holds a token. The links last about an hour, so
-the job must start within that time. Script runs only.
+Script runs only. The instance can't reach the hi server inside NetBird,
+so the data gets there one of two ways.
 
-On Hugging Face Jobs, everything travels in one environment variable of
-at most 120 KB: enough for a few hundred files. Small files that a
+**On Hugging Face Jobs, through the server's public address.** The server
+opens a narrow public address with NetBird (`netbird expose`) that answers
+only the data proxy, and gives the job a run token: it reads only the
+repositories named with `--data`, until the run's time limit, and travels
+as an encrypted job secret. The job downloads through it, and the script
+can then read those repositories itself:
+
+```python
+from datasets import load_dataset
+results = load_dataset("hifinab/fintabarena-results")   # works in the job too
+```
+
+This needs **Peer Expose** turned on in NetBird (Settings > Clients); the
+server closes the address when no run needs it.
+
+**On Colab, or when the server can't expose: signed links.** hi asks the
+server for a signed download link per file when the run starts, and sends
+the links with the script; the instance never holds a token. The links
+last about an hour, so the job must start within that time. On Hugging
+Face Jobs this way, everything travels in one environment variable of at
+most 120 KB: enough for a few hundred files. Small files that a
 repository keeps in git rather than Hugging Face's file storage, such as
 an older model's `tokenizer.json`, have no link and travel inside the job,
 and `hi` says when they make it too large. Leave them out with a pattern,

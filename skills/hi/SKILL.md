@@ -195,7 +195,9 @@ hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
 7. For a `hi compute run` script that needs the team's data, add
    `--data <org>/<name>[/<folder or pattern>]`; it lands in `data/<name>`
    on the instance. Never send a Hugging Face token with `--secret` for
-   it. On Hugging Face Jobs, narrow large repositories with a pattern; if
+   it. On Hugging Face Jobs the script can also read those repositories
+   itself (`load_dataset`, `hf_hub_download`); hi sets `HF_ENDPOINT` and
+   `HF_TOKEN` in the job. On Hugging Face Jobs, narrow large repositories with a pattern; if
    hi says files kept in git make the job too large, leave them out or
    use Colab.
 8. Inside a hi box (`$HI_BOX` is set), `HF_ENDPOINT` and a placeholder
