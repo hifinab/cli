@@ -396,7 +396,11 @@ server:
     a dataset's parquet files and a 548 MB Xet file from signed links with
     no token (6 KB wrapper), and ran the script with its arguments. With
     an old model's 1.4 MB in-git `tokenizer.json`, the Hugging Face size
-    check refused it and named the file.
+    check refused it and named the file. On 2026-10-04 a real Hugging Face
+    job (`cpu-basic`) downloaded `hifinab/fintabarena-results` from the
+    team's server: 150 files, 35.6 MB, parquet, pickle, and JSON kept in
+    git, in 2 s, with no `HF_TOKEN` on the instance; the script's PEP 723
+    dependencies installed and it ran with its arguments.
 
 ## Later: uploads
 

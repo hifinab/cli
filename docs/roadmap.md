@@ -553,13 +553,19 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.25.2 — A clear message from an older server
+
+- [x] `hi compute run --data` against a server older than v0.25.1 says to
+  update the server, instead of "404 page not found".
+
 ### v0.25.1 — The team's data on rented GPUs
 
 - [x] `hi compute run --data <org>/<name>[/<pattern>]` downloads the team's
   data into `data/<name>` on the instance before the script starts. The
   instance can't reach the hi server, so the server hands out a signed
   link per file (about an hour, no token) and `hi` ships them in a wrapper
-  that then runs the script. Tested with real links and a 548 MB file.
+  that then runs the script. Tested with real links and a 548 MB file,
+  and on a real Hugging Face job with 150 private files from the team.
 
 ### v0.25.0 — `hi data` in code, projects, and boxes
 
