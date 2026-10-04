@@ -25,6 +25,8 @@ Hugging Face.
 | Run a Python script or container on a GPU          | [Run a job to completion]({{ '/guide/compute/run/' | relative_url }}) |
 | Get a shell on a GPU machine and forward a port    | [Interactive machines]({{ '/guide/compute/instances/' | relative_url }}) |
 | Try an LLM on hardware I do not have               | [Serve a model]({{ '/guide/compute/serve/' | relative_url }})       |
+| Download the team's private datasets and models    | [Download the team's data]({{ '/guide/data/' | relative_url }}) |
+| Give a cloud job the team's data                   | [Run a job: the team's data]({{ '/guide/compute/run/#the-teams-data' | relative_url }}) |
 | Know what I am paying and who pays                 | [Costs, limits, and billing]({{ '/guide/compute/billing/' | relative_url }}) |
 | Set up Colab or Hugging Face for the first time    | [Google Colab]({{ '/guide/compute/colab/' | relative_url }}), [Hugging Face Jobs]({{ '/guide/compute/hugging-face/' | relative_url }}) |
 | Let Claude Code or Codex use a GPU safely          | [Let your coding agent use a GPU]({{ '/guide/examples/agent/' | relative_url }}) |

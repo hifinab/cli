@@ -30,7 +30,7 @@
 - [Agent skill](https://hifin.sh/guide/reference/skill/): what `hi skill` writes and where
 - [All commands](https://hifin.sh/guide/reference/commands/): every command and option
 - [Run agents in a box](https://hifin.sh/guide/box/): `hi box`, agents without permission prompts in a rootless container
-- [Download the team's data](https://hifin.sh/guide/data/): `hi data`, the team's private Hugging Face datasets, models, and buckets through the hi server
+- [Download the team's data](https://hifin.sh/guide/data/): `hi data`, the team's private Hugging Face datasets, models, and buckets through the hi server, on laptops, in boxes, and in cloud jobs (`hi compute run --data`)
 - [Ask for a command](https://hifin.sh/guide/q/): `hi q`, for people at a terminal; agents don't need it
 - [Start a project](https://hifin.sh/guide/projects/): `hi init` templates, `--update`, and `--adopt`
 - [Troubleshooting](https://hifin.sh/guide/reference/troubleshooting/): messages and what to do

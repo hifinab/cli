@@ -359,6 +359,8 @@ Options for `run` and `up`:
 --name <name>        Local handle; generated when omitted
 --env KEY=VALUE      Plain environment variable; repeatable
 --secret KEY         Secret read from the local environment; repeatable
+--data ORG/NAME[/P]  The team's data into data/NAME before a script run
+                     starts, through the hi server (hi_data.md)
 --max <duration>     Hard lifetime limit, such as 30m or 4h; always enforced
 --detach             run only: return after submission instead of streaming logs
 --yes                Skip the cost confirmation

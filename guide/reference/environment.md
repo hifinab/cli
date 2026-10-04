@@ -12,7 +12,9 @@ description: The environment variables hi reads and the files it writes.
 | `HF_TOKEN`              | Hugging Face token; otherwise read from the token file            |
 | `HF_TOKEN_PATH`         | Where to find the Hugging Face token file                         |
 | `HF_HOME`               | Hugging Face folder; the token is `$HF_HOME/token`                |
-| `HF_ENDPOINT`           | Another Hugging Face API endpoint                                 |
+| `HF_ENDPOINT`           | Another Hugging Face API endpoint; `hi data run` and `env` set it to the server's proxy |
+| `HI_DATA_ENDPOINT`, `HI_DATA_TOKEN` | In a `hi compute run --data` job: the server's public data proxy and the run token (an encrypted secret); the script gets them as `HF_ENDPOINT` and `HF_TOKEN` |
+| `HI_BOX`                | Set inside a `hi box`; with `--data`, the box also has `HF_ENDPOINT` and a placeholder `HF_TOKEN` |
 | `RUNPOD_API_KEY`        | RunPod API key; otherwise read from `~/.runpod/config.toml`       |
 | `HI_NETBIRD_SETUP_KEY`  | Setup key for `hi net` in scripts                                 |
 | `HI_Q_BASE_URL`, `HI_Q_MODEL`, `HI_Q_API_KEY` | `hi q`: an OpenAI-compatible endpoint, its model, and key |
@@ -57,6 +59,10 @@ description: The environment variables hi reads and the files it writes.
 | `.hifin/template.json` (in a project)       | What `hi init` generated: template, versions or commits, and file hashes; no paths or names |
 | `docs/upgrades/<version>.md` (in a project) | From `hi init --update`: template changes to the project's own files, for an agent to apply; delete it afterward |
 
+In a project, `hi data get` records its downloads in `.hifin/data.json`:
+each repository, the commit, the folder, and the filters. Commit it with
+the code that uses the data.
+
 ## Files hi reads from other tools
 
 | Path                                        | Owner                                                |
@@ -78,13 +84,14 @@ The server keeps everything in its state folder (`hi server --dir`, default
 
 | File                       | Contents                                                       |
 |----------------------------|----------------------------------------------------------------|
-| `config.json`              | The listen address and server settings                         |
+| `config.json`              | The listen address and server settings, such as `expose_listen` |
 | `state.json`               | Users, devices, requests, leases, and template sources         |
-| `keys.json`                | Provider keys, the model key (`ai`), and template source tokens |
+| `keys.json`                | Provider keys, the model key (`ai`), template source tokens, and Hugging Face tokens (`data:<org>`) |
+| `data_usage.jsonl`         | One line per `hi data` download or Xet grant: user, device, repository, file, size |
 | `ai.json`                  | `hi server ai`: the upstream URL, default model, keyless or not, and on or off |
 | `ai_usage.jsonl`           | One line per model request: user, device, model, tokens, cost, status; no messages |
 | `server_key`               | The key the server signs template bundles with                 |
-| `policy.json`              | Groups, limits, budgets, and template access                   |
+| `policy.json`              | Groups, limits, budgets, template access, and data patterns    |
 | `audit.jsonl`              | Every request, decision, start, stop, and template change      |
 | `templates/<source>.git`   | Mirrors of the template sources                                |
 

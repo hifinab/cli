@@ -149,7 +149,10 @@ direct-message notifications.
 
 - **Server:** one `hi` binary on a small always-on machine enrolled in NetBird
   (`hi server run`, as a systemd service). It listens only on its NetBird
-  address, where it serves the client API and nothing else. It keeps its state
+  address, where it serves the client API and nothing else. The one
+  exception is a second listener with only the `hi data` proxy, which it
+  publishes with `netbird expose` while cloud runs need it
+  ([hi_server_expose.md](../ideas/hi_server_expose.md)). It keeps its state
   in a JSON file with an append-only JSON Lines audit log, which is enough for
   one organization and adds no database to the binary. Its provider keys live
   in a `0600` file on an encrypted disk.
@@ -681,7 +684,12 @@ hi server wall add|remove|list <screen> [<ssh-pubkey>] [--session s]
 hi server templates add <name> <git-url> [--ref <ref>]
 hi server templates remove|list|sync [<name>]
 hi server templates rename <name> <new-name>
+hi server data [add <org>... | list | test | remove <org>]
+hi server expose [stop]
 ```
+
+The team's Hugging Face data (`hi server data`, `hi data`) is specified in
+[hi_data.md](hi_data.md).
 
 Approver devices and wall displays:
 

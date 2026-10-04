@@ -200,6 +200,13 @@ If the server can't be reached, `hi q` falls back to your own key or Claude
 Code, if you have one, and says so in a dim line. Without one, it stops
 until the server is back.
 
+### Download the team's data
+
+When the server serves the team's Hugging Face organizations,
+[`hi data`](/guide/data/) lists and downloads their private datasets,
+models, and buckets with no Hugging Face token on your machine, and
+`hi compute run --data` gives a cloud job the same data.
+
 ### Leave the server
 
 ```sh
@@ -491,6 +498,44 @@ hi server templates remove private
   stored the first time they connected.
 - To keep a group from seeing a source, list the ones it may use in
   `policy.json`: `"template_sources": ["private"]`, or `[]` for none.
+
+### Serve the team's Hugging Face data
+
+The server can hold one read token per Hugging Face organization and hand
+out the organizations' datasets, models, and buckets through a proxy, so
+nobody needs a Hugging Face account or token of their own:
+
+```sh
+hi server data add hifinab        # asks for the token; it shows as *
+hi server data                    # a menu: add, test, remove
+hi server data list|test|remove <org>
+```
+
+- Use a fine-grained, read-only token limited to the organizations. It
+  stays in `keys.json`; the proxy passes on only reads, but a read-only
+  token is safer if the box is ever compromised.
+- Every group reads everything by default. To limit one, add
+  `"data": ["hifinab/bars-1d", "hifinab/public-*"]` to it in `policy.json`;
+  `[]` allows nothing.
+- Token grants are in the audit log, and each download in
+  `data_usage.jsonl`.
+
+**Cloud jobs.** A rented machine can't reach the server inside NetBird.
+For `hi compute run --data` on Hugging Face Jobs, the server opens a
+second listener (its NetBird address, port 7374) that answers only the
+data proxy, and publishes it with `netbird expose` while runs need it. It
+closes it once no run token is valid and nothing has called for 10
+minutes.
+
+- Turn on **Peer Expose** in the NetBird dashboard (Settings > Clients),
+  once. Without it, runs fall back to signed download links, which work
+  but last about an hour and are limited in size on Hugging Face.
+- `hi server expose` shows the current public address and until when run
+  tokens are valid; `hi server expose stop` closes it now.
+- `"expose_listen"` in `config.json` moves the listener, or `"off"` turns
+  exposure off.
+
+See [Download the team's data](/guide/data/) for what users do.
 
 ### Serve a model to hi q
 

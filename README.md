@@ -317,7 +317,11 @@ The server keeps one read token per organization (`hi server data add
 contents come straight from Hugging Face's CDN. In a project, `hi data get`
 records the commit it fetched in `.hifin/data.json`; `hi data run --
 python train.py` lets `load_dataset` and `from_pretrained` read the team's
-repositories directly, and `hi box --data` gives a box the same. See
+repositories directly, and `hi box --data` gives a box the same.
+`hi compute run --data hifinab/bars-1d train.py` gives a cloud job the data:
+on Hugging Face Jobs the server opens a narrow public address with
+`netbird expose` for the run, so the script can also call `load_dataset`;
+elsewhere it sends signed download links. See
 [Download the team's data](https://hifin.sh/guide/data/).
 
 ## Agent skill

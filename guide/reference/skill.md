@@ -46,6 +46,9 @@ paths; Git stores the link as a link.
   [hi server](/guide/compute/managed/), send requests with `--reason` and
   `--no-wait`, wait with `hi compute requests <id> --wait`, report a denial
   instead of working around it, and never approve anything.
+- **Team data:** get the team's datasets and models with `hi data`, never
+  with a Hugging Face token of their own; check sizes first; use
+  `hi data run` for code that reads them, and `--data` on cloud runs.
 
 Read the whole skill with `hi skill --print`.
 
