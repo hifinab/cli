@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -58,6 +59,16 @@ func newFakeHub(t *testing.T) *fakeHub {
 			w.Write([]byte(`[{"type":"directory","path":"runs"},{"type":"file","path":"runs/a.parquet","size":7000},{"type":"file","path":"notes.md","size":12}]`))
 		case r.URL.Path == "/api/datasets" || r.URL.Path == "/api/models" || strings.HasPrefix(r.URL.Path, "/api/buckets/") && strings.Count(r.URL.Path, "/") == 3:
 			w.Write([]byte(`[]`))
+		case strings.HasPrefix(r.URL.Path, "/api/datasets/hifinab/bars/tree/"):
+			w.Write([]byte(`[{"type":"directory","path":"data"},{"type":"file","path":"data/day.parquet","size":5000},{"type":"file","path":"data/week.parquet","size":9000},{"type":"file","path":"README.md","size":11}]`))
+		case strings.HasPrefix(r.URL.Path, "/datasets/hifinab/bars/resolve/"+strings.Repeat("a1", 20)+"/data/"):
+			w.Header().Set("Location", "https://cdn.example/signed/"+filepath.Base(r.URL.Path)+"?Expires=1")
+			w.WriteHeader(http.StatusFound)
+		case r.URL.Path == "/datasets/hifinab/bars/resolve/"+strings.Repeat("a1", 20)+"/README.md":
+			w.Header().Set("Location", "/api/resolve-cache/datasets/hifinab/bars/"+strings.Repeat("a1", 20)+"/README.md")
+			w.WriteHeader(http.StatusTemporaryRedirect)
+		case strings.HasPrefix(r.URL.Path, "/api/resolve-cache/datasets/hifinab/bars/"):
+			w.Write([]byte("# Bars data"))
 		case r.URL.Path == "/hifinab/ranker/resolve/main/config.json":
 			w.Header().Set("Location", "/api/resolve-cache/models/hifinab/ranker/0a1b2c/config.json")
 			w.Header().Set("Link", `<`+hub.server.URL+`/api/models/hifinab/ranker/xet-read-token/0a1b2c>; rel="xet-auth"`)
@@ -551,5 +562,131 @@ func TestHiDataRunAndEnv(t *testing.T) {
 	}
 	if code, _, stderr := runHi("data", "run"); code != 2 || !strings.Contains(stderr, "usage") {
 		t.Fatalf("run without a command: %d %s", code, stderr)
+	}
+}
+
+func TestDataLinksForComputeRuns(t *testing.T) {
+	ts, _ := newDataServer(t)
+	client, _, err := dataClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var links apiDataLinks
+	if err := client.call(http.MethodPost, "/v1/data/links", apiDataLinksRequest{Scope: "dataset:hifinab/bars"}, &links); err != nil {
+		t.Fatal(err)
+	}
+	if links.Revision != strings.Repeat("a1", 20) || len(links.Files) != 3 {
+		t.Fatalf("links: %+v", links)
+	}
+	byPath := map[string]apiDataLink{}
+	for _, file := range links.Files {
+		byPath[file.Path] = file
+	}
+	if byPath["data/day.parquet"].URL != "https://cdn.example/signed/day.parquet?Expires=1" || byPath["README.md"].URL != "" || string(byPath["README.md"].Content) != "# Bars data" {
+		t.Fatalf("files: %+v", byPath)
+	}
+
+	if err := client.call(http.MethodPost, "/v1/data/links", apiDataLinksRequest{Scope: "dataset:hifinab/bars", Include: []string{"data/d*"}}, &links); err != nil || len(links.Files) != 1 {
+		t.Fatalf("a pattern: %+v, %v", links, err)
+	}
+	if err := client.call(http.MethodPost, "/v1/data/links", apiDataLinksRequest{Scope: "dataset:hifinab/bars", Include: []string{"nothing/*"}}, &links); err == nil || !strings.Contains(err.Error(), "no files") {
+		t.Fatalf("a pattern that matches nothing: %v", err)
+	}
+	if err := client.call(http.MethodPost, "/v1/data/links", apiDataLinksRequest{Scope: "*"}, &links); err == nil {
+		t.Fatal("links for every repository at once")
+	}
+	writeTestFile(t, policyPath(ts.dir), `{"groups":{"students":{"data":["hifinab/fills"]}}}`, 0o600)
+	if err := client.call(http.MethodPost, "/v1/data/links", apiDataLinksRequest{Scope: "dataset:hifinab/bars"}, &links); err == nil || !strings.Contains(err.Error(), "may not read") {
+		t.Fatalf("links outside policy: %v", err)
+	}
+	audit, _ := os.ReadFile(filepath.Join(ts.dir, "audit.jsonl"))
+	if !strings.Contains(string(audit), `"action":"data links"`) || strings.Contains(string(audit), "cdn.example") {
+		t.Fatalf("audit = %s", audit)
+	}
+}
+
+func TestDataRunRefs(t *testing.T) {
+	for value, want := range map[string]dataRunRef{
+		"hifinab/fdb":                   {ref: "hifinab/fdb", id: "hifinab/fdb"},
+		"bucket:hifinab/fdb/runs":       {ref: "bucket:hifinab/fdb", id: "hifinab/fdb", include: "runs/*"},
+		"hifinab/fdb/runs/2026-09/*":    {ref: "hifinab/fdb", id: "hifinab/fdb", include: "runs/2026-09/*"},
+		"hifinab/bars/data/day.parquet": {ref: "hifinab/bars", id: "hifinab/bars", include: "data/day.parquet"},
+	} {
+		got, err := parseDataRunRef(value)
+		if err != nil || got != want {
+			t.Errorf("%s: %+v, %v", value, got, err)
+		}
+	}
+	if _, err := parseDataRunRef("fdb"); err == nil {
+		t.Error("a name without an organization was accepted")
+	}
+}
+
+// TestDataRunWrapperDownloadsThenRunsTheScript runs the wrapper with
+// Python against a local file server standing in for the CDN.
+func TestDataRunWrapperDownloadsThenRunsTheScript(t *testing.T) {
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("no python3")
+	}
+	cdn := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/expired" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.Write([]byte(strings.Repeat("x", 5000)))
+	}))
+	defer cdn.Close()
+	script := "# /// script\n# dependencies = [\"numpy\"]\n# ///\nimport os, sys\nprint('script', sys.argv[1:], os.path.getsize('data/bars/data/day.parquet'), open('data/bars/README.md').read())\n"
+	repos := []dataRunRepo{{ID: "hifinab/bars", To: "data/bars", Files: []apiDataLink{
+		{Path: "data/day.parquet", Size: 5000, URL: cdn.URL + "/day"},
+		{Path: "README.md", Size: 11, Content: []byte("# Bars data")},
+	}}}
+	wrapper, err := dataRunWrapper("train.py", []byte(script), repos)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(wrapper), "# /// script\n# dependencies = [\"numpy\"]\n# ///\n") {
+		t.Fatalf("the inline metadata isn't kept at the top:\n%s", wrapper[:200])
+	}
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, "train.py"), string(wrapper), 0o644)
+	command := exec.Command(python, "train.py", "--epochs", "2")
+	command.Dir = dir
+	output, err := command.CombinedOutput()
+	if err != nil || !strings.Contains(string(output), "script ['--epochs', '2'] 5000 # Bars data") || !strings.Contains(string(output), "hi data: ready") {
+		t.Fatalf("wrapper: %v\n%s", err, output)
+	}
+
+	repos[0].Files[0] = apiDataLink{Path: "data/other.parquet", Size: 5000, URL: cdn.URL + "/expired"}
+	wrapper, _ = dataRunWrapper("train.py", []byte(script), repos)
+	writeTestFile(t, filepath.Join(dir, "train.py"), string(wrapper), 0o644)
+	command = exec.Command(python, "train.py")
+	command.Dir = dir
+	output, err = command.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "has expired") {
+		t.Fatalf("an expired link: %v\n%s", err, output)
+	}
+}
+
+func TestPrepareDataRunWrapsTheScript(t *testing.T) {
+	newDataServer(t)
+	dir := t.TempDir()
+	script := filepath.Join(dir, "train.py")
+	writeTestFile(t, script, "print('hi')\n", 0o644)
+	request := runRequest{script: script}
+	var stderr strings.Builder
+	cleanup, err := prepareDataRun(&request, []string{"dataset:hifinab/bars/data"}, "hf", &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cleanup()
+	wrapper, _ := os.ReadFile(request.script)
+	if request.script == script || filepath.Base(request.script) != "train.py" || !strings.Contains(string(wrapper), "_NAME = \"train.py\"") ||
+		!strings.Contains(stderr.String(), "2 files, 14.0 KB at a1a1a1a, into data/bars on the instance") {
+		t.Fatalf("wrapper %s:\n%s\n%s", request.script, wrapper, stderr.String())
+	}
+	if _, err := prepareDataRun(&runRequest{image: "python:3.12"}, []string{"hifinab/bars"}, "hf", &stderr); err == nil {
+		t.Fatal("--data with an image run was accepted")
 	}
 }

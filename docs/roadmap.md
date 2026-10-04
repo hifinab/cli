@@ -553,6 +553,14 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.25.1 — The team's data on rented GPUs
+
+- [x] `hi compute run --data <org>/<name>[/<pattern>]` downloads the team's
+  data into `data/<name>` on the instance before the script starts. The
+  instance can't reach the hi server, so the server hands out a signed
+  link per file (about an hour, no token) and `hi` ships them in a wrapper
+  that then runs the script. Tested with real links and a 548 MB file.
+
 ### v0.25.0 — `hi data` in code, projects, and boxes
 
 - [x] `hi data run -- <command>` and `eval "$(hi data env)"`: `load_dataset`,
@@ -564,8 +572,7 @@ each type starts.
 - [x] `hi box --data`: the box gets a placeholder token and hi's proxy adds
   a hi data token on the way to the server, and allows Hugging Face's
   download hosts. Tested with rootless Podman and a 548 MB Xet file.
-- [x] The spec is approved: [hi_data.md](specs/approved/hi_data.md). Still
-  open: data on rented compute instances, which can't reach the server.
+- [x] The spec is approved: [hi_data.md](specs/approved/hi_data.md).
 
 ### v0.24.3 — Day-long data tokens, and `hi data` in the docs
 

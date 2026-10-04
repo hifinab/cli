@@ -1,10 +1,10 @@
 # `hi data` specification
 
 Status: Approved (2026-10-03). Datasets and models shipped in v0.24.0,
-buckets in v0.24.2, and `hi data run`, `env`, `.hifin/data.json`, and
-`hi box --data` in v0.25.0. Decided: groups with no `data` policy read
-everything, models are included, uploads wait. Open: data on compute
-instances (release 3).
+buckets in v0.24.2, `hi data run`, `env`, `.hifin/data.json`, and
+`hi box --data` in v0.25.0, and `hi compute run --data` in v0.25.1.
+Decided: groups with no `data` policy read everything, models are
+included, compute instances get signed links, uploads wait.
 
 Dependencies: `hi server` (keys kept on the server, devices, groups,
 `policy.json`, audit, Slack, signed client API inside NetBird), and the
@@ -199,6 +199,40 @@ file contents, and the server's name is resolved on the host, since it may
 resolve only through NetBird. A box running longer than a day needs a
 restart for a new token.
 
+### `hi compute run --data`
+
+A rented instance can't reach the hi server, which listens only inside
+NetBird, so it can't use the proxy. Decided on 2026-10-04: signed links.
+Joining instances to NetBird, a public HTTPS endpoint for `/hf`, and
+copying from the laptop over SSH were considered; the first puts a network
+credential on rented machines and doesn't work on Hugging Face Jobs or
+Colab, the second exposes the server, and the third is slow.
+
+1. When the run starts, after the confirmation, the device calls
+   `POST /v1/data/links` with `{scope, revision, include}` for each
+   `--data`. The server checks policy, pins the commit, lists the files
+   (at most 2,000), and resolves each with the organization's token,
+   eight at a time. The Hub answers a file in Hugging Face's storage with a
+   signed CDN link that needs no token and lasts about an hour; a small
+   file kept in git has no such link, so the server sends its contents
+   (10 MB each, 32 MB in all at most). The grant is audited.
+2. `hi` replaces the script with a wrapper: the links and contents,
+   compressed, then a downloader that fetches eight files at a time into
+   `data/<name>` with retries, skips files already there with the right
+   size, and stops with a clear message when a link has expired; then the
+   user's script runs as `__main__` with its arguments. The script's
+   inline metadata (PEP 723) is copied to the top, so `uv` installs its
+   dependencies as before.
+3. Hugging Face Jobs carry the script in one environment variable, which
+   Linux limits to 128 KiB, so the wrapper may be at most 120 KB there.
+   Links take about 1 KB each before compression. When files kept in git
+   make it too large, the error names them. Colab uploads the script as a
+   file and has no such limit.
+
+Only script runs take `--data`: an image may have no Python. `hi compute
+up` instances (RunPod, Shadeform) can use `hi data get` over SSH only if
+they reach the server; that is left for later.
+
 ## Policy
 
 `policy.json` gains `data` per group: patterns over `<org>/<name>` for the
@@ -276,7 +310,11 @@ Signed client API, for enrolled user devices:
   for datasets and models the current commit.
 - `POST /v1/data/token` with `{scope}` (one `<org>/<name>`, or `*` for
   `hi data run`): a hi data token bound to this device and the group's
-  policy, valid for 24 hours. Laptops older than v0.24.2 don't get buckets
+  policy, valid for 24 hours.
+- `POST /v1/data/links` with `{scope, revision, include}`: for a compute
+  run, a signed download link per file (or its contents, for small files
+  kept in git) and the pinned commit; see
+  [`hi compute run --data`](#hi-compute-run---data). Laptops older than v0.24.2 don't get buckets
   in the list, since they would download them as models.
 
 The proxy, under `/hf/`, takes a hi data token as `Authorization: Bearer`.
@@ -302,10 +340,8 @@ The client API is plain HTTP inside NetBird, so `HF_ENDPOINT` is
    in policy; audit. Day-long tokens in v0.24.3.
 2. v0.25.0: `hi data run` and `env`; `.hifin/data.json` and `hi data get`
    with no arguments; `hi box --data`.
-3. Compute: `hi compute run --data <org>/<name>`, so a job downloads on the
-   instance instead of the laptop. Not decided: rented instances can't
-   reach the hi server, which listens only inside NetBird, so the
-   instance can't use the proxy the way a laptop does.
+3. v0.25.1: `hi compute run --data <org>/<name>[/<pattern>]`, so a job
+   downloads on the instance instead of the laptop (see below).
 
 ## Risks
 
@@ -356,6 +392,11 @@ server:
 9. In `hi box run --data` (rootless Podman), `hf_hub_download` of a 548 MB
    Xet file worked with only the placeholder token in the box; the box
    reached `cas-server.xethub.hf.co` and `us.aws.cdn.hf.co`.
+10. `hi compute run --data`'s wrapper, run as the instance would, fetched
+    a dataset's parquet files and a 548 MB Xet file from signed links with
+    no token (6 KB wrapper), and ran the script with its arguments. With
+    an old model's 1.4 MB in-git `tokenizer.json`, the Hugging Face size
+    check refused it and named the file.
 
 ## Later: uploads
 

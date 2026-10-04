@@ -304,6 +304,9 @@ Options for up and run:
   --high-mem         Request a high-RAM machine (Colab)
   --env KEY=VALUE    Environment variable for run; repeatable
   --secret KEY       Pass $KEY as an encrypted secret (Hugging Face)
+  --data ORG/NAME[/PATTERN]
+                     Download the team's data into data/NAME before the script
+                     starts, through signed links from the hi server (hi data)
   --detach           run: return after starting (Hugging Face)
   --image <image>    Container image (Hugging Face, RunPod)
   --namespace <ns>   Account to bill this once (Hugging Face; see billing)
@@ -1369,8 +1372,10 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	namespace := flags.String("namespace", "", "account or organization to bill")
 	var env repeatedFlag
 	var secrets repeatedFlag
+	var data repeatedFlag
 	flags.Var(&env, "env", "KEY=VALUE")
 	flags.Var(&secrets, "secret", "secret name")
+	flags.Var(&data, "data", "the team's data to download first: <org>/<name>[/<folder or pattern>]")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return 0, err
 	}
@@ -1434,6 +1439,19 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	fmt.Fprintf(stdout, "Run %s on %s %s (%s%s), %s.\n",
 		what, provider.name(), request.hardware.name, request.hardware.rate,
 		billedSuffix(provider, request.namespace), describeLifetime(request.max))
+	if len(data) > 0 {
+		if request.script == "" {
+			return 0, usageError{"--data works with script runs (hi compute run --data <org>/<name> script.py)"}
+		}
+		for _, value := range data {
+			ref, err := parseDataRunRef(value)
+			if err != nil {
+				return 0, err
+			}
+			fmt.Fprintf(stdout, "First downloads %s into %s on the instance, through signed links from the hi server.\n",
+				value, defaultDataFolder(dataItem{ID: ref.id}))
+		}
+	}
 	if *dryRun {
 		fmt.Fprintf(stdout, "Would run: %s\n", strings.Join(provider.runCommand(request), " "))
 		return 0, nil
@@ -1453,6 +1471,14 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 		if err := confirm(stdin, stdout, *yes, "Start it?"); err != nil {
 			return 0, err
 		}
+	}
+	if len(data) > 0 {
+		// The links last about an hour, so they are asked for only now.
+		cleanup, err := prepareDataRun(&request, data, provider.name(), stderr)
+		if err != nil {
+			return 0, err
+		}
+		defer cleanup()
 	}
 	return provider.runJob(request, stdin, stdout, stderr)
 }

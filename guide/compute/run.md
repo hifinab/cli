@@ -71,6 +71,33 @@ hi compute run --gpu a10g-small \
 > putting the value on a command line.
 {: .warning}
 
+## The team's data
+
+With a hi server that serves the team's Hugging Face data
+([`hi data`](/guide/data/)), `--data` downloads it on the instance before
+the script starts:
+
+```sh
+hi compute run --gpu a10g-small --data hifinab/bars-1d train.py
+hi compute run --gpu a10g-small --data hifinab/fdb/runs/2026-09 --data hifinab/ranker train.py
+```
+
+Each repository lands in `data/<name>` next to where the script runs, as
+with `hi data get`. A folder or pattern after the name (`/runs/2026-09`,
+`/*.parquet`) downloads only those files.
+
+The instance can't reach the hi server, so hi asks it for a signed
+download link per file when the run starts, and sends the links with the
+script; the instance never holds a token. The links last about an hour, so
+the job must start within that time. Script runs only.
+
+On Hugging Face Jobs, everything travels in one environment variable of
+at most 120 KB: enough for a few hundred files. Small files that a
+repository keeps in git rather than Hugging Face's file storage, such as
+an older model's `tokenizer.json`, have no link and travel inside the job,
+and `hi` says when they make it too large. Leave them out with a pattern,
+or run on Colab, which has no such limit.
+
 ## Long runs: detach, follow, and wait (Hugging Face)
 
 Start a run and get your terminal back with `--detach`:
@@ -123,6 +150,7 @@ uploading a model to the Hub.
 | `--max <duration>`  | Stop after this long: hours (`2`), `30m`, `2d`, or `none`; default `1h` |
 | `--name <name>`     | Name for `logs`, `wait`, and `stop`                         |
 | `--env KEY=VALUE`   | Environment variable; repeatable                            |
+| `--data <org>/<name>[/<pattern>]` | The team's data into `data/<name>` first; repeatable |
 | `--secret KEY`      | Encrypted secret from your shell (Hugging Face); repeatable |
 | `--detach`          | Return after starting (Hugging Face)                        |
 | `--namespace <ns>`  | Bill this Hugging Face account for this run                  |

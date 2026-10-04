@@ -510,6 +510,7 @@ func validRepoPart(part string) bool {
 func (s *hiServer) dataRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/data", s.device(s.handleDataCatalog))
 	mux.HandleFunc("POST /v1/data/token", s.device(s.handleDataToken))
+	mux.HandleFunc("POST /v1/data/links", s.device(s.handleDataLinks))
 	mux.Handle(dataProxyPath+"/", http.HandlerFunc(s.handleDataProxy))
 }
 

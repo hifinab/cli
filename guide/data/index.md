@@ -108,6 +108,17 @@ hi box claude --data "train the ranker on hifinab/bars-1d"
 The box gets a placeholder token; hi's proxy outside the box adds the real
 one on the way to the server, and allows Hugging Face's download hosts.
 
+## On a rented GPU
+
+`hi compute run --data` downloads the team's data on the instance before
+the script starts, through signed links that need no token:
+
+```sh
+hi compute run --gpu a10g-small --data hifinab/bars-1d train.py
+```
+
+See [Run a script](/guide/compute/run/#the-teams-data) for the limits.
+
 ## What the server does
 
 ```text
