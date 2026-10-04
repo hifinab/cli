@@ -553,6 +553,13 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.27.1 — The agent skill knows `hi data` and `hi net expose`
+
+- [x] The skill's description, which decides when agents load it, now names
+  the team's data (`hi data`, `--data`) and `hi net expose`, and its
+  introduction points to `hi data help` and `hi net expose help`. Refresh
+  installed skills with `hi skill --global`, and `hi skill` in projects.
+
 ### v0.27.0 — `hi net expose`: a local service on a temporary public address
 
 - [x] `hi net expose <port>` publishes a service on this machine with

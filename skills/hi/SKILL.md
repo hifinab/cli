@@ -1,6 +1,6 @@
 ---
 name: hi
-description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform) - run a Python script or container to completion on a GPU, start an SSH-able GPU box, forward its ports to localhost, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers starting a new project from a template (hi init), Hifin workstation setup (hi install, hi verify strix), NetBird (hi net), and downloading the team's private Hugging Face datasets, models, and buckets through a hi server (hi data). Use when the user wants to train, evaluate, or test something on a GPU they do not have locally, try or serve an LLM remotely, see or stop running remote compute, get the team's data or models, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
+description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform): run a script or container on a GPU, start an SSH-able GPU box, forward ports, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers the team's private Hugging Face datasets, models, and buckets through a hi server (hi data, and --data on runs and boxes), sharing a local service on a temporary public address (hi net expose), new projects from templates (hi init), workstation setup (hi install, hi verify strix), and NetBird (hi net). Use when the user wants to train, evaluate, or test on a GPU they do not have locally, try or serve an LLM remotely, see or stop remote compute, get the team's data or models, show a local web app or receive a webhook, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
 ---
 
 # hi
@@ -8,8 +8,12 @@ description: Use the hi CLI to run work on rented remote machines (Google Colab,
 `hi` is the Hifin command-line tool. Its `hi compute` commands rent remote
 machines from Colab, Hugging Face, RunPod, or Shadeform with the same commands
 on all of them, and give them back. `hi init` starts new projects from
-templates. Run `hi compute help` for the full reference; the user-facing guide
-is at https://hifin.sh/guide/ if the user needs step-by-step instructions.
+templates. On a machine connected to the team's hi server, `hi data` gets the
+team's private Hugging Face data without a token of your own. `hi net expose`
+puts a service on this machine on a temporary public address. Run
+`hi compute help`, `hi data help`, or `hi net expose help` for the full
+reference; the user-facing guide is at https://hifin.sh/guide/ if the user
+needs step-by-step instructions.
 
 ## Rules
 
