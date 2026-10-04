@@ -39,6 +39,7 @@ on Colab). Follow these rules every time:
    code and data, and only when the user chose it.
 5. **Ask before system changes.** `hi install`, `hi adduser`, and `hi net` need
    sudo and change the machine. Only run them when the user asks.
+   (`hi net expose` needs no sudo but has its own rules below.)
 6. **Managed compute waits for a person.** When `hi compute providers` says a
    provider is `managed by` a hi server, starting there sends a request that
    someone else approves. Rules 1 and 2 still apply. Never run
@@ -204,6 +205,30 @@ hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
    `HF_TOKEN` are already set when the box was started with `--data`; use
    `hf` or Python directly. Without them, ask the user to start the box
    with `--data`.
+
+## Share a local service (hi net expose)
+
+`hi net expose <port>` puts a service on this machine on a temporary public
+HTTPS address through NetBird. It puts the user's service on the internet,
+so:
+
+1. Ask the user first, and say what will be reachable and by whom.
+2. Keep the default password unless the user agrees otherwise. Use
+   `--public` (anyone with the address) only with the user's explicit yes,
+   for example for a webhook sender that can't pass a login page.
+3. Keep `--max` short (`--max 30m`); the default is 1 hour.
+4. Use `--detach --json`, give the user the address (and the password),
+   and `hi net expose stop <name>` when the task is done; check
+   `hi net expose ls` shows nothing you started.
+
+```sh
+hi net expose 3000 --max 30m --detach --json
+hi net expose ls
+hi net expose stop <name>
+```
+
+If it says Peer Expose isn't enabled, a NetBird admin must turn it on in
+the NetBird dashboard (Settings > Clients); tell the user.
 
 ## Check and clean up
 

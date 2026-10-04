@@ -48,3 +48,6 @@ hi net reconnect    # disconnect and reconnect with the stored enrollment
 ```
 
 `reconnect` does not need the setup key again.
+
+To put a service on this machine on a temporary public address through
+NetBird, see [Share a local service](/guide/workstation/expose/).

@@ -61,6 +61,8 @@
       url: /guide/workstation/
     - title: NetBird network
       url: /guide/workstation/netbird/
+    - title: Share a local service
+      url: /guide/workstation/expose/
     - title: Users
       url: /guide/workstation/users/
 - section: Reference

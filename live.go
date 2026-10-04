@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -273,6 +274,8 @@ type apiActivity struct {
 	Instance string `json:"instance"`
 	Command  string `json:"command"`
 	Open     bool   `json:"open"`
+	// Detail is a short description, for hi net expose.
+	Detail string `json:"detail,omitempty"`
 }
 
 // handleLive serves a viewer everything, and anyone else their own part.
@@ -299,6 +302,25 @@ func (s *hiServer) handleActivity(w http.ResponseWriter, _ *http.Request, device
 	}
 	switch input.Command {
 	case "ssh", "tunnel", "logs", "serve":
+	case "expose":
+		// hi net expose: a public address from this device, recorded.
+		address, err := url.Parse(input.Instance)
+		if err != nil || address.Scheme != "https" || len(input.Instance) > 200 || len(input.Detail) > 200 {
+			writeAPIError(w, http.StatusBadRequest, "malformed exposure")
+			return
+		}
+		action, text := "exposed", "%s exposed %s (%s)"
+		if !input.Open {
+			action, text = "stopped exposing", "%s stopped exposing %s"
+		}
+		s.audit(device.User, action, input.Instance, input.Detail+" from "+device.Hostname)
+		event := fmt.Sprintf(text, device.User, address.Host, input.Detail)
+		if !input.Open {
+			event = fmt.Sprintf(text, device.User, address.Host)
+		}
+		s.feed.add(liveEvent{Time: computeNow(), Text: event, User: device.User})
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
 	case "init":
 		// A project made from a server template: the template's name only.
 		if !validServerName(strings.ReplaceAll(input.Instance, "/", "-")) {

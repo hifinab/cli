@@ -41,6 +41,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "uninstall":
 		return runUninstall(args[1:], stdin, stdout, stderr)
 	case "net":
+		if len(args) >= 2 && args[1] == "expose" {
+			return runNetExpose(args[2:], stdin, stdout, stderr)
+		}
 		var err error
 		switch {
 		case len(args) == 1:
@@ -115,6 +118,7 @@ Usage:
   hi net status                 Show NetBird connection status
   hi net down                   Disconnect NetBird
   hi net reconnect              Reconnect an enrolled NetBird peer
+  hi net expose <port>          Put a local service on a temporary public address (hi net expose help)
   hi compute                    Start and use remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
   hi login <hf|colab|runpod|shadeform>
                                 Sign in to a compute provider
@@ -139,7 +143,9 @@ func printNetUsage(w io.Writer) {
   hi net --setup-key-file <path>
   hi net status
   hi net down
-  hi net reconnect`)
+  hi net reconnect
+  hi net expose <port> [--max 1h] [--public | --pin P | --groups G] [--detach]
+  hi net expose ls | stop <name>`)
 }
 
 func readLine(r io.Reader) (string, error) {

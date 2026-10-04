@@ -39,6 +39,7 @@ hi net             Securely enroll this machine with NetBird
 hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
+hi net expose 3000 Put a local service on a temporary public address (hi net expose help)
 hi init            Start a project from a template (python, web, service, pipeline, ml, and your server's own)
 hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
 hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
@@ -117,6 +118,13 @@ the peer. `hi net reconnect` runs `netbird down` followed by `netbird up`,
 reusing the peer's stored enrollment without requesting another setup key.
 Running any command without NetBird installed reports that `hi install` is
 required.
+
+`hi net expose <port>` puts a service on this machine, even one on
+`localhost`, on a temporary public HTTPS address through NetBird's reverse
+proxy: protected by a generated password unless you pass `--pin`,
+`--groups`, or `--public`, ending after `--max` (default 1h), with a request
+log; `--detach`, `ls`, and `stop` for background use. See
+[Share a local service](https://hifin.sh/guide/workstation/expose/).
 
 ## Remote compute
 

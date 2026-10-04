@@ -553,6 +553,21 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.27.0 — `hi net expose`: a local service on a temporary public address
+
+- [x] `hi net expose <port>` publishes a service on this machine with
+  NetBird's reverse proxy, through a relay on the NetBird address so
+  services on `localhost` work, with a request log.
+- [x] Protected by a generated password by default; `--pin`, `--groups`
+  (NetBird SSO), or `--public` instead. Ends after `--max` (default 1h, at
+  most 24h) or on Ctrl+C.
+- [x] `--detach` and `--json` for agents; `ls` and `stop`; each exposure in
+  a connected hi server's audit log and live feed; the agent skill asks the
+  user first and never goes `--public` without a yes.
+  Tested on aiw9 with NetBird 0.74.4.
+  Spec: [hi_net_expose.md](specs/ideas/hi_net_expose.md). Later: TCP
+  services and a `net_expose` group policy (release 2 of the spec).
+
 ### v0.26.0 — The team's data in cloud jobs, through `netbird expose`
 
 - [x] The server opens a second listener with only the `hi data` proxy and
@@ -635,7 +650,7 @@ each type starts.
 
 ## Planned
 
-### v0.27.0 — The team's data on every cloud machine
+### v0.28.0 — The team's data on every cloud machine
 
 - [ ] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
   machine gets `HF_ENDPOINT` and a run token for its lifetime, so
@@ -681,7 +696,7 @@ images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
-### v0.28.0 — Learn from agent-machine services
+### v0.29.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -702,7 +717,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
 
-### v0.29.0 — skills.sh
+### v0.30.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`
@@ -722,7 +737,7 @@ Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
 
 ### Later — `hi data` and `hi server expose`
 
-Follow-ups to v0.24–v0.27, not scheduled yet.
+Follow-ups to v0.24–v0.28, not scheduled yet.
 
 - [ ] On hold (decided 2026-10-03): a line per organization in the weekly
   Slack report, from `data_usage.jsonl`.

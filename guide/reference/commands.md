@@ -22,6 +22,7 @@ description: Every hi command and option in one place.
 | `hi uninstall <tool>…`           | Remove workstation software                            |
 | `hi verify strix`                | Check a Strix Halo workstation                         |
 | `hi net`                         | Enroll in NetBird; `status`, `down`, `reconnect`       |
+| `hi net expose <port>`           | A local service on a temporary public address; see below |
 | `hi adduser <name>`              | Create a user with GPU access                          |
 | `hi update [--check] [--version <tag>] [--restart\|--no-restart]` | Update `hi`; offer to restart a `hi server` service still on the old version |
 | `hi version`, `hi help`          | Version and help                                       |
@@ -248,6 +249,18 @@ hi net --setup-key-file <file>           # enroll from a file only you can read
 HI_NETBIRD_SETUP_KEY=… hi net            # enroll from the environment
 hi net status | down | reconnect
 ```
+
+| Command                                             | Does                                                 |
+|-----------------------------------------------------|------------------------------------------------------|
+| `hi net expose <port>`                              | Expose `localhost:<port>` until `--max` or Ctrl+C    |
+| `  --max <duration>`                                | How long; default `1h`, at most `24h`                |
+| `  --password <text>`, `--pin <6 digits>`, `--groups <g1,g2>`, `--public` | The lock: a generated password by default |
+| `  --name <prefix>`, `--host <addr>`                | The start of the address; where the service listens  |
+| `  --detach`, `--json`                              | Run in the background; print JSON                    |
+| `hi net expose ls [--json]`                         | What this machine is exposing                        |
+| `hi net expose stop <name> \| --all`                | Stop it now                                          |
+
+See [Share a local service](/guide/workstation/expose/).
 
 ## hi adduser
 

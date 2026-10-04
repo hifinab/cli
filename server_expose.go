@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,55 +96,14 @@ func (s *hiServer) ensureExposure(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, exposeCommand, "expose", port, "--with-name-prefix", "hi-"+name)
-	stdout, err := cmd.StdoutPipe()
+	cmd, url, _, err := startNetbirdExpose([]string{"expose", port, "--with-name-prefix", "hi-" + name}, exposeStartTimeout)
 	if err != nil {
-		cancel()
+		e.problem = err.Error()
 		return "", err
 	}
-	cmd.Stderr = cmd.Stdout
-	if err := cmd.Start(); err != nil {
-		cancel()
-		return "", fmt.Errorf("netbird expose: %w", err)
-	}
-	found := make(chan string, 1)
-	var output strings.Builder
-	go func() {
-		scanner := bufio.NewScanner(stdout)
-		sent := false
-		for scanner.Scan() {
-			line := scanner.Text()
-			if !sent {
-				output.WriteString(line + "\n")
-				if match := exposeURLLine.FindStringSubmatch(line); match != nil {
-					found <- match[1]
-					sent = true
-				}
-			}
-		}
-		if !sent {
-			close(found)
-		}
-	}()
-	var url string
-	select {
-	case got, ok := <-found:
-		if !ok {
-			cmd.Wait()
-			cancel()
-			text := strings.TrimSpace(output.String())
-			if strings.Contains(text, "not enabled") {
-				text += "; a NetBird admin turns on Peer Expose in Settings > Clients"
-			}
-			e.problem = text
-			return "", fmt.Errorf("netbird expose: %s", text)
-		}
-		url = got
-	case <-time.After(exposeStartTimeout):
-		cancel()
+	stopCmd := func() {
+		cmd.Process.Signal(os.Interrupt)
 		cmd.Wait()
-		return "", errors.New("netbird expose gave no URL in time")
 	}
 	// The name can take a few seconds to answer.
 	deadline := time.Now().Add(exposeStartTimeout)
@@ -159,8 +116,7 @@ func (s *hiServer) ensureExposure(name string) (string, error) {
 			}
 		}
 		if time.Now().After(deadline) {
-			cancel()
-			cmd.Wait()
+			stopCmd()
 			return "", fmt.Errorf("%s doesn't answer; is the instance listener on the NetBird address?", url)
 		}
 		time.Sleep(time.Second)
@@ -168,7 +124,6 @@ func (s *hiServer) ensureExposure(name string) (string, error) {
 	e.cmd, e.url, e.started, e.problem = cmd, url, time.Now(), ""
 	go func() {
 		cmd.Wait()
-		cancel()
 		e.mu.Lock()
 		if e.cmd == cmd {
 			e.cmd, e.url = nil, ""

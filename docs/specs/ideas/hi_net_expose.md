@@ -1,6 +1,9 @@
 # `hi net expose` specification
 
-Status: Draft (2026-10-04).
+Status: Draft (2026-10-04). Release 1 shipped in v0.27.0, tested on aiw9
+with NetBird 0.74.4: a service on `127.0.0.1` reached from the internet
+through the relay, the password page, `--public`, `--detach`, `ls`,
+`stop --all`, and a foreground exposure ending at `--max`.
 
 Dependencies: NetBird's reverse proxy (`netbird expose`, beta, on NetBird's
 cloud, with **Peer Expose** turned on in Settings > Clients), `hi net`, and
