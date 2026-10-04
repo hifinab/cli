@@ -71,7 +71,9 @@ func TestNetExposeRelaysALocalServiceUntilMax(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	done := make(chan int)
-	go func() { done <- runNetExpose([]string{port, "--host", "127.0.0.1", "--max", "2s", "--pin", "123456"}, strings.NewReader(""), &stdout, &stderr) }()
+	go func() {
+		done <- runNetExpose([]string{port, "--host", "127.0.0.1", "--max", "2s", "--pin", "123456"}, strings.NewReader(""), &stdout, &stderr)
+	}()
 	var url string
 	for i := 0; i < 50 && url == ""; i++ {
 		time.Sleep(100 * time.Millisecond)
