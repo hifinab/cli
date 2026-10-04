@@ -267,16 +267,26 @@ func prepareDataRun(request *runRequest, values []string, provider string, stder
 	if err != nil {
 		return nil, err
 	}
-	repos, err := fetchDataRunLinks(refs, stderr)
-	if err != nil {
-		return nil, err
+	// On Hugging Face Jobs, prefer the exposed proxy: no size limit, and
+	// the script can read the repositories itself.
+	var wrapper []byte
+	if provider == "hf" {
+		wrapper, err = prepareDataRunProxy(request, refs, script, stderr)
+		if err != nil && !errors.Is(err, errNoRunAccess) {
+			return nil, err
+		}
 	}
-	wrapper, err := dataRunWrapper(filepath.Base(request.script), script, repos)
-	if err != nil {
-		return nil, err
-	}
-	if size := base64.StdEncoding.EncodedLen(len(wrapper)); provider == "hf" && size > dataRunMaxScript {
-		return nil, dataRunTooLarge(repos, size)
+	if wrapper == nil {
+		repos, err := fetchDataRunLinks(refs, stderr)
+		if err != nil {
+			return nil, err
+		}
+		if wrapper, err = dataRunWrapper(filepath.Base(request.script), script, repos); err != nil {
+			return nil, err
+		}
+		if size := base64.StdEncoding.EncodedLen(len(wrapper)); provider == "hf" && size > dataRunMaxScript {
+			return nil, dataRunTooLarge(repos, size)
+		}
 	}
 	dir, err := os.MkdirTemp("", "hi-run-")
 	if err != nil {

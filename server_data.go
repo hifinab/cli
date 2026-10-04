@@ -438,8 +438,33 @@ func (s *hiServer) userGroup(user string) (string, bool) {
 type dataClaims struct {
 	Device  string `json:"d"`
 	User    string `json:"u"`
-	Scope   string `json:"s"` // "*" or "<kind>:<org>/<name>"
+	Scope   string `json:"s,omitempty"` // "*" or "<kind>:<org>/<name>"
 	Expires int64  `json:"e"`
+	// A run token, for a cloud machine (hi server expose): accepted only on
+	// the instance listener, for the repositories in Scopes.
+	Cloud  bool     `json:"x,omitempty"`
+	Scopes []string `json:"ss,omitempty"`
+	Run    string   `json:"r,omitempty"`
+}
+
+// allows reports whether the token covers a repository.
+func (c dataClaims) allows(kind, id string) bool {
+	if c.Cloud {
+		for _, scope := range c.Scopes {
+			if strings.EqualFold(scope, kind+":"+id) {
+				return true
+			}
+		}
+		return false
+	}
+	return c.Scope == "*" || strings.EqualFold(c.Scope, kind+":"+id)
+}
+
+func (c dataClaims) describeScope() string {
+	if c.Cloud {
+		return strings.Join(c.Scopes, ", ")
+	}
+	return c.Scope
 }
 
 func dataTokenPayload(claims []byte) []byte {
@@ -511,6 +536,7 @@ func (s *hiServer) dataRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/data", s.device(s.handleDataCatalog))
 	mux.HandleFunc("POST /v1/data/token", s.device(s.handleDataToken))
 	mux.HandleFunc("POST /v1/data/links", s.device(s.handleDataLinks))
+	mux.HandleFunc("POST /v1/data/run-access", s.device(s.handleRunAccess))
 	mux.Handle(dataProxyPath+"/", http.HandlerFunc(s.handleDataProxy))
 }
 
@@ -709,8 +735,21 @@ func writeHubError(w http.ResponseWriter, status int, message string) {
 }
 
 func (s *hiServer) handleDataProxy(w http.ResponseWriter, r *http.Request) {
+	s.serveDataProxy(w, r, false, "")
+}
+
+// serveDataProxy is the proxy on the client listener (device tokens) or,
+// with cloud set, on the instance listener (run tokens only), whose links
+// point at the public URL.
+func (s *hiServer) serveDataProxy(w http.ResponseWriter, r *http.Request, cloud bool, public string) {
 	token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	claims, err := s.verifyDataToken(strings.TrimSpace(token))
+	if err == nil && claims.Cloud != cloud {
+		err = errors.New("this token is for a cloud machine's run, which reaches the server through its public URL")
+		if cloud {
+			err = errors.New("only run tokens are accepted here; a device's hi data token works only inside NetBird")
+		}
+	}
 	if err != nil {
 		writeHubError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -721,8 +760,8 @@ func (s *hiServer) handleDataProxy(w http.ResponseWriter, r *http.Request) {
 		writeHubError(w, http.StatusForbidden, fmt.Sprintf("hi data only passes on downloads of datasets, models, and buckets; %s %s is not one", r.Method, escaped))
 		return
 	}
-	if claims.Scope != "*" && !strings.EqualFold(claims.Scope, route.kind+":"+route.id) {
-		writeHubError(w, http.StatusForbidden, fmt.Sprintf("this hi data token is for %s, not %s", claims.Scope, route.id))
+	if !claims.allows(route.kind, route.id) {
+		writeHubError(w, http.StatusForbidden, fmt.Sprintf("this hi data token is for %s, not %s", claims.describeScope(), route.id))
 		return
 	}
 	group, ok := s.userGroup(claims.User)
@@ -755,6 +794,9 @@ func (s *hiServer) handleDataProxy(w http.ResponseWriter, r *http.Request) {
 		scheme = "https"
 	}
 	base := scheme + "://" + r.Host + dataProxyPath
+	if public != "" {
+		base = public + dataProxyPath
+	}
 	upstreamPath, _ := url.PathUnescape(escaped)
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(out *httputil.ProxyRequest) {

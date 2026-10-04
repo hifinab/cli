@@ -1448,7 +1448,7 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 			if err != nil {
 				return 0, err
 			}
-			fmt.Fprintf(stdout, "First downloads %s into %s on the instance, through signed links from the hi server.\n",
+			fmt.Fprintf(stdout, "First downloads %s into %s on the instance, through the hi server.\n",
 				value, defaultDataFolder(dataItem{ID: ref.id}))
 		}
 	}

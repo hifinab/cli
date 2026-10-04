@@ -1,7 +1,9 @@
 # `hi server expose` specification
 
 Status: Draft (2026-10-04). Release 1 (the team's data on cloud machines)
-is being prototyped.
+is prototyped and was tested end to end on a real Hugging Face job; not
+released. Not yet built from the spec: `hi server expose revoke`, and the
+`on|off` command (`expose_listen: "off"` in `config.json` does it).
 
 Dependencies: `hi server` (signed client API inside NetBird, server key,
 policy, audit), `hi data` ([hi_data.md](../approved/hi_data.md)), NetBird's
@@ -194,3 +196,19 @@ Checked on 2026-10-04 on vmhiserver (NetBird 0.79.0, NetBird cloud):
   and a form post all failed with 401 or 404, so scripts can't use it.
 - Stopping `netbird expose` ended the service; the URL answered 404 within
   seconds.
+
+Prototype, checked the same day with a throwaway hi server on vmhiserver
+(ports 7399 and 7400, only the hifinab data token):
+
+- The first `POST /v1/data/run-access` started `netbird expose 7400
+  --with-name-prefix hi-vmhiserver` and answered with
+  `https://hi-vmhiserver-y4v6.eu1.netbird.services/hf` once `/health`
+  responded; the start and the run token were audited.
+- A real Hugging Face job (`cpu-basic`) got the run token as the encrypted
+  secret `HI_DATA_TOKEN` and downloaded `hifinab/fintabarena-results`
+  through it: 150 files, 35.6 MB, in 13 s (2 s with signed links; each
+  file's call goes through NetBird's proxy first). The script then called
+  `hf_hub_download` for a file itself, and a repository the token doesn't
+  name was refused.
+- Stopping the server with SIGTERM stopped `netbird expose`; the URL
+  answered 404 seconds later.

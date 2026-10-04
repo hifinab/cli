@@ -176,6 +176,8 @@ type hiServer struct {
 	serverKey ed25519.PrivateKey
 	// templateMu serializes git work on the template mirrors.
 	templateMu sync.Mutex
+	// exposure is the instance listener's netbird expose, if any.
+	exposure serverExposure
 	// dataMu guards the hi data listings and data_usage.jsonl.
 	dataMu    sync.Mutex
 	dataLists map[string]*dataListing
@@ -208,6 +210,10 @@ type serverConfig struct {
 	// and an extra of 0 turn replacements off.
 	FallbackPriceFactor float64  `json:"fallback_price_factor,omitempty"`
 	FallbackPriceExtra  *float64 `json:"fallback_price_extra,omitempty"`
+	// ExposeListen is the listener netbird expose publishes for cloud
+	// machines (server_expose.go): the client address's host on port 7374
+	// by default, or "off".
+	ExposeListen string `json:"expose_listen,omitempty"`
 }
 
 // priceBound is how much a replacement for sold-out hardware may cost.
@@ -1383,6 +1389,7 @@ func (s *hiServer) adminHandler() http.Handler {
 	mux := http.NewServeMux()
 	s.templateAdminRoutes(mux)
 	s.dataAdminRoutes(mux)
+	s.exposeAdminRoutes(mux)
 	mux.HandleFunc("GET /admin/requests", func(w http.ResponseWriter, r *http.Request) {
 		all := r.URL.Query().Get("all") == "1"
 		s.mu.Lock()
@@ -1715,6 +1722,18 @@ func (s *hiServer) serve(ctx context.Context, listen string) error {
 	admin := &http.Server{Handler: s.adminHandler(), ReadHeaderTimeout: 10 * time.Second}
 	go client.Serve(clientListener)
 	go admin.Serve(adminListener)
+	var instance *http.Server
+	if address := s.exposure.listen; address != "" {
+		if listener, err := net.Listen("tcp", address); err != nil {
+			fmt.Fprintf(s.log, "hi server: no instance listener on %s, so cloud runs use signed links: %v\n", address, err)
+			s.exposure.mu.Lock()
+			s.exposure.listen = ""
+			s.exposure.mu.Unlock()
+		} else {
+			instance = &http.Server{Handler: s.instanceHandler(), ReadHeaderTimeout: 10 * time.Second}
+			go instance.Serve(listener)
+		}
+	}
 	fmt.Fprintf(s.log, "hi server %s listening on %s\n", version, listen)
 	if err := s.startSlack(ctx); err != nil {
 		fmt.Fprintf(s.log, "slack: %v\n", err)
@@ -1733,10 +1752,15 @@ func (s *hiServer) serve(ctx context.Context, listen string) error {
 			defer cancel()
 			client.Shutdown(shutdown)
 			admin.Shutdown(shutdown)
+			s.stopExposure()
+			if instance != nil {
+				instance.Shutdown(shutdown)
+			}
 			os.Remove(socket)
 			return nil
 		case <-ticker.C:
 			s.reconcile()
+			s.reapExposure()
 		case <-templates.C:
 			s.syncTemplatesInBackground()
 		}
@@ -1813,6 +1837,8 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return exitCode(serverTemplatesCommand(rest, stdin, stdout, stderr), stderr)
 	case "data":
 		return exitCode(serverDataCommand(rest, stdin, stdout, stderr), stderr)
+	case "expose":
+		return exitCode(serverExposeCommand(rest, stdout, stderr), stderr)
 	default:
 		fmt.Fprintf(stderr, "hi: unknown server command %q\n\n", command)
 		printServerUsage(stderr)
@@ -1861,6 +1887,7 @@ Usage:
   hi server data add <org>... [--token-file F]
                                           Serve an organization's datasets, models, and buckets
   hi server data list|test|remove         Show, check, or stop serving organizations
+  hi server expose [stop]                 The public URL cloud runs reach hi data through, if any
 
 Commands other than init and run talk to the running server through its
 admin socket, so they work only on the server box. Decisions are recorded
@@ -1955,6 +1982,7 @@ func serverRunCommand(args []string, stdout, stderr io.Writer) error {
 	if len(server.providers) == 0 {
 		fmt.Fprintln(stderr, "hi: warning: no provider keys yet; add one with `hi server provider add runpod`")
 	}
+	server.exposure.listen = exposeListenAddress(config)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return server.serve(ctx, config.Listen)
