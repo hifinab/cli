@@ -3,7 +3,10 @@
 > hi is a single-binary CLI for Hifin machines and projects: it rents remote GPUs
 > (Google Colab, Hugging Face Jobs, RunPod, Shadeform) with `hi compute`, starts
 > projects from templates with `hi init`, sets up Ubuntu workstations with
-> `hi install`, and turns plain-words requests into shell commands with `hi q`. These notes are for coding agents such as Codex and Claude Code.
+> `hi install`, turns plain-words requests into shell commands with `hi q`,
+> downloads the team's private Hugging Face data through a hi server with
+> `hi data`, and puts a local service on a temporary public address with
+> `hi net expose`. These notes are for coding agents such as Codex and Claude Code.
 
 ## Instructions for agents
 
@@ -20,7 +23,10 @@
    always set `--max`; stop what you start and check `hi compute ls`; pass
    credentials with `--secret`, never `--env`; never approve your own requests
    on a hi server; and ask before `hi install`, `hi adduser`, `hi net`, or
-   `hi update`, which change the machine.
+   `hi update`, which change the machine. Get the team's data with `hi data`,
+   never with a Hugging Face token of your own. Ask before `hi net expose`,
+   keep its password, never use `--public` without the user's yes, and stop
+   it when done.
 4. Run `hi help`, `hi compute help`, or `hi init --help` for the exact options.
 
 ## Guide

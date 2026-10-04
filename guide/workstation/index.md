@@ -128,5 +128,6 @@ The final report confirms that ROCm sees the `gfx1151` GPU through both
 ## Next
 
 - Join the Hifin network: [NetBird network](/guide/workstation/netbird/)
+- Show a web app or receive a webhook from this machine: [Share a local service](/guide/workstation/expose/)
 - Add people to the machine: [Users](/guide/workstation/users/)
 - Sign in to compute providers: [Install hi](/guide/install/#sign-in-to-a-compute-provider)

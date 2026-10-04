@@ -63,6 +63,11 @@ In a project, `hi data get` records its downloads in `.hifin/data.json`:
 each repository, the commit, the folder, and the filters. Commit it with
 the code that uses the data.
 
+`hi net expose` keeps each running exposure in
+`~/.local/state/hi/net/expose/<name>.json` (mode 0600: the address, port,
+lock, password or PIN, process, and end time), removed when it stops, and
+a background exposure's request log next to it.
+
 ## Files hi reads from other tools
 
 | Path                                        | Owner                                                |
@@ -92,7 +97,7 @@ The server keeps everything in its state folder (`hi server --dir`, default
 | `ai_usage.jsonl`           | One line per model request: user, device, model, tokens, cost, status; no messages |
 | `server_key`               | The key the server signs template bundles with                 |
 | `policy.json`              | Groups, limits, budgets, template access, and data patterns    |
-| `audit.jsonl`              | Every request, decision, start, stop, and template change      |
+| `audit.jsonl`              | Every request, decision, start, stop, template change, data token, and exposure |
 | `templates/<source>.git`   | Mirrors of the template sources                                |
 
 ## On remote machines

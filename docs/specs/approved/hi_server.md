@@ -163,7 +163,9 @@ direct-message notifications.
   certificate.
 - **Live events:** the server keeps an event stream (requests, approvals,
   starts, activity, cost ticks, stops) that the live dashboard subscribes to
-  over the same signed client API.
+  over the same signed client API. Connected devices also report each
+  `hi net expose` (address, port, lock, end time), which goes to the audit
+  log and the feed ([hi_net_expose.md](../ideas/hi_net_expose.md)).
 - **SSH and tunnels:** the SSH connection goes straight from the laptop to the
   instance, not through the server. The server puts the user's SSH public key
   on the instance when it creates it, so the server never handles a user's

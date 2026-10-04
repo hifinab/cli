@@ -109,6 +109,20 @@ unreachable; devices keep the last good commit, and the next sync retries.
 | `the data is too much to send with one Hugging Face job`    | Name a folder or pattern after the repository (`--data hifinab/fdb/runs/*`), or use Colab. Happens only with signed links. |
 | `the download link for … has expired`                       | The job started more than about an hour after the links were made. Run it again. |
 
+## Sharing a local service
+
+| Message                                                     | What to do                                                   |
+|-------------------------------------------------------------|--------------------------------------------------------------|
+| `NetBird isn't connected on this machine`                   | Connect with `hi net` (or `hi net reconnect`) first.         |
+| `peer expose is not enabled … turns on Peer Expose`         | A NetBird admin turns on Peer Expose in Settings > Clients, once. |
+| `nothing answers on localhost:<port> yet`                   | Start the service, or check the port. Visitors get an error page until it answers. |
+| `hi net expose: nothing answers on … on the exposing machine` (in the browser) | The service stopped or listens elsewhere; `--host` points at another address. |
+| A webhook or script gets 401                                | Password, PIN, and SSO are login pages for browsers. Use `--public`, and have the service check its own token or signature. |
+| `doesn't answer yet; NetBird may be slow`                   | NetBird's proxy took too long to publish the name. Try again. |
+| `--max is at most 24h`                                      | Exposures always end; start a new one when it does.          |
+| `choose one of --password, --pin, --groups, and --public`   | Pass at most one lock.                                       |
+| `nothing named "…" is exposed`                              | `hi net expose ls` shows the names.                          |
+
 ## Installing and signing in
 
 | Message                                                     | What to do                                                   |

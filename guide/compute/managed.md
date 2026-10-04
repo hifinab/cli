@@ -207,6 +207,13 @@ When the server serves the team's Hugging Face organizations,
 models, and buckets with no Hugging Face token on your machine, and
 `hi compute run --data` gives a cloud job the same data.
 
+### Share a local service
+
+[`hi net expose`](/guide/workstation/expose/) works without a server, but on
+a connected machine each exposure is recorded: the server's audit log and
+live feed show who exposed which address, from which port, with which
+lock, and until when.
+
 ### Leave the server
 
 ```sh
@@ -585,6 +592,20 @@ memory, so share it knowingly: a 4-bit Qwen 3.8 Flash Next is about 110 GB.
 
 Switch back to OpenRouter with `hi server ai set` without `--url`; the
 stored key is kept.
+
+### Exposed services
+
+Connected machines report each [`hi net expose`](/guide/workstation/expose/)
+to the server, which writes `exposed` and `stopped exposing` to the audit
+log and shows them in the live feed:
+
+```sh
+hi server audit --since 1d | grep expos
+```
+
+This is a record, not a control. Whether anyone can expose at all is
+NetBird's **Peer Expose** setting (Settings > Clients in the NetBird
+dashboard), which also covers `netbird expose` run without `hi`.
 
 ### Watch and stop
 
