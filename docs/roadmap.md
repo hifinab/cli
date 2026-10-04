@@ -635,6 +635,27 @@ each type starts.
 
 ## Planned
 
+### v0.27.0 — The team's data on every cloud machine
+
+- [ ] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
+  machine gets `HF_ENDPOINT` and a run token for its lifetime, so
+  `hf download`, `load_dataset`, and `hi data get` work over SSH. On a
+  managed provider the server issues the token when the start is approved;
+  Community Cloud refuses `--data` or asks first.
+  Spec: [hi_server_expose.md, Cloud machines](specs/ideas/hi_server_expose.md#cloud-machines) and
+  [Releases](specs/ideas/hi_server_expose.md#releases) (2).
+- [ ] `hi server expose revoke <run>` ends one run's token early; the server
+  keeps the revoked run IDs until they would have expired.
+  Spec: [hi_server_expose.md, Run tokens](specs/ideas/hi_server_expose.md#run-tokens) and
+  [Commands](specs/ideas/hi_server_expose.md#commands).
+- [ ] "1 file", not "1 files", in `hi compute run --data`'s output and on
+  the instance.
+- [ ] Try the `hi server data` admin menu in a real terminal: add, test,
+  and remove an organization.
+  Spec: [hi_data.md, Adding organizations](specs/approved/hi_data.md#adding-organizations).
+- [ ] Approve [hi_server_expose.md](specs/ideas/hi_server_expose.md) and move it to
+  `specs/approved/` once this release is out.
+
 ### v0.23.0 — `hi box`: local agent boxes
 
 - [x] `hi box claude|codex [prompt]`, `shell`, and `run -- <command>`
@@ -660,7 +681,7 @@ images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
-### v0.27.0 — Learn from agent-machine services
+### v0.28.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -681,7 +702,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
 
-### v0.28.0 — skills.sh
+### v0.29.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`
@@ -698,6 +719,45 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 - [ ] Turn the ideas worth building into a draft spec in `specs/ideas/`.
 
 Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
+
+### Later — `hi data` and `hi server expose`
+
+Follow-ups to v0.24–v0.27, not scheduled yet.
+
+- [ ] On hold (decided 2026-10-03): a line per organization in the weekly
+  Slack report, from `data_usage.jsonl`.
+  Spec: [hi_data.md, Records](specs/approved/hi_data.md#records).
+- [ ] On hold (decided 2026-10-03): `hi data upload`, with its limits
+  (which repositories or buckets, approval, review) to be decided then.
+  Spec: [hi_data.md, Later: uploads](specs/approved/hi_data.md#later-uploads).
+- [ ] A stable public address for `hi server expose`: a custom domain
+  (`--with-custom-domain`), so a restart of `netbird expose` doesn't cut
+  off runs already going.
+  Spec: [hi_server_expose.md, Open questions](specs/ideas/hi_server_expose.md#open-questions) (2) and
+  [The exposure's lifetime](specs/ideas/hi_server_expose.md#the-exposures-lifetime).
+- [ ] `hi server expose on|off`, in place of `"expose_listen": "off"`.
+  Spec: [hi_server_expose.md, Commands](specs/ideas/hi_server_expose.md#commands).
+- [ ] Colab through the proxy: a way to hand Colab the run token, so its
+  runs get no one-hour links and can call `load_dataset`.
+  Spec: [hi_data.md, Known limits](specs/approved/hi_data.md#known-limits) and
+  [hi_server_expose.md, Cloud machines](specs/ideas/hi_server_expose.md#cloud-machines).
+- [ ] `--data` for container runs (`hi compute run <image> -- <command>`),
+  with a shell-only downloader.
+  Spec: [hi_data.md, Known limits](specs/approved/hi_data.md#known-limits).
+- [ ] Boxes running longer than a day: the box proxy asks for a fresh hi
+  data token before the old one expires.
+  Spec: [hi_data.md, Known limits](specs/approved/hi_data.md#known-limits) and
+  [`hi box --data`](specs/approved/hi_data.md#hi-box---data).
+- [ ] More routes on the instance listener, each its own scope on the run
+  token: the team model for `hi q` on cloud machines, and an idle signal so
+  a machine can stop itself (with [hi_compute_idle.md](specs/ideas/hi_compute_idle.md)).
+  Spec: [hi_server_expose.md, Releases](specs/ideas/hi_server_expose.md#releases) (3).
+- [ ] Decide one exposure for all runs or one per run, and whether to add
+  NetBird's dashboard-only header check as a second lock.
+  Spec: [hi_server_expose.md, Open questions](specs/ideas/hi_server_expose.md#open-questions) (1, 3).
+- [ ] The S3-compatible gateway for buckets (`s3.hf.co`), for tools that
+  only speak S3.
+  Spec: [hi_data.md, Open questions](specs/approved/hi_data.md#open-questions).
 
 ## Deferred until everything else is done
 

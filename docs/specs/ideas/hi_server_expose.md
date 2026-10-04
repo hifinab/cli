@@ -126,22 +126,31 @@ can't expose.
 `POST /v1/data/run-access` with the run's scopes and lifetime and gets
 `{url, token, expires}`. The job gets:
 
-- `HF_ENDPOINT=<url>/hf` as an environment variable;
-- the run token as the encrypted job secret `HF_TOKEN`, never as a plain
-  environment variable, which shows in the job's settings;
+- `HI_DATA_ENDPOINT=<url>/hf` as an environment variable;
+- the run token as the encrypted job secret `HI_DATA_TOKEN`, never as a
+  plain environment variable, which shows in the job's settings (hi's own
+  `HF_TOKEN` is its Hugging Face sign-in, so the secret has another name);
 - a wrapper that downloads each `--data` repository into `data/<name>`
   through the proxy (listing the tree, then following each file's redirect
-  to the CDN without the token), and then runs the script.
+  to the CDN without the token), removes `HI_DATA_TOKEN` from the
+  environment, and runs the script with `HF_ENDPOINT` and `HF_TOKEN` set to
+  the proxy and the run token.
 
 With these, the script can also call `load_dataset("hifinab/...")` for any
 repository named with `--data`. There is no size limit and no one-hour
 expiry.
 
-**Colab** has no secret store, so it keeps using signed links.
+**Colab** has no secret store, so it keeps using signed links. Passing the
+run token another way (the `colab run` command line, or a file uploaded
+with the script) would let Colab use the proxy too; not decided.
 
-**`hi compute up` (RunPod, Shadeform), later release.** `--data` on `up`
-would put `HF_ENDPOINT` and the run token in the machine's environment, so
-`hf download` and `hi data get` work over SSH.
+**`hi compute up` (RunPod, Shadeform), release 2.** `--data` on `up` asks
+for a run token for the instance's lifetime and puts `HF_ENDPOINT` and the
+token in the machine's environment, so `hf download`, `load_dataset`, and
+`hi data get` work over SSH. On a managed provider the server creates the
+machine, so it would issue the token itself when the start is approved,
+rather than the device at request time; RunPod's Community Cloud, where
+`hi` already warns about secrets, should refuse `--data` or ask first.
 
 ## Risks
 
@@ -174,9 +183,13 @@ would put `HF_ENDPOINT` and the run token in the machine's environment, so
    its own, which gives each run its own URL at the cost of a NetBird
    service per run.
 2. Whether to use a custom domain (`--with-custom-domain`) so the URL is
-   stable across restarts of `netbird expose`.
+   stable across restarts of `netbird expose`. Today a restart gives a new
+   name, and runs already going lose the proxy until they ask again.
 3. Whether NetBird's dashboard-only static header check is worth setting
    up as a second lock for a permanent service.
+4. `hi server expose on|off` and `revoke <run>` (see [Commands](#commands))
+   aren't built yet; `"expose_listen": "off"` in `config.json` turns
+   exposure off, and removing the device or user ends its run tokens.
 
 ## Findings
 

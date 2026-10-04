@@ -298,8 +298,11 @@ headers:
   storage directly. The server records the token grant (repository and
   revision), not which files were read.
 
-The server never sees the bytes downloaded. The weekly report gets a line per organization: downloads, data
-size, and the most used repositories.
+The server never sees the bytes downloaded.
+
+On hold (decided 2026-10-03): a line per organization in the weekly Slack
+report, with downloads, data size, and the most used repositories, read
+from `data_usage.jsonl`. Not built.
 
 ## Protocol
 
@@ -401,6 +404,23 @@ server:
     team's server: 150 files, 35.6 MB, parquet, pickle, and JSON kept in
     git, in 2 s, with no `HF_TOKEN` on the instance; the script's PEP 723
     dependencies installed and it ran with its arguments.
+
+## Known limits
+
+- **Colab runs use signed links**, not the proxy, because Colab has no
+  secret store for a run token: the links last about an hour, and the
+  script can't call `load_dataset` itself
+  ([hi_server_expose.md](../ideas/hi_server_expose.md#cloud-machines)).
+- **Container runs** (`hi compute run <image> -- <command>`) don't take
+  `--data`; an image may have no Python for the wrapper. A shell-only
+  downloader (curl or wget) would lift this.
+- **`hi compute up` machines (RunPod, Shadeform)** get no data yet; release
+  2 of [hi_server_expose.md](../ideas/hi_server_expose.md#releases).
+- **A box running longer than a day** needs a restart: its hi data token
+  is asked for once, when the box starts. The proxy could ask for a fresh
+  one before it expires.
+- **One Hugging Face token per organization** sets the rate limit for
+  everyone (see [Risks](#risks)).
 
 ## Later: uploads
 
