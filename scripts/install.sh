@@ -233,6 +233,11 @@ remove_tool() {
 
 # Installation ------------------------------------------------------------
 
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) local_bin_on_path=1 ;;
+  *) local_bin_on_path=0 ;;
+esac
+
 log "Requesting administrator access"
 sudo -v
 
@@ -253,7 +258,10 @@ if ((${#install_ids[@]} > 0)) || [[ "$upgrade" == "1" ]]; then
   sudo apt-get update
   apt_install ca-certificates curl wget gnupg python3-setuptools python3-wheel pipx wtmpdb
   sudo install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d
-  pipx ensurepath
+  # pipx prints a warning when ~/.local/bin is already on PATH.
+  if [[ "$local_bin_on_path" == "0" ]]; then
+    pipx ensurepath
+  fi
 fi
 
 packages=()
@@ -353,9 +361,17 @@ if [[ "$upgrade" == "1" ]]; then
   sudo env DEBIAN_FRONTEND=noninteractive apt-get upgrade -y
 fi
 
-if installing strix; then
+# Installers add ~/.local/bin to PATH in the shell profile, which only
+# reaches new shells.
+path_changed=0
+if ((${#install_ids[@]} > 0)) && [[ "$local_bin_on_path" == "0" ]]; then
+  path_changed=1
+fi
+if installing strix && [[ "$path_changed" == "1" ]]; then
   printf '\nDone. Log out and back in to apply render/video group membership and PATH changes.\n'
-elif ((${#install_ids[@]} > 0)); then
+elif installing strix; then
+  printf '\nDone. Log out and back in to apply render/video group membership.\n'
+elif [[ "$path_changed" == "1" ]]; then
   printf '\nDone. Open a new shell to apply PATH changes.\n'
 else
   printf '\nDone.\n'
