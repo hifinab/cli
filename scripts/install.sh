@@ -258,7 +258,6 @@ fi
 
 packages=()
 installing terminal && packages+=(tmux btop)
-installing node && packages+=(nodejs npm)
 if installing gh; then
   log "Configuring the GitHub CLI repository"
   add_github_repo
@@ -286,6 +285,13 @@ if ((${#packages[@]} > 0)); then
     sudo apt-get update
   fi
   apt_install "${packages[@]}"
+fi
+# Ubuntu's npm recommends eslint, webpack, node-tap, and through them a
+# terminal emulator, X11 libraries, and Perl modules, none of which npm
+# needs.
+if installing node; then
+  log "Installing nodejs npm"
+  apt_install --no-install-recommends nodejs npm
 fi
 
 if installing podman; then
