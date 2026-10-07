@@ -16,8 +16,8 @@
    `~/.local/bin/hi`.
 2. Load the hi skill, which matches the installed version and holds the rules
    you must follow. Print it with `hi skill --print`. To keep it for later
-   sessions, ask the user before running `hi skill --global` (every project)
-   or `hi skill` (this folder only).
+   sessions, ask the user before running `hi skill add hi --global` (every
+   project) or `hi skill add hi` (this folder only).
 3. Follow the skill rather than this page. The short version of its rules:
    ask before starting paid hardware and show the `--dry-run` plan first;
    always set `--max`; stop what you start and check `hi compute ls`; pass
@@ -33,7 +33,7 @@
 
 - [Your first remote GPU](https://hifin.sh/guide/quickstart/): sign in, run a script, stop it
 - [Let your coding agent use a GPU](https://hifin.sh/guide/examples/agent/): what to ask an agent, and what it does
-- [Agent skill](https://hifin.sh/guide/reference/skill/): what `hi skill` writes and where
+- [Skills](https://hifin.sh/guide/reference/skill/): `hi skill` finds, installs, and updates agent skills from skills.sh, and writes the hi skill
 - [All commands](https://hifin.sh/guide/reference/commands/): every command and option
 - [Hand tasks to agents](https://hifin.sh/guide/agent/): `hi agent`, Claude Code or Codex on a task in a box, without permission prompts, with one report for every agent
 - [Run code in a box](https://hifin.sh/guide/box/): `hi box`, a shell or a command in a rootless container with no credentials and a limited network

@@ -18,7 +18,7 @@ description: Every hi command and option in one place.
 | `hi shell-init bash\|zsh`        | Shell integration for `hi q`                           |
 | `hi agent …`                     | Hand a task to Claude Code or Codex in a box; see below |
 | `hi box …`                       | Run a shell or a command in a rootless box; see below  |
-| `hi skill`                       | Write the agent skill                                  |
+| `hi skill …`                     | Find, install, and update agent skills; see below      |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
 | `hi verify strix`                | Check a Strix Halo workstation                         |
@@ -236,12 +236,21 @@ Options when starting: `--name`, `--network locked|dev|open`,
 
 ## hi skill
 
-| Option       | Meaning                                           |
-|--------------|---------------------------------------------------|
-| (none)       | Write into the current folder                     |
-| `--global`   | Write into your home folder                       |
-| `--print`    | Print the skill; write nothing                    |
-| `--force`    | Replace a `hi` skill that `hi` did not write      |
+| Command                              | Does                                                     |
+|--------------------------------------|----------------------------------------------------------|
+| `hi skills`                          | In a terminal: search skills.sh, browse, and pick        |
+| `hi skill find <query>`              | Search skills.sh: installs, makers, and audits           |
+| `hi skill add <source>`              | Install from `owner/repo`, `owner/repo/skill`, a git URL, or a folder |
+| `hi skill add hi`                    | Write the `hi` skill (plain `hi skill` does too, without a terminal) |
+| `hi skill ls`                        | Installed skills, their source, commit, and state        |
+| `hi skill show <name\|source>`       | Description, license, files, and audits                  |
+| `hi skill update [name…] [--check]`  | Move skills to their source's newest commit              |
+| `hi skill rm <name>…`                | Remove skills                                            |
+| `hi skill --print`                   | Print the `hi` skill; write nothing                      |
+
+Options: `--global` (your home folder), `--skill a,b`, `--yes`,
+`--accept-risk`, `--ref`, `--force`, and `--json`. `hi skills` is the same
+command. See [Skills](/guide/reference/skill/).
 
 ## hi install and hi verify
 

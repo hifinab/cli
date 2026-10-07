@@ -26,42 +26,41 @@ var (
 	claudeSkillTarget = filepath.Join("..", "..", ".agents", "skills", "hi")
 )
 
-func runSkill(args []string, stdout, stderr io.Writer) int {
+func runSkill(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 {
+		switch args[0] {
+		case "help", "-h", "--help":
+			printSkillUsage(stdout)
+			return 0
+		case "find", "search", "add", "install", "ls", "list", "show", "update", "upgrade", "rm", "remove":
+			options, err := parseSkillOptions(args[1:])
+			if err != nil {
+				fmt.Fprintf(stderr, "hi: %v\n\n", err)
+				printSkillUsage(stderr)
+				return 2
+			}
+			return exitCode(skillCommand(args[0], options, stdin, stdout, stderr), stderr)
+		}
+	}
+	// In a terminal, hi skill alone is the selector; everywhere else it
+	// writes the hi skill, as it always has.
+	if len(args) == 0 && interactive(stdin, stdout) {
+		return exitCode(runSkillSelector(false, stdin, stdout, stderr), stderr)
+	}
 	flags := flag.NewFlagSet("hi skill", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	global := flags.Bool("global", false, "install for every project in your home directory")
 	printOnly := flags.Bool("print", false, "print the skill instead of writing it")
 	force := flags.Bool("force", false, "replace a hi skill that hi did not write")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fmt.Fprintln(stderr, "usage: hi skill [--global] [--print] [--force]")
+		fmt.Fprintln(stderr, "usage: hi skill [--global] [--print] [--force], or hi skill help for find, add, ls, update, and rm")
 		return 2
 	}
 	if *printOnly {
 		stdout.Write(skillContent())
 		return 0
 	}
-
-	base, err := os.Getwd()
-	if *global {
-		base, err = os.UserHomeDir()
-	}
-	if err != nil {
-		return exitCode(err, stderr)
-	}
-	written, err := writeSkill(base, *force)
-	for _, path := range written {
-		fmt.Fprintf(stdout, "Wrote %s\n", path)
-	}
-	if err != nil {
-		return exitCode(err, stderr)
-	}
-	if *global {
-		fmt.Fprintln(stdout, "Claude Code, Codex, and other agents now know how to use hi in every project.")
-	} else {
-		fmt.Fprintln(stdout, "Agents started in this folder now know how to use hi. Commit the files to share them.")
-	}
-	fmt.Fprintln(stdout, "Rerun `hi skill` after updating hi to refresh them.")
-	return 0
+	return exitCode(writeHiSkill(*global, *force, stdout), stderr)
 }
 
 // skillContent is the embedded skill with a marker naming the hi version,

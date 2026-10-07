@@ -50,7 +50,7 @@ hi server          Run the server that brokers compute and serves templates for 
 hi agent [task]    Hand a task to Claude Code or Codex in a box and get its report (hi agent help)
 hi box shell       Run a shell or a command in a rootless box (hi box help)
 hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
-hi skill           Teach coding agents to use hi (writes SKILL.md)
+hi skills          Find, install, and update agent skills from skills.sh; hi skill add hi teaches agents hi
 hi verify strix    Check an installed Strix Halo workstation
 hi update          Update hi to the latest release, and restart a hi server service on the old one (--check, --version, --restart)
 hi version         Print the installed version
@@ -340,27 +340,32 @@ hifinab/bars-1d` gives a RunPod or Shadeform machine `HF_ENDPOINT` and a
 token for those repositories in its shells. See
 [Download the team's data](https://hifin.sh/guide/data/).
 
-## Agent skill
+## Agent skills
 
-`hi skill` teaches coding agents such as Claude Code and Codex how to use
-`hi`, including the rules for remote compute: ask before spending, show
-`--dry-run` first, always set `--max`, stop what they start, and never print
-tokens.
+`hi skill` finds, installs, and updates [skills](https://agentskills.io)
+for coding agents, from [skills.sh](https://skills.sh) and any git
+repository, and writes the `hi` skill, which teaches agents how to use `hi`:
+ask before spending, show `--dry-run` first, always set `--max`, stop what
+they start, and never print tokens.
 
 ```sh
-cd my-project && hi skill    # .agents/skills/hi/SKILL.md, linked from .claude/skills/hi
-hi skill --global            # the same under ~, for every project
-hi skill --print             # just show it
+hi skills                                    # in a terminal: search, browse, and pick
+hi skill add hi                              # the hi skill, into .agents/skills, linked from .claude/skills
+hi skill add anthropics/skills --skill pdf   # a skill from GitHub, at its current commit
+hi skill update                              # newer commits, with the change and audits shown first
+hi skill ls
 ```
 
-The skill is written once in the Agent Skills folder that Codex and others
-read. Claude Code reads only `.claude/skills`, so `hi skill` makes that a
-relative symlink to the same folder. Commit both so the whole team's agents
-get it, and rerun `hi skill` after updating `hi` to refresh it.
+Skills go where `npx skills` puts them, `.agents/skills/<name>` linked
+from `.claude/skills/<name>`, and are recorded with their commit in the
+same `skills-lock.json`. Each stays at its commit until `hi skill update`.
+skills.sh's security audits are shown, and a skill rated `high` or
+`critical` needs a yes. `hi` sends skills.sh no install events.
 
-Using Codex or another agent? Run `hi skill --global` once per machine. An
-agent that doesn't have `hi` yet can start from <https://hifin.sh/llms.txt>,
-which tells it to install `hi` and follow the skill.
+Using Codex or another agent? Run `hi skill add hi --global` once per
+machine. An agent that doesn't have `hi` yet can start from
+<https://hifin.sh/llms.txt>, which tells it to install `hi` and follow the
+skill.
 
 ## Workstation setup
 

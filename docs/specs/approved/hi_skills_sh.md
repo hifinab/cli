@@ -1,10 +1,10 @@
 # `hi skill` with skills.sh
 
-Status: Draft (2026-10-07)
+Status: Approved (2026-10-07). Release 1 built and tested on 2026-10-07 (v0.30.0).
 
 Dependencies: `hi skill` (v0.7.1, which this replaces and keeps working),
 `hi init` (layers name skills), `hi agent` bundles
-([hi_agent_bundles.md](hi_agent_bundles.md), which this changes), `hi server`
+([hi_agent_bundles.md](../ideas/hi_agent_bundles.md), which this changes), `hi server`
 template sources (team skills, release 3), [skills.sh](https://skills.sh),
 and `git`.
 
@@ -111,8 +111,8 @@ and pick:
 
 - **Search as you type**, after two characters (skills.sh's minimum),
   waiting a moment after the last key so each word doesn't send a request.
-  Results are sorted with verified owners first, then by installs, and
-  show each partner's audit.
+  Results are sorted by installs, verified owners marked, with each
+  partner's audit.
 - **Browse without typing.** skills.sh's open search can't list without a
   query, and its leaderboard needs the Vercel token, so an empty search
   shows hi's suggestions instead: the skills the built-in bundles use, and
@@ -263,9 +263,11 @@ So:
 - **Popularity isn't trust.** Many repositories on skills.sh are copies of
   others with large install counts (`101-skills/superpowers`,
   `qu-skills/superpowers`, and more on 2026-10-07). `find` marks a skill's
-  owner as verified when it's the owner of the tool or company it's about,
-  from a short list hi keeps (`anthropics`, `vercel-labs`, `duckdb`,
-  `huggingface`, `openai`, …), and lists those first.
+  owner as verified (✓) when it's the owner of the tool or company it's
+  about, from a short list hi keeps (`anthropics`, `vercel-labs`, `duckdb`,
+  `huggingface`, `openai`, …). Results stay in order of installs: listing
+  verified owners first put unrelated skills at the top (an Azure skill for
+  "excel").
 - **Agents ask.** The `hi` skill tells agents to ask the person before
   `hi skill add` or `update`, like other commands that change the project.
 
@@ -280,7 +282,7 @@ skill, which already covers `--data`.
 
 `hifinab/cli` is public and keeps the skill at `skills/hi/SKILL.md`, so
 `npx skills add hifinab/cli` already installs it; skills.sh lists it once
-someone does. That covers the first item of the roadmap's v0.31.0.
+someone does. That covered the first item of the roadmap's skills.sh entry.
 
 ## Bundles
 

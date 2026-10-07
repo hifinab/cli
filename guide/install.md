@@ -89,7 +89,7 @@ hi update --restart  # and restart a hi server service without asking
 checksum, and replaces the binary in one step; if anything fails, the old
 binary stays as it was. `--version` can also go back to an older release.
 After updating, refresh any [agent skills](/guide/reference/skill/) you wrote
-with `hi skill`.
+with `hi skill update`.
 
 `hi update` arrived in v0.7.1. Older versions update once with the installer:
 

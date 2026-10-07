@@ -747,7 +747,24 @@ images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
-### v0.30.0 — Learn from agent-machine services
+### v0.30.0 — `hi skill` with skills.sh
+
+- [x] `hi skills` in a terminal: search skills.sh as you type, browse
+  suggestions, see a skill's description, license, and audits, and pick
+  several to install; `u` updates and `x` removes. Without a terminal,
+  `hi skill` still writes the hi skill.
+- [x] `hi skill find`, `add`, `ls`, `show`, `update` (`--check`), and `rm`:
+  skills from GitHub, any git repository, or a folder, at a recorded commit,
+  in `.agents/skills` linked from `.claude/skills`, and in the
+  `skills-lock.json` that `npx skills` uses, with the commit added.
+- [x] skills.sh's audits on find, add, show, and update; a `high` or
+  `critical` rating needs a yes or `--accept-risk`; no install telemetry,
+  and `DO_NOT_TRACK` turns off searches and audits.
+  Tested on 2026-10-07 against skills.sh and GitHub, and the selector in a
+  real terminal.
+  Spec: [hi_skills_sh.md](specs/approved/hi_skills_sh.md), release 1.
+
+### v0.31.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -767,28 +784,6 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   providers; [hi_compute_ssh_run.md](specs/ideas/hi_compute_ssh_run.md)
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
-
-### v0.31.0 — skills.sh
-
-- [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
-  open directory of agent skills installed with `npx skills add <owner/repo>`
-  into Claude Code, Codex, and 20+ other agents. Ideas to weigh:
-  - Publish the `hi` skill from v0.7.1 so `npx skills add hifinab/cli`
-    installs the same files as `hi skill`, and link it from `llms.txt`.
-  - Add community skills to a project with `hi skill add <owner/repo>`, or
-    list them in `hi init` templates, written into `.agents/skills` and
-    linked from `.claude/skills` like the `hi` skill.
-  - Pin each added skill to a commit, so a skill that worked keeps working
-    and a changed upstream skill shows up as a diff.
-  - Keep the private skills in `hifinab/templates` (v0.17.0) off the public
-    directory, and let `policy.json` list the skill sources a group may add.
-- [x] Turn the ideas worth building into a draft spec in `specs/ideas/`:
-  [hi_skills_sh.md](specs/ideas/hi_skills_sh.md). `hi skill find`, `add`,
-  `ls`, `show`, `update`, and `rm`, from git at pinned commits, with
-  skills.sh for search and audits; bundles list skills.sh skills instead of
-  hand-written ones.
-
-Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
 
 ### Later — `hi agent`
 

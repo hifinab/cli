@@ -1,6 +1,6 @@
 # `hi skill` specification
 
-Status: Released in v0.7.1
+Status: Released in v0.7.1. Extended by [hi_skills_sh.md](hi_skills_sh.md): skills from skills.sh, `hi skill add`, `update`, and the selector.
 
 Dependencies: none; the skill is embedded in the `hi` binary.
 

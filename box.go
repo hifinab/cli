@@ -35,6 +35,7 @@ var boxPresets = map[string][]string{
 		"proxy.golang.org", "sum.golang.org", "storage.googleapis.com",
 		"crates.io", "static.crates.io", "index.crates.io",
 		"huggingface.co", "cdn-lfs.huggingface.co", "cas-bridge.xethub.hf.co",
+		"skills.sh", "www.skills.sh",
 	},
 	"open": {"*"},
 }

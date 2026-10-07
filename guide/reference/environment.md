@@ -41,7 +41,9 @@ description: The environment variables hi reads and the files it writes.
 | `~/.runpod/config.toml`                     | The RunPod API key from `hi login runpod` (`apiKey`, mode 0600), shared with runpodctl |
 | `~/.local/state/hi/compute/instances.json`  | Instances `hi` started: name, provider, start, limit |
 | `~/.local/state/hi/compute/<name>.watch.log` | Log of the Colab lifetime watcher                   |
-| `.agents/skills/hi/SKILL.md`, `.claude/skills/hi` | The agent skill, from `hi skill`               |
+| `.agents/skills/<name>/`, `.claude/skills/<name>` | Agent skills, from `hi skill`                  |
+| `skills-lock.json`                                | Each skill's source and commit (shared with `npx skills`) |
+| `~/.config/hi/skills.json`                        | The same for skills added with `--global`      |
 | `~/.config/hi/shadeform_key`                | The Shadeform API key from `hi login shadeform` (mode 0600) |
 | `~/.config/hi/server.json`, `~/.config/hi/device_key` | The hi server this device joined, its stored key, and this device's private key (`hi connect`) |
 | `~/.config/hi/q.json`, `~/.config/hi/q-key` | The model chosen with `hi q --setup`, and its key (mode 0600) |

@@ -28,7 +28,7 @@ they are useful alone: tasks from markdown files, and folders that aren't git
 repositories.
 
 Not in this spec: a public marketplace or third-party registry (see
-skills.sh in the roadmap, v0.31.0), skills that need the host's desktop, its
+skills.sh, v0.30.0), skills that need the host's desktop, its
 browser sessions, or devices other than the Strix Halo GPU, and scheduled or
 long-running agents; a session still ends with one report.
 
@@ -131,7 +131,7 @@ without git.
 
 ## Bundles and skills (release 2)
 
-Changed on 2026-10-07 by [hi_skills_sh.md](hi_skills_sh.md#bundles):
+Changed on 2026-10-07 by [hi_skills_sh.md](../approved/hi_skills_sh.md#bundles):
 bundles list skills from skills.sh by source and commit, with each skill's
 `needs` (the keys of `requires.json` below) in the bundle file, instead of
 hand-written skills with their own `requires.json`. The format and the image
@@ -350,7 +350,7 @@ The same report as today, with:
   attaches, so agents in boxes know how to call `hi`?
 - [ ] Do workspaces pin bundle versions, like `.hifin/template.json` pins
   templates, or does a run always take the source's current commit?
-- [ ] How do bundles relate to skills.sh (v0.31.0)? A skill from skills.sh,
+- [ ] How do bundles relate to skills.sh (v0.30.0)? A skill from skills.sh,
   pinned to a commit, could be one more local skill in a bundle.
 - [ ] Are skills that need an API key in scope? If so, through `--secret` or
   through the hi server, never inside a bundle.

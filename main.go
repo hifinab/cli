@@ -63,8 +63,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	case "update":
 		return runUpdate(args[1:], stdin, stdout, stderr)
-	case "skill":
-		return runSkill(args[1:], stdout, stderr)
+	case "skill", "skills":
+		return runSkill(args[1:], stdin, stdout, stderr)
 	case "q":
 		return runQ(args[1:], stdin, stdout, stderr)
 	case "box":
@@ -134,7 +134,8 @@ Usage:
   hi agent [claude|codex] [task]
                                 Hand a task to a coding agent in a box and get its report (hi agent help)
   hi box shell|run              Run a shell or a command in a rootless box with no credentials
-  hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
+  hi skills                     Find, install, and update agent skills from skills.sh (hi skill help);
+                                hi skill add hi teaches agents to use hi
   hi verify strix               Check an installed Strix Halo workstation
   hi update [--check]           Update hi to the latest release, and restart a hi server running the old one
   hi version                    Print the installed version

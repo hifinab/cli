@@ -43,7 +43,8 @@ on Colab). Follow these rules every time:
    `@community`): it is a third-party host. Use Community only for public
    code and data, and only when the user chose it.
 5. **Ask before system changes.** `hi install`, `hi adduser`, and `hi net` need
-   sudo and change the machine. Only run them when the user asks.
+   sudo and change the machine. Only run them when the user asks. The same
+   for adding or updating skills (`hi skill add`, `hi skill update`).
    (`hi net expose` needs no sudo but has its own rules below.)
 6. **Managed compute waits for a person.** When `hi compute providers` says a
    provider is `managed by` a hi server, starting there sends a request that
@@ -319,6 +320,26 @@ overwrites their hand edits. `hi init` never overwrites a file with other conten
 if it lists conflicts, tell the user instead of moving their files. In a
 project made by `hi init`, run `make check` before saying a change is done,
 and follow its `AGENTS.md`.
+
+## Add skills (hi skill)
+
+`hi skill` installs skills like this one from skills.sh and git
+repositories, at a recorded commit, into `.agents/skills` (linked from
+`.claude/skills`) and `skills-lock.json`.
+
+```sh
+hi skill find pdf                         # skills.sh: installs, ✓ for the tool's maker, audits
+hi skill show anthropics/skills/pdf       # description, license, scripts, audits; installs nothing
+hi skill add anthropics/skills/pdf --yes  # after the user agreed
+hi skill ls                               # installed skills and their commits
+hi skill update --check                   # newer commits; exits 1 if there are any
+```
+
+Only add, update, or remove skills when the user asks, and show them
+`hi skill show` first: a skill is instructions from someone else that
+agents follow, often with scripts. Never pass `--accept-risk` or `--force`
+on your own; if an audit rates a skill `high` or `critical`, tell the user.
+A new skill is loaded in the next session, not this one.
 
 ## Workstation and network
 

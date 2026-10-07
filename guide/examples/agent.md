@@ -11,7 +11,7 @@ with `--dry-run`, always set `--max`, and stop what they start.
 
 ```sh
 cd my-project
-hi skill
+hi skill add hi
 ```
 
 ```text
@@ -21,8 +21,8 @@ Agents started in this folder now know how to use hi. Commit the files to share 
 ```
 
 Commit both paths so everyone's agents get the skill. For every project on
-your machine, use `hi skill --global` instead. [Agent skill](/guide/reference/skill/)
-has the details.
+your machine, use `hi skill add hi --global` instead. [Skills](/guide/reference/skill/)
+has the details, and how to add other skills from skills.sh.
 
 ## 2. Ask for what you want
 
