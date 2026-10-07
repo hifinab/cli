@@ -777,6 +777,10 @@ Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
 - [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
+- [ ] Task files (`hi agent brief.md`, `-`) and folders without git, then
+  bundles: named sets of skills whose `requires.json` builds a cached
+  `hi-agent:<hash>` image, from the built-in and team template sources.
+  Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md) (draft).
 
 ### Later — `hi data` and `hi server expose`
 
