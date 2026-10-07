@@ -131,6 +131,12 @@ without git.
 
 ## Bundles and skills (release 2)
 
+Changed on 2026-10-07 by [hi_skills_sh.md](hi_skills_sh.md#bundles):
+bundles list skills from skills.sh by source and commit, with each skill's
+`needs` (the keys of `requires.json` below) in the bundle file, instead of
+hand-written skills with their own `requires.json`. The format and the image
+generator below stay the same.
+
 ### Where they live
 
 Bundles live where skills already do, so team bundles need no new server

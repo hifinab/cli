@@ -782,7 +782,11 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
     and a changed upstream skill shows up as a diff.
   - Keep the private skills in `hifinab/templates` (v0.17.0) off the public
     directory, and let `policy.json` list the skill sources a group may add.
-- [ ] Turn the ideas worth building into a draft spec in `specs/ideas/`.
+- [x] Turn the ideas worth building into a draft spec in `specs/ideas/`:
+  [hi_skills_sh.md](specs/ideas/hi_skills_sh.md). `hi skill find`, `add`,
+  `ls`, `show`, `update`, and `rm`, from git at pinned commits, with
+  skills.sh for search and audits; bundles list skills.sh skills instead of
+  hand-written ones.
 
 Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
 
