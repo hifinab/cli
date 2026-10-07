@@ -553,6 +553,23 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.28.0 — `hi agent`: agents get their own command
+
+- [x] `hi agent [claude|codex] "<task>"` runs the agent in a box on a new
+  worktree and waits for one report, the same for every agent: status,
+  exit status, final message, its own summary block, session ID, tokens
+  where the agent gives them, and the changed files from git. Without a
+  name, the first agent installed and signed in.
+- [x] `--json`, `--detach`, and `hi agent wait <name>`; exit 1 when the
+  agent failed. `hi agent claude|codex` without a task is an interactive
+  session in a box.
+- [x] `hi box` is now for any code: `hi box claude|codex` and `hi box token`
+  moved to `hi agent`, and print a pointer. The `locked` preset allows
+  nothing; an agent's own hosts come with the agent.
+- [x] The guide's new page, the agent skill, the website, and `llms.txt`.
+  Tested on 2026-10-07 on aiw9 with rootless Podman, Claude Code, and Codex.
+  Spec: [hi_agent.md](specs/approved/hi_agent.md), release 1.
+
 ### v0.27.1 — The agent skill knows `hi data` and `hi net expose`
 
 - [x] The skill's description, which decides when agents load it, now names
@@ -657,35 +674,7 @@ each type starts.
 
 ## Planned
 
-### v0.31.0 — `hi agent`: agents get their own command
-
-- [x] `hi agent [claude|codex] "<task>"` runs the agent in a box on a new
-  worktree and waits for one report, the same for every agent: status,
-  exit status, final message, its own summary block, session ID, tokens
-  where the agent gives them, and the changed files from git. Without a
-  name, the first agent installed and signed in.
-- [x] `--json`, `--detach`, and `hi agent wait <name>`; exit 1 when the
-  agent failed. `hi agent claude|codex` without a task is an interactive
-  session in a box.
-- [x] `hi box` is now for any code: `hi box claude|codex` and `hi box token`
-  moved to `hi agent`, and print a pointer. The `locked` preset allows
-  nothing; an agent's own hosts come with the agent.
-- [x] The guide's new page, the agent skill, the website, and `llms.txt`.
-  Tested on 2026-10-07 on aiw9 with rootless Podman, Claude Code, and Codex.
-  Spec: [hi_agent.md](specs/approved/hi_agent.md), release 1.
-
-### Later — `hi agent`
-
-- [ ] Tiers (`--tier read|edit|full`), `--max`, `resume`, a configured
-  agent order that moves on when one is out of quota, version checks, and
-  nested calls through the box socket with depth, concurrency, and time
-  limits. Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (2).
-- [ ] Agents' sign-ins kept on the hi server, with spend limits, audit, and
-  the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
-- [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
-  Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
-
-### v0.28.0 — The team's data on every cloud machine
+### v0.29.0 — The team's data on every cloud machine
 
 - [ ] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
   machine gets `HF_ENDPOINT` and a run token for its lifetime, so
@@ -731,7 +720,7 @@ images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
-### v0.29.0 — Learn from agent-machine services
+### v0.30.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -752,7 +741,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   covers runs on RunPod, Shadeform, and managed providers. The services
   were compared on 2026-10-01 in [hi_box.md](specs/approved/hi_box.md#services).
 
-### v0.30.0 — skills.sh
+### v0.31.0 — skills.sh
 
 - [ ] Explore integrating [skills.sh](https://www.skills.sh/), Vercel Labs'
   open directory of agent skills installed with `npx skills add <owner/repo>`
@@ -769,6 +758,17 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 - [ ] Turn the ideas worth building into a draft spec in `specs/ideas/`.
 
 Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
+
+### Later — `hi agent`
+
+- [ ] Tiers (`--tier read|edit|full`), `--max`, `resume`, a configured
+  agent order that moves on when one is out of quota, version checks, and
+  nested calls through the box socket with depth, concurrency, and time
+  limits. Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (2).
+- [ ] Agents' sign-ins kept on the hi server, with spend limits, audit, and
+  the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
+- [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
+  Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
 
 ### Later — `hi data` and `hi server expose`
 

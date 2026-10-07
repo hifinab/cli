@@ -1,6 +1,6 @@
 # `hi agent` specification
 
-Status: Approved (2026-10-07). Release 1 built for v0.31.0 and tested on
+Status: Approved (2026-10-07). Release 1 shipped in v0.28.0, tested on
 2026-10-07 with Claude Code and Codex in rootless Podman.
 
 Dependencies: `hi box` (boxes, worktrees, the proxy, `diff`), `hi install`
