@@ -47,7 +47,9 @@
   pages:
     - title: Ask for a command
       url: /guide/q/
-    - title: Run agents in a box
+    - title: Hand tasks to agents
+      url: /guide/agent/
+    - title: Run code in a box
       url: /guide/box/
     - title: Download the team's data
       url: /guide/data/

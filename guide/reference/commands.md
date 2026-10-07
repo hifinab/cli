@@ -16,7 +16,8 @@ description: Every hi command and option in one place.
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
 | `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
 | `hi shell-init bash\|zsh`        | Shell integration for `hi q`                           |
-| `hi box …`                       | Run agents and commands in a rootless box; see below   |
+| `hi agent …`                     | Hand a task to Claude Code or Codex in a box; see below |
+| `hi box …`                       | Run a shell or a command in a rootless box; see below  |
 | `hi skill`                       | Write the agent skill                                  |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
@@ -200,25 +201,36 @@ for one question or chat, `--no-context` to send only the question, and
 `--yes` to run read-only commands without asking. Dangerous commands always
 need `yes` typed. See [Ask for a command](/guide/q/).
 
+## hi agent
+
+| Command                                  | Does                                                     |
+|------------------------------------------|----------------------------------------------------------|
+| `hi agent [claude\|codex] "<task>"`      | Run a task in a box on a new worktree and wait for the report; without a name, the first agent installed and signed in |
+| `hi agent claude\|codex`                 | An interactive session in a box, without permission prompts |
+| `hi agent wait <name> [--json]`          | Wait for a run and print its report                      |
+| `hi agent token claude`                  | Store a long-lived token from `claude setup-token`       |
+
+Options: `--detach` to start and return, `--json` for the report as JSON on
+stdout, and the box options below. Exits with 0 when the agent is done and
+1 when it failed. See [Hand tasks to agents](/guide/agent/).
+
 ## hi box
 
 | Command                              | Does                                                     |
 |--------------------------------------|----------------------------------------------------------|
-| `hi box claude\|codex [prompt]`      | An agent without permission prompts on a new worktree; with a prompt, in the background |
 | `hi box shell`                       | A shell in a box for this project                        |
 | `hi box run -- <command>`            | One command; exits with its status                       |
 | `hi box ls`                          | Boxes, state, branch, and changes                        |
-| `hi box attach <name>`               | Follow a background agent, or take over a box's terminal |
+| `hi box attach <name>`               | Follow an agent, or take over a box's terminal           |
 | `hi box diff <name> [--full]`        | Commits and files, flagging files that run on the host   |
 | `hi box allow <name> [<domain>]`     | Allow a domain, or list what was refused                 |
 | `hi box stop\|rm <name> [--force]`   | Stop, or remove the box and its worktree                 |
 | `hi box rm --all [--force] [--yes]`  | Remove every box after one question                      |
-| `hi box token claude`                | Store a long-lived token from `claude setup-token`       |
 
 Options when starting: `--name`, `--network locked|dev|open`, `--allow
 <domain>`, `--gpu`, `--data` (the team's data through the hi server),
 `--worktree`, `--here`, `--image`, and `--memory`. See
-[Run agents in a box](/guide/box/).
+[Run code in a box](/guide/box/).
 
 ## hi skill
 

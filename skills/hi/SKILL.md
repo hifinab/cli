@@ -1,6 +1,6 @@
 ---
 name: hi
-description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform): run a script or container on a GPU, start an SSH-able GPU box, forward ports, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers the team's private Hugging Face datasets, models, and buckets through a hi server (hi data, and --data on runs and boxes), sharing a local service on a temporary public address (hi net expose), new projects from templates (hi init), workstation setup (hi install, hi verify strix), and NetBird (hi net). Use when the user wants to train, evaluate, or test on a GPU they do not have locally, try or serve an LLM remotely, see or stop remote compute, get the team's data or models, show a local web app or receive a webhook, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
+description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform): run a script or container on a GPU, start an SSH-able GPU box, forward ports, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers the team's private Hugging Face datasets, models, and buckets through a hi server (hi data, and --data on runs and boxes), sharing a local service on a temporary public address (hi net expose), handing a task to another coding agent (hi agent), new projects from templates (hi init), workstation setup (hi install, hi verify strix), and NetBird (hi net). Use when the user wants to train, evaluate, or test on a GPU they do not have locally, try or serve an LLM remotely, see or stop remote compute, get the team's data or models, show a local web app or receive a webhook, get a second opinion from another agent, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
 ---
 
 # hi
@@ -10,10 +10,11 @@ machines from Colab, Hugging Face, RunPod, or Shadeform with the same commands
 on all of them, and give them back. `hi init` starts new projects from
 templates. On a machine connected to the team's hi server, `hi data` gets the
 team's private Hugging Face data without a token of your own. `hi net expose`
-puts a service on this machine on a temporary public address. Run
-`hi compute help`, `hi data help`, or `hi net expose help` for the full
-reference; the user-facing guide is at https://hifin.sh/guide/ if the user
-needs step-by-step instructions.
+puts a service on this machine on a temporary public address. `hi agent`
+hands a task to Claude Code or Codex in a box and returns its report. Run
+`hi compute help`, `hi data help`, `hi net expose help`, or `hi agent help`
+for the full reference; the user-facing guide is at https://hifin.sh/guide/
+if the user needs step-by-step instructions.
 
 ## Rules
 
@@ -233,6 +234,31 @@ hi net expose stop <name>
 
 If it says Peer Expose isn't enabled, a NetBird admin must turn it on in
 the NetBird dashboard (Settings > Clients); tell the user.
+
+## Hand a task to another agent (hi agent)
+
+`hi agent` runs Claude Code or Codex on a task in a box, without permission
+prompts, on a new branch, and waits for one report with the same fields for
+every agent. Use it when another agent adds something you can't: a second
+opinion from another vendor (for example Codex reviewing your change), or a
+long or risky task the user wants run in a box. Don't use it to split your
+own task into pieces: your own subagents do that better, because they share
+what you know. Each run costs the other agent's tokens, so ask the user
+first unless they asked for it.
+
+```sh
+hi agent codex --json "review the diff between main and this branch; don't change files"
+hi agent claude --json --detach "<task>"    # returns at once
+hi agent wait <name> --json                 # the report when it's done
+```
+
+The report's `status` is `done` or `failed` (exit 1), `text` is the agent's
+final message, `report` its own summary (`complete`, `partial`, or
+`blocked`, with `follow_ups`), and `changed_files` comes from git. The work
+is on `branch` in this repository: read it with `hi box diff <name>` before
+merging, and tell the user. Remove boxes you started with
+`hi box rm <name>` once the user has what they need. Inside a box
+(`$HI_BOX` is set), `hi agent` isn't available.
 
 ## Check and clean up
 

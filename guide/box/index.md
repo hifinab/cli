@@ -1,69 +1,49 @@
 ---
-title: Run agents in a box
-description: Run Claude Code or Codex without permission prompts in a rootless container with hi box, with no credentials, a network that only reaches allowed hosts, and the Strix Halo GPU.
+title: Run code in a box
+description: Run a shell or a command in a rootless container with hi box, with no credentials, a network that only reaches allowed hosts, and the Strix Halo GPU.
 ---
 
-Coding agents are most useful when they can work without asking before
-every command, and that is only safe inside a boundary. `hi box` gives an
-agent a rootless container with the project in it and nothing else from
-your home folder: no SSH keys, no GitHub token, no cloud keys. Its network
-reaches only what is allowed.
+`hi box` runs code somewhere it can't hurt you: a rootless container with
+the project in it and nothing else from your home folder: no SSH keys, no
+GitHub token, no cloud keys. Its network reaches only what is allowed. Use
+it to try a teammate's branch or a downloaded repository, to reproduce a
+bug from a clean environment, or to train on the GPU without the script
+seeing your files.
 
 ```sh
-hi box claude "make the flaky test in tests/test_sync.py reliable"
-hi box ls
-hi box diff myproject-1
+hi box shell                          # a shell in a box for this project
+hi box run -- make test               # one command; exits with its status
+hi box run --gpu -- python train.py   # with the Strix Halo GPU
 ```
 
-The agent works on its own git branch, `hi-box/<name>`, in a new worktree,
-and leaves its work there for you to review and merge.
+Coding agents run in boxes too: [`hi agent`](/guide/agent/) starts Claude
+Code or Codex in one, without permission prompts, and reports what it did.
 
 ## Start a box
 
 ```sh
-hi box claude [prompt]       # Claude Code, without permission prompts
-hi box codex [prompt]        # Codex, the same
-hi box shell                 # a shell in a box for this project
-hi box run -- make test      # one command; exits with its status
+hi box shell                 # a shell; another hi box shell opens a second one
+hi box run -- <command>      # one command, then the box stops
 ```
 
-With a prompt, the agent runs on its own in the background, and `hi box
-attach <name>` follows it. Without one, you work with it in your terminal.
-Agents always get a new worktree; `shell` and `run` work in the project
-folder itself unless you add `--worktree`. `--here` puts an agent in the
-project folder instead.
+`shell` and `run` work in the project folder itself. Add `--worktree` to
+work on a new git worktree and the branch `hi-box/<name>` instead, so the
+box's changes stay out of your folder until you merge them.
 
 The box is named after the project and a number, such as `myproject-1`, or
 `--name`. The first box builds hi's image, Ubuntu with git, Python, uv,
-Node.js, and the usual tools, which takes a few minutes once. The agents come
-from your machine, mounted read-only, so the box runs the versions you have.
+Node.js, and the usual tools, which takes a few minutes once.
 
 ## What the box holds
 
 - The project, or its new worktree, at the same path as on your machine.
-- The repository's `.git`, so the agent can commit, with `.git/hooks` and
+- The repository's `.git`, so the box can commit, with `.git/hooks` and
   `.git/config` read-only: it can't plant a hook that runs on your machine.
 - A home folder of its own, kept with the box.
 - Nothing else from your home folder.
 
 The box runs as you, with no extra privileges, at most 4,096 processes, and
 16 GB of memory (`--memory`).
-
-## Sign-ins
-
-**Claude Code** never sees your token. The box gets a placeholder, and hi's
-proxy outside the box swaps in your Claude sign-in for requests to
-Anthropic. The proxy reads the sign-in from Claude Code on your machine, so
-it stays fresh while you use Claude there. For long unattended runs, store a
-token that lasts a year:
-
-```sh
-claude setup-token          # prints a token
-hi box token claude         # paste it; kept in ~/.config/hi, never in a box
-```
-
-**Codex** gets a copy of its sign-in (`~/.codex/auth.json`) in the box's home
-folder for now.
 
 ## Network
 
@@ -72,11 +52,11 @@ list of hosts and logs every connection:
 
 | `--network`   | Allows                                                                   |
 |---------------|--------------------------------------------------------------------------|
-| `locked`      | The agents' own hosts (for Codex: `chatgpt.com` and OpenAI's)            |
-| `dev` (default) | `locked`, plus GitHub, PyPI, npm, Go modules, crates.io, PyTorch, and Hugging Face |
+| `locked`      | Nothing                                                                  |
+| `dev` (default) | GitHub, PyPI, npm, Go modules, crates.io, PyTorch, and Hugging Face    |
 | `open`        | Everything, still logged                                                 |
 
-When the agent is refused something it needs:
+When the box is refused something it needs:
 
 ```sh
 hi box allow myproject-1                     # what was refused
@@ -85,8 +65,8 @@ hi box allow myproject-1 files.example.com   # allow it; no restart needed
 
 Name lookups inside the box fail, so tools that ignore the proxy can't get
 out. The allowlist checks host names, so it stops accidents and casual
-leaks, not a determined agent: it can still send the project to a host it
-is allowed to reach.
+leaks, not determined code: it can still send the project to a host it is
+allowed to reach.
 
 ## devcontainer.json
 
@@ -152,104 +132,14 @@ from the box lands as you, not as root. Without Podman it uses Docker and
 says that Docker's daemon runs as root, so an escape would be root on the
 machine.
 
-## How it works, step by step
+## Under the hood
 
-This follows one run from start to finish:
-
-```sh
-cd ~/projects/myproject
-hi box claude "make the flaky test in tests/test_sync.py reliable"
-hi box ls
-hi box diff myproject-1
-```
-
-### Starting the box
-
-`hi box claude` sets the box up, starts Claude Code in it, and returns at
-once:
-
-1. **It picks the engine**: rootless Podman, or Docker with a warning when
-   Podman is missing.
-2. **It reads the project's settings** from `devcontainer.json`, if there is
-   one: the image, environment, `postCreateCommand`, and
-   `customizations.hi`. Without one, the defaults are the `dev` network, no
-   GPU, and hi's image.
-3. **It names the box** after the folder and a number, `myproject-1`, and
-   keeps its state in `~/.local/state/hi/box/myproject-1/`.
-4. **It gives the agent its own copy of the code.** `git worktree add -b
-   hi-box/myproject-1 … HEAD` checks out your last commit into a new folder
-   on a new branch. Your own working folder isn't touched, and uncommitted
-   changes aren't in the box; hi says so when there are some.
-5. **It writes the allowlist**, the hosts the box may reach, from the
-   network preset, `--allow`, and the project's domains if you allowed them.
-6. **It makes sure the image exists.** hi's image is built once per machine
-   and tagged by a hash of its definition, so a change to it builds a new
-   one. It contains no agent.
-7. **It creates a private network**, `hi-box-myproject-1`, with no route out
-   and no name lookups.
-8. **It starts the proxy**, `hi-box-myproject-1-proxy`, the box's only way
-   out. It is a second container on both the private network and a normal
-   one, running your `hi` binary read-only. It allows connections only to
-   the allowlist and writes every decision to `network.log`. It is the only
-   container that can read your Claude sign-in, on a port of its own for
-   Claude's requests.
-9. **It starts the box**, `hi-box-myproject-1`, in the background:
-   - It runs as you, without extra privileges (`--cap-drop=ALL`,
-     `no-new-privileges`), at most 4,096 processes, and 16 GB of memory.
-   - It sees the worktree; your repository's `.git`, so it can commit, with
-     `hooks` and `config` read-only; an empty home folder of its own; and
-     the `claude` binary from your machine, read-only. Nothing else from
-     your home folder.
-   - `HTTPS_PROXY` points at the proxy. The Claude token in the box is the
-     word `hi-box-placeholder`, and `ANTHROPIC_BASE_URL` points at the
-     proxy's Claude port. Your git name and email are passed in, so its
-     commits carry them.
-   - The command is `claude -p "<your prompt>"
-     --dangerously-skip-permissions`: Claude Code works without asking for
-     permission, which the box is there to make safe.
-
-### While the agent works
-
-Claude Code reads and edits files in the worktree and runs commands there,
-such as the tests. Its requests to the model go to the proxy, which puts
-your real token in place of the placeholder on the way to Anthropic.
-Anything else on the internet goes through the allowlist, and what it
-refuses shows up in `hi box allow myproject-1`. Its commits land on the
-branch `hi-box/myproject-1` in your repository.
-
-### Checking on it
-
-`hi box ls` lists every box: whether it is running or has exited, its
-branch, its changes against the commit it started from (committed,
-uncommitted, and new files), and its age. It also stops the proxies of boxes
-that have finished.
-
-`hi box attach myproject-1` shows a background agent's output. With a
-prompt, Claude Code only prints its final answer, so there is nothing to see
-until it is done. To watch an agent work, start it without a prompt and work
-with it in your terminal.
-
-### Reviewing the work
-
-`hi box diff myproject-1` changes nothing. It shows the commits on
-`hi-box/myproject-1` since the start, and the files changed, including
-uncommitted and new ones. Files that run on your machine later get a ⚠:
-`Makefile`, `package.json`, `.envrc`, CI workflows, and editor tasks. Read
-those before you run anything from the branch. `--full` adds the whole diff.
-
-To keep the work, merge it in the project:
-
-```sh
-git merge hi-box/myproject-1
-```
-
-`hi box rm myproject-1` then removes the containers, the network, and the
-worktree. It keeps the branch if it has commits, and refuses while the
-worktree has uncommitted work, unless you add `--force`.
-
-### Giving it a good task
-
-A box runs unattended, so give it a task it can finish and check on its own:
-"make `make check` pass", "add tests for `parse_config` and fix what they
-find", or "upgrade FastAPI and fix what breaks". A vague task such as "fix
-something" gives a vague result.
+`hi box` keeps each box's state in `~/.local/state/hi/box/<name>/`: its
+settings, its worktree, its home folder, its allowlist, and `network.log`.
+It starts two containers: the box, `hi-box-<name>`, on a private network
+with no route out and no name lookups, and its proxy,
+`hi-box-<name>-proxy`, on both that network and a normal one. The proxy
+runs your `hi` binary read-only, allows connections only to the allowlist,
+and writes every decision to `network.log`. The box runs as you, with
+`--cap-drop=ALL` and `no-new-privileges`, and gets `HTTPS_PROXY` pointing
+at the proxy and your git name and email for its commits.

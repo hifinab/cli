@@ -33,8 +33,8 @@ func TestBoxHostAllowed(t *testing.T) {
 		t.Fatal("* should allow everything")
 	}
 	dev := boxPresetHosts("dev")
-	if !boxHostAllowed(dev, "chatgpt.com") || !boxHostAllowed(dev, "pypi.org") || boxHostAllowed(boxPresetHosts("locked"), "pypi.org") {
-		t.Fatal("dev should include locked, and locked should not include registries")
+	if !boxHostAllowed(dev, "pypi.org") || boxHostAllowed(dev, "chatgpt.com") || len(boxPresetHosts("locked")) != 0 {
+		t.Fatal("dev should allow registries but no agent's hosts, and locked nothing")
 	}
 }
 
@@ -235,7 +235,7 @@ func TestBoxStartArguments(t *testing.T) {
 	defer func() { boxCommand, boxLookPath = previousCommand, previousLook }()
 
 	var stdout, stderr bytes.Buffer
-	if status := runBox([]string{"claude", "--name", "t1", "fix", "it"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+	if status := runAgent([]string{"claude", "--detach", "--name", "t1", "fix", "it"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
 		t.Fatalf("status %d: %s %s", status, stdout.String(), stderr.String())
 	}
 	var run, proxy []string
@@ -251,7 +251,9 @@ func TestBoxStartArguments(t *testing.T) {
 	for _, want := range []string{
 		"--network hi-box-t1", "--dns 127.0.0.1", "-d", "--userns=keep-id", "--cap-drop=ALL", "no-new-privileges",
 		"CLAUDE_CODE_OAUTH_TOKEN=" + boxClaudePlacehold, "ANTHROPIC_BASE_URL=http://10.234.", ":3129",
-		"/.git/hooks:", "/.git/hooks:ro", "/.git/config:ro", "claude -p fix it --dangerously-skip-permissions",
+		"/.git/hooks:", "/.git/hooks:ro", "/.git/config:ro",
+		`claude -p "$1" --output-format json --dangerously-skip-permissions > /box/home/.hi-agent/result.json`,
+		"sh fix it\n\nWhen you are finished", "<<<REPORT",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("box run lacks %q:\n%s", want, joined)

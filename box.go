@@ -18,17 +18,15 @@ import (
 	"time"
 )
 
-// hi box runs an agent, a shell, or a command in a rootless container with
-// the project and nothing else from the home folder, and a network whose
-// only way out is hi's proxy. See docs/specs/approved/hi_box.md.
+// hi box runs a shell or a command, or for hi agent a coding agent, in a
+// rootless container with the project and nothing else from the home
+// folder, and a network whose only way out is hi's proxy. See
+// docs/specs/approved/hi_box.md and hi_agent.md.
 
-// boxPresets are the hosts each network preset allows. Claude Code needs
-// none: its requests go through the proxy's token listener.
+// boxPresets are the hosts each network preset allows. An agent's own hosts
+// come from hi agent (agentHosts), not from a preset.
 var boxPresets = map[string][]string{
-	"locked": {
-		// Codex with a ChatGPT sign-in, or an API key.
-		"chatgpt.com", "ab.chatgpt.com", "auth.openai.com", "api.openai.com",
-	},
+	"locked": {},
 	"dev": {
 		"github.com", "codeload.github.com", "objects.githubusercontent.com", "raw.githubusercontent.com",
 		"release-assets.githubusercontent.com", "api.github.com",
@@ -41,13 +39,9 @@ var boxPresets = map[string][]string{
 	"open": {"*"},
 }
 
-// boxPresetHosts is a preset's allowlist; dev includes locked.
+// boxPresetHosts is a preset's allowlist.
 func boxPresetHosts(network string) []string {
-	hosts := append([]string{}, boxPresets[network]...)
-	if network == "dev" {
-		hosts = append(append([]string{}, boxPresets["locked"]...), hosts...)
-	}
-	return hosts
+	return append([]string{}, boxPresets[network]...)
 }
 
 // boxRiskyFiles run on the host later, so diff flags changes to them.
@@ -89,6 +83,8 @@ type boxOptions struct {
 	all      bool
 	yes      bool
 	full     bool
+	detach   bool // hi agent
+	json     bool // hi agent
 	words    []string
 }
 
@@ -117,8 +113,12 @@ func runBox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	switch command {
-	case "claude", "codex", "shell", "run":
-		return exitCode(startBox(command, options, stdin, stdout, stderr), stderr)
+	case "claude", "codex":
+		fmt.Fprintf(stderr, "hi: agents moved: use hi agent %s, with the same options\n", command)
+		return 2
+	case "shell", "run":
+		_, err := startBox(command, options, stdin, stdout, stderr)
+		return exitCode(err, stderr)
 	case "ls":
 		return exitCode(listBoxes(stdout), stderr)
 	case "attach":
@@ -135,7 +135,8 @@ func runBox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "allow":
 		return exitCode(allowBox(options, stdout), stderr)
 	case "token":
-		return exitCode(boxTokenCommand(options, stdin, stdout), stderr)
+		fmt.Fprintln(stderr, "hi: the Claude token moved: use hi agent token claude")
+		return 2
 	}
 	fmt.Fprintf(stderr, "hi: unknown box command %q\n\n", command)
 	printBoxUsage(stderr)
@@ -143,14 +144,11 @@ func runBox(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 }
 
 func printBoxUsage(w io.Writer) {
-	fmt.Fprintln(w, `hi box runs agents and commands in a rootless container that holds the
+	fmt.Fprintln(w, `hi box runs a shell or a command in a rootless container that holds the
 project and nothing else from your home folder, with no way out but hi's
-proxy.
+proxy. Coding agents run in boxes with hi agent.
 
 usage:
-  hi box claude [prompt]          Claude Code without permission prompts, on a new
-                                  git worktree; with a prompt it runs on its own
-  hi box codex [prompt]           the same for Codex
   hi box shell                    a shell in a box for this project
   hi box run -- <command>         run one command in a box and exit with its status
   hi box ls                       boxes, their state, branch, and changes
@@ -161,18 +159,17 @@ usage:
   hi box rm --all [--force] [--yes]
                                   remove every box after one question; boxes with
                                   uncommitted work are kept unless --force
-  hi box token claude             store a long-lived Claude token from claude setup-token
 
 options when starting:
   --name <name>          the box's name (default: the project and a number)
   --network locked|dev|open
-                         locked: the agents' own hosts; dev (default): plus GitHub and
-                         package registries; open: everything, still logged
+                         locked: nothing (an agent's own hosts only); dev (default):
+                         GitHub and package registries; open: everything, still logged
   --allow <domain>       one more domain (repeat it)
   --gpu                  the AMD GPU (Strix Halo)
   --data                 the team's Hugging Face data through the hi server (hi data);
                          the box gets a placeholder token, the proxy the real one
-  --worktree             a new git worktree for shell and run (agents always get one)
+  --worktree             a new git worktree (agents always get one)
   --here                 work in the project folder itself, not a worktree
   --image <image>        another image; devcontainer.json's image or Dockerfile is used too
   --memory <size>        memory limit (default 16g)`)
@@ -214,6 +211,10 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 			options.force = true
 		case arg == "--full":
 			options.full = true
+		case arg == "--detach" && command == "agent":
+			options.detach = true
+		case arg == "--json" && command == "agent":
+			options.json = true
 		case arg == "--name" || strings.HasPrefix(arg, "--name="):
 			options.name, err = value()
 		case arg == "--network" || strings.HasPrefix(arg, "--network="):
@@ -233,7 +234,7 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 		case strings.HasPrefix(arg, "-") && command != "run":
 			return options, fmt.Errorf("unknown option %s", arg)
 		default:
-			// The prompt for an agent, a box's name, or run's command.
+			// An agent's task, a box's name, or run's command.
 			if command == "run" {
 				options.words = append(options.words, args[i:]...)
 				i = len(args)
@@ -257,10 +258,13 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 // ---------------------------------------------------------------------------
 // starting a box
 
-func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr io.Writer) error {
+// startBox starts a box for kind: shell, run, or an agent from hi agent.
+// An agent with a prompt starts in the background, and startBox returns
+// its box at once; everything else runs in the terminal until it ends.
+func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr io.Writer) (meta boxMeta, err error) {
 	engine, warning, err := detectBoxEngine()
 	if err != nil {
-		return err
+		return meta, err
 	}
 	if warning != "" {
 		fmt.Fprintln(stderr, "hi: "+warning)
@@ -268,11 +272,11 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	root, inGit := boxProjectRoot()
 	home, _ := os.UserHomeDir()
 	if root == home || root == "/" || root == "" {
-		return fmt.Errorf("run hi box in a project folder, not in %s: the box gets the whole folder", firstNonEmpty(root, "/"))
+		return meta, fmt.Errorf("run hi box in a project folder, not in %s: the box gets the whole folder", firstNonEmpty(root, "/"))
 	}
 	devcontainer, err := readBoxDevcontainer(root)
 	if err != nil {
-		return err
+		return meta, err
 	}
 	if devcontainer != nil && len(devcontainer.ignored) > 0 {
 		fmt.Fprintf(stdout, "Ignoring %s from %s: they run on the host or widen the box.\n", strings.Join(devcontainer.ignored, ", "), filepath.Base(devcontainer.path))
@@ -283,16 +287,16 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	network := firstNonEmpty(options.network, custom.Network, "dev")
 	if _, ok := boxPresets[network]; !ok {
-		return fmt.Errorf("devcontainer.json asks for network %q; use locked, dev, or open", network)
+		return meta, fmt.Errorf("devcontainer.json asks for network %q; use locked, dev, or open", network)
 	}
 	gpu := options.gpu || custom.GPU
 	if gpu {
 		if _, err := os.Stat("/dev/kfd"); err != nil {
-			return errors.New("--gpu needs an AMD GPU with ROCm (/dev/kfd); install it with hi install strix")
+			return meta, errors.New("--gpu needs an AMD GPU with ROCm (/dev/kfd); install it with hi install strix")
 		}
 	}
 
-	agent := kind == "claude" || kind == "codex"
+	agent := agentKinds[kind]
 	prompt := ""
 	if agent {
 		prompt = strings.Join(options.words, " ")
@@ -301,18 +305,18 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	if name == "" {
 		name = nextBoxName(filepath.Base(root))
 	} else if !boxNamePattern.MatchString(name) {
-		return fmt.Errorf("a box name has lowercase letters, digits, and dashes, up to 40: %q", name)
+		return meta, fmt.Errorf("a box name has lowercase letters, digits, and dashes, up to 40: %q", name)
 	}
 	stateDir := boxStateFile(name)
-	if meta, err := loadBoxMeta(name); err == nil {
+	if existing, err := loadBoxMeta(name); err == nil {
 		// shell in a running box opens another shell there.
 		if kind == "shell" && engine.state("hi-box-"+name) == "running" {
-			return engine.interactive(stdin, stdout, stderr, "exec", "-it", "hi-box-"+name, "bash")
+			return meta, engine.interactive(stdin, stdout, stderr, "exec", "-it", "hi-box-"+name, "bash")
 		}
-		return fmt.Errorf("box %s already exists (%s); attach with hi box attach %s, or remove it with hi box rm %s", name, meta.Agent, name, name)
+		return meta, fmt.Errorf("box %s already exists (%s); attach with hi box attach %s, or remove it with hi box rm %s", name, existing.Agent, name, name)
 	}
 	if err := os.MkdirAll(filepath.Join(stateDir, "home"), 0o700); err != nil {
-		return err
+		return meta, err
 	}
 	cleanup := func() { os.RemoveAll(stateDir) }
 
@@ -321,10 +325,10 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	if data {
 		if dataSetup, err = prepareBoxData(stateDir); err != nil {
 			cleanup()
-			return err
+			return meta, err
 		}
 	}
-	meta := boxMeta{Name: name, Agent: kind, Root: root, Network: network, GPU: gpu, Data: data, Engine: engine.name,
+	meta = boxMeta{Name: name, Agent: kind, Root: root, Network: network, GPU: gpu, Data: data, Engine: engine.name,
 		Created: time.Now().UTC(), Background: agent && prompt != "", Prompt: qClip(prompt)}
 	useWorktree := (agent && !options.here) || options.worktree
 	var mounts []string
@@ -335,7 +339,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	if useWorktree {
 		if !inGit {
 			cleanup()
-			return errors.New("agents work on a new git worktree, and this isn't a git repository; use --here to work in the folder itself")
+			return meta, errors.New("agents work on a new git worktree, and this isn't a git repository; use --here to work in the folder itself")
 		}
 		meta.Worktree = true
 		meta.Branch = "hi-box/" + name
@@ -344,7 +348,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		var out bytes.Buffer
 		if err := boxCommand(nil, &out, &out, "git", "-C", root, "worktree", "add", "-q", "-b", meta.Branch, work, "HEAD"); err != nil {
 			cleanup()
-			return fmt.Errorf("git worktree add: %s", qFirstLine(out.String(), err.Error()))
+			return meta, fmt.Errorf("git worktree add: %s", qFirstLine(out.String(), err.Error()))
 		}
 		meta.Workdir = work
 		mounts = append(mounts, work+":"+work)
@@ -371,20 +375,21 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	if len(custom.Domains) > 0 && boxDomainDecision(root, custom.Domains, stdin, stdout) {
 		hosts = append(hosts, custom.Domains...)
 	}
+	hosts = append(hosts, agentHosts[kind]...)
 	hosts = append(hosts, options.allow...)
 	if data {
 		hosts = append(hosts, boxDataHosts...)
 	}
 	if err := os.WriteFile(filepath.Join(stateDir, "allow"), []byte(strings.Join(hosts, "\n")+"\n"), 0o600); err != nil {
 		cleanup()
-		return err
+		return meta, err
 	}
 
 	baseImage, err := engine.ensureBaseImage(stdout, stderr)
 	if err != nil {
 		removeBoxWorktree(meta, true)
 		cleanup()
-		return err
+		return meta, err
 	}
 	meta.Image = baseImage
 	switch {
@@ -398,7 +403,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		if meta.Image, err = engine.ensureProjectImage(filepath.Join(dir, devcontainer.Build.Dockerfile), context, stdout, stderr); err != nil {
 			removeBoxWorktree(meta, true)
 			cleanup()
-			return err
+			return meta, err
 		}
 	}
 
@@ -409,7 +414,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		return err
 	}
 	if err := startBoxNetwork(engine, &meta, stateDir, kind == "claude", dataSetup); err != nil {
-		return fail(err)
+		return meta, fail(err)
 	}
 
 	run := []string{"run", "--name", "hi-box-" + name, "--hostname", name, "--network", "hi-box-" + name, "--dns", "127.0.0.1"}
@@ -454,9 +459,17 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 			env[key] = value
 		}
 	}
-	command, err := boxAgentSetup(kind, prompt, options.words, meta, homeDir, &run, env)
+	var command []string
+	switch kind {
+	case "shell":
+		command = []string{"bash"}
+	case "run":
+		command = options.words
+	default:
+		command, err = agentBoxSetup(kind, prompt, meta, homeDir, &run, env)
+	}
 	if err != nil {
-		return fail(err)
+		return meta, fail(err)
 	}
 	keys := make([]string, 0, len(env))
 	for key := range env {
@@ -473,15 +486,14 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	run = append(run, command...)
 
 	if err := saveBoxMeta(meta); err != nil {
-		return fail(err)
+		return meta, fail(err)
 	}
 	describeBox(meta, gpu, stdout)
 	if meta.Background {
 		if _, err := engine.output(run...); err != nil {
-			return fail(err)
+			return meta, fail(err)
 		}
-		fmt.Fprintf(stdout, "%s is working in the background.\n  hi box attach %s   follow it\n  hi box diff %s     see what it changed\n", name, name, name)
-		return nil
+		return meta, nil
 	}
 	err = engine.interactive(stdin, stdout, stderr, run...)
 	engine.output("stop", "-t", "2", "hi-box-"+name+"-proxy")
@@ -490,7 +502,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		// Pass the command's own status on.
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			return exitStatusError{code: exitErr.ExitCode(), message: fmt.Sprintf("the command exited with status %d", exitErr.ExitCode())}
+			return meta, exitStatusError{code: exitErr.ExitCode(), message: fmt.Sprintf("the command exited with status %d", exitErr.ExitCode())}
 		}
 	default:
 		fmt.Fprintf(stdout, "\nBox %s has stopped. hi box diff %s shows its work; hi box rm %s removes it.\n", name, name, name)
@@ -498,71 +510,11 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			return nil // the agent or shell's own exit status
+			return meta, nil // the agent or shell's own exit status
 		}
-		return err
+		return meta, err
 	}
-	return nil
-}
-
-// boxAgentSetup prepares the home folder and environment for the agent,
-// adds its mounts, and returns the box's command.
-func boxAgentSetup(kind, prompt string, words []string, meta boxMeta, homeDir string, run *[]string, env map[string]string) ([]string, error) {
-	switch kind {
-	case "claude":
-		binary, err := boxHostBinary("claude")
-		if err != nil {
-			return nil, errors.New("Claude Code is not installed on this machine; install it with hi install claude")
-		}
-		*run = append(*run, "-v", binary+":/usr/local/bin/claude:ro")
-		env["CLAUDE_CODE_OAUTH_TOKEN"] = boxClaudePlacehold
-		env["ANTHROPIC_BASE_URL"] = fmt.Sprintf("http://%s:%d", meta.ProxyIP, boxInjectPort)
-		env["DISABLE_AUTOUPDATER"] = "1"
-		env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-		// Claude Code wants a temporary folder of its own; /tmp may hold
-		// root-owned folders created for the box's mounts.
-		env["CLAUDE_CODE_TMPDIR"] = "/box/home/.tmp"
-		if err := os.MkdirAll(filepath.Join(homeDir, ".tmp"), 0o700); err != nil {
-			return nil, err
-		}
-		state := map[string]any{
-			"hasCompletedOnboarding":        true,
-			"bypassPermissionsModeAccepted": true,
-			"projects":                      map[string]any{meta.Workdir: map[string]any{"hasTrustDialogAccepted": true}},
-		}
-		data, _ := json.Marshal(state)
-		if err := os.WriteFile(filepath.Join(homeDir, ".claude.json"), data, 0o600); err != nil {
-			return nil, err
-		}
-		if prompt != "" {
-			return []string{"claude", "-p", prompt, "--dangerously-skip-permissions"}, nil
-		}
-		return []string{"claude", "--dangerously-skip-permissions"}, nil
-	case "codex":
-		binary, err := boxHostBinary("codex")
-		if err != nil {
-			return nil, errors.New("Codex is not installed on this machine; install it with hi install codex")
-		}
-		*run = append(*run, "-v", filepath.Dir(filepath.Dir(binary))+":/opt/codex:ro")
-		home, _ := os.UserHomeDir()
-		auth, err := os.ReadFile(filepath.Join(firstNonEmpty(os.Getenv("CODEX_HOME"), filepath.Join(home, ".codex")), "auth.json"))
-		if err != nil {
-			return nil, errors.New("Codex is not signed in on this machine; run codex once and sign in")
-		}
-		if err := os.MkdirAll(filepath.Join(homeDir, ".codex"), 0o700); err != nil {
-			return nil, err
-		}
-		if err := os.WriteFile(filepath.Join(homeDir, ".codex", "auth.json"), auth, 0o600); err != nil {
-			return nil, err
-		}
-		if prompt != "" {
-			return []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check", prompt}, nil
-		}
-		return []string{"codex", "--dangerously-bypass-approvals-and-sandbox"}, nil
-	case "shell":
-		return []string{"bash"}, nil
-	}
-	return words, nil
+	return meta, nil
 }
 
 // boxHostBinary resolves an installed agent to its real file.
@@ -638,22 +590,6 @@ func startBoxNetwork(engine boxEngine, meta *boxMeta, stateDir string, claude bo
 	_, err = engine.output("start", proxy)
 	return err
 }
-
-// boxClaudeSecret is the file the proxy reads Claude's token from: one
-// stored by hi box token, or Claude Code's own credentials.
-func boxClaudeSecret() (string, error) {
-	if path := boxTokenPath(); fileExists(path) {
-		return path, nil
-	}
-	home, _ := os.UserHomeDir()
-	path := filepath.Join(firstNonEmpty(os.Getenv("CLAUDE_CONFIG_DIR"), filepath.Join(home, ".claude")), ".credentials.json")
-	if !fileExists(path) {
-		return "", errors.New("Claude Code is not signed in on this machine; run claude and sign in, or store a token with hi box token claude")
-	}
-	return path, nil
-}
-
-func boxTokenPath() string { return filepath.Join(qConfigDirectory(), "box-claude-token") }
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
@@ -772,7 +708,7 @@ func listBoxes(stdout io.Writer) error {
 		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\t%s\n", meta.Name, meta.Agent, state, firstNonEmpty(meta.Branch, "-"), changes, formatDuration(time.Since(meta.Created)))
 	}
 	if count == 0 {
-		fmt.Fprintln(stdout, "No boxes. Start one with hi box claude, hi box codex, or hi box shell.")
+		fmt.Fprintln(stdout, "No boxes. Start one with hi box shell, hi box run, or hi agent.")
 		return nil
 	}
 	return table.Flush()
@@ -965,30 +901,6 @@ func allowBox(options boxOptions, stdout io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(stdout, "%s may now reach %s and its subdomains. No restart needed.\n", meta.Name, strings.TrimPrefix(domain, "*."))
-	return nil
-}
-
-// boxTokenCommand stores a long-lived token from claude setup-token, which
-// the proxy prefers to the host's own sign-in, since that expires.
-func boxTokenCommand(options boxOptions, stdin io.Reader, stdout io.Writer) error {
-	if len(options.words) != 1 || options.words[0] != "claude" {
-		return usageError{"usage: hi box token claude"}
-	}
-	fmt.Fprintln(stdout, "Run claude setup-token in another terminal and paste the token it prints.")
-	token, err := readOptionalKey("Claude", stdin, stdout, false)
-	if err != nil {
-		return err
-	}
-	if !strings.HasPrefix(token, "sk-ant-") {
-		return errors.New("that doesn't look like a token from claude setup-token (sk-ant-…)")
-	}
-	if err := os.MkdirAll(qConfigDirectory(), 0o700); err != nil {
-		return err
-	}
-	if err := os.WriteFile(boxTokenPath(), []byte(token+"\n"), 0o600); err != nil {
-		return err
-	}
-	fmt.Fprintf(stdout, "Stored in %s. Boxes' proxies use it from the next box on; it never enters a box.\n", boxTokenPath())
 	return nil
 }
 

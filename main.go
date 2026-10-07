@@ -69,6 +69,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runQ(args[1:], stdin, stdout, stderr)
 	case "box":
 		return runBox(args[1:], stdin, stdout, stderr)
+	case "agent":
+		return runAgent(args[1:], stdin, stdout, stderr)
 	case "shell-init":
 		return runShellInit(args[1:], stdout, stderr)
 	case "init":
@@ -129,7 +131,9 @@ Usage:
   hi init [<template> <dir>]    Start a project from a template (python, web, service, pipeline, ml)
   hi q <what you want to do>    Ask an AI model for a shell command, then run, copy, or explain it
   hi q                          Chat with it; hi q --setup chooses the model and sets up the shell
-  hi box claude|codex|shell|run Run an agent or a command in a rootless box with no credentials
+  hi agent [claude|codex] [task]
+                                Hand a task to a coding agent in a box and get its report (hi agent help)
+  hi box shell|run              Run a shell or a command in a rootless box with no credentials
   hi skill [--global]           Teach coding agents to use hi (writes SKILL.md)
   hi verify strix               Check an installed Strix Halo workstation
   hi update [--check]           Update hi to the latest release, and restart a hi server running the old one

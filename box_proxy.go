@@ -263,7 +263,7 @@ func readBoxClaudeToken(path string) (string, error) {
 		return "", errors.New("no Claude sign-in in the credentials file; run claude on the host and sign in")
 	}
 	if expires := credentials.ClaudeAiOauth.ExpiresAt; expires > 0 && time.Now().UnixMilli() > expires {
-		return credentials.ClaudeAiOauth.AccessToken, errors.New("the host's Claude sign-in has expired; run claude once on the host, or store a long-lived token with hi box token")
+		return credentials.ClaudeAiOauth.AccessToken, errors.New("the host's Claude sign-in has expired; run claude once on the host, or store a long-lived token with hi agent token claude")
 	}
 	return credentials.ClaudeAiOauth.AccessToken, nil
 }

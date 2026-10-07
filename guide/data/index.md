@@ -98,11 +98,13 @@ eval "$(hi data env)"   # sets HF_ENDPOINT and HF_TOKEN; the token lasts a day
 
 ## In a box
 
-Agents in [`hi box`](/guide/box/) hold no credentials. With `--data`, the
-box's own `hf` and Python code can still read the team's data:
+Boxes from [`hi box`](/guide/box/) and [`hi agent`](/guide/agent/) hold no
+credentials. With `--data`, the box's own `hf` and Python code can still
+read the team's data:
 
 ```sh
-hi box claude --data "train the ranker on hifinab/bars-1d"
+hi box run --data -- python train.py
+hi agent claude --data "train the ranker on hifinab/bars-1d"
 ```
 
 The box gets a placeholder token; hi's proxy outside the box adds the real
