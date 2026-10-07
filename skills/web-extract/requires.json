@@ -1,0 +1,6 @@
+{
+  "description": "Turn a web page into clean markdown or text without menus and ads, for reading and quoting.",
+  "layer": "light",
+  "pip": ["trafilatura==2.3.1"],
+  "network": {"mode": "open", "reason": "fetches whatever pages the task needs"}
+}

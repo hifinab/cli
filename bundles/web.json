@@ -1,0 +1,5 @@
+{
+  "name": "web",
+  "description": "Browse the web, read pages as clean text, and write findings with their sources.",
+  "skills": ["browse", "web-extract", "cite-sources"]
+}

@@ -1,0 +1,6 @@
+{
+  "description": "Draw clear charts to PNG or SVG files with matplotlib.",
+  "layer": "light",
+  "pip": ["matplotlib==3.11.2"],
+  "env": {"MPLBACKEND": "Agg"}
+}

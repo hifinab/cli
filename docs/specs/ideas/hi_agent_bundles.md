@@ -133,34 +133,56 @@ without git.
 
 ### Where they live
 
-Skills already have a home: the built-in source (`templates/` in this
-repository) and the team's template sources served by `hi server`, both
-with `skills/<name>/SKILL.md`, signed and cached as
-[hi_init.md](../approved/hi_init.md#where-templates-and-skills-live)
-describes. Bundles use the same sources, so there is no new server command,
-no new signing, and no new cache:
+Bundles live where skills already do, so team bundles need no new server
+command, signing, or cache. Built-in and team sources have the same three
+kinds of content:
 
 ```text
-<source>/
-  bundles/web.json
-  skills/browser/SKILL.md
-  skills/browser/requires.json
-  skills/web-extract/SKILL.md
-  skills/web-extract/requires.json
+                this repository (built-in)    a team source (hifinab/templates)
+layers          templates/<layer>/            <layer>/
+skills          skills/<name>/                skills/<name>/
+bundles         bundles/<name>.json           bundles/<name>.json
 ```
 
-A local folder in `HI_BUNDLES_DIR` (default `~/.local/share/hi/bundles/`)
-with the same layout is the person's own and isn't signed. When names clash,
-local wins over the team's, and the team's over built-in. `hi bundle ls` and
-the plan line show the source.
+A skill lives once, in `skills/<name>/` with its `SKILL.md` and, when it
+needs packages, a `requires.json`; a template (`layer.json`'s `skills`) and a
+bundle can both use it. The template loader already skips top-level folders
+without a `layer.json`, so a `bundles/` folder in a team source is ignored by
+`hi init`. Team sources are served and signed as
+[hi_init.md](../approved/hi_init.md#where-templates-and-skills-live)
+describes.
 
-`bundle.json` only names skills:
+What goes where follows the templates' rule: generic bundles that anyone
+using `hi` can use are built in; anything about Hifin's own work (quant
+skills, internal sources, report styles) goes in `hifinab/templates`.
+
+A local folder in `HI_BUNDLES_DIR` (default `~/.local/share/hi/bundles/`)
+with the same `bundles/` and `skills/` layout is the person's own and isn't
+signed. When names clash, local wins over the team's, and the team's over
+built-in. `hi bundle ls` and the plan line show the source.
+
+### The built-in bundles
+
+Written on 2026-10-07; every code example in their skills was run in the
+box's base image with the pinned packages.
+
+| Bundle   | Skills                                                  | Network |
+|----------|---------------------------------------------------------|---------|
+| `web`    | `browse` (Playwright and Chromium), `web-extract` (trafilatura), `cite-sources` | `open` |
+| `office` | `word-docs` (python-docx), `spreadsheets` (openpyxl), `pdf-read` (pdfplumber, pypdf, pdftotext), `convert-docs` (pandoc) | preset |
+| `data`   | `tables` (pandas, DuckDB, pyarrow), `charts` (matplotlib), `hi-data` (`hf` and `datasets` through `--data`) | preset |
+
+The document skills are written for hi rather than copied: Anthropic's
+public `docx`, `xlsx`, `pptx`, and `pdf` skills are source-available, not
+open source.
+
+`bundles/<name>.json` only names skills:
 
 ```json
 {
   "name": "web",
-  "description": "Browse the web, extract content, and write findings to files.",
-  "skills": ["browser", "web-extract", "markdown-report"]
+  "description": "Browse the web, read pages as clean text, and write findings with their sources.",
+  "skills": ["browse", "web-extract", "cite-sources"]
 }
 ```
 
@@ -171,13 +193,12 @@ stack without conflicts.
 
 ```json
 {
-  "description": "Drive headless Chromium with Playwright to visit pages, click, and read them.",
+  "description": "Drive headless Chromium with Playwright to open pages, click, fill forms, and read what a page shows after JavaScript runs.",
   "layer": "heavy",
-  "apt": ["fonts-noto"],
-  "npm": ["playwright@1.56.0"],
+  "pip": ["playwright==1.63.0"],
   "browsers": ["chromium"],
-  "network": {"mode": "open", "reason": "browses arbitrary sites"},
-  "gpu": false
+  "env": {"PLAYWRIGHT_BROWSERS_PATH": "/opt/ms-playwright"},
+  "network": {"mode": "open", "reason": "visits whatever sites the task needs"}
 }
 ```
 
@@ -186,9 +207,23 @@ The keys are closed: `description`, `layer` (`base`, `heavy`, `light`),
 `network` (`mode`, `hosts`, `reason`), and `gpu`. Each key maps to one fixed
 install step, so no manifest can run its own shell. An unknown key, or a
 package name that isn't a plain name and version, refuses the whole bundle.
-Versions must be pinned, or the image changes under a cached tag.
+`pip` and `npm` versions must be pinned with `==` and `@`, or the image
+changes under a cached tag; `apt` packages follow the base image.
 
 A skill without `requires.json` needs nothing beyond the base image.
+
+What the check in the base image showed the generator must do:
+
+- **pip goes into a venv**, `/opt/hi/venv`: Ubuntu 24.04's Python refuses
+  a plain `pip install` (PEP 668).
+- **The box sets `PATH` when it starts** (`-e PATH=…`), which replaces the
+  image's, so the box must put `/opt/hi/venv/bin` first itself.
+- **Anything in the box's home is hidden**, because the home folder is
+  mounted over it. Playwright's browsers go to `/opt/ms-playwright`, through
+  the skill's `env`, which the generator sets before the install steps and
+  the box sets at run time.
+- **Chromium ignores `HTTPS_PROXY`**; the `browse` skill passes the proxy to
+  `launch()` itself.
 
 ### From skills to an image
 
@@ -210,9 +245,9 @@ hi tags the image `hi-agent:<hash of the Dockerfile>`, and a run whose tag
 exists skips the build. The plan says which:
 
 ```text
-Plan: skills browser, web-extract, markdown-report (3 of 6 attached)
+Plan: skills browse, web-extract, cite-sources (3 of 7 attached)
 Image: hi-agent:7f3a91c (cached)
-Network: open (browser: browses arbitrary sites)
+Network: open (browse: visits whatever sites the task needs)
 Folder: ~/work/gpu-prices (not a git repository: it works in place)
 ```
 
@@ -338,7 +373,9 @@ From checking the proposal against the code and specs on 2026-10-07:
 - **`apt install chromium` doesn't work on Ubuntu images**, where it's a
   snap. Playwright's own browser download does, hence the `browsers` key.
 - **The `research` name is taken:** it's a private template in
-  `hifinab/templates`. A built-in bundle should be named differently, such as
-  `web`, or local-over-team precedence will confuse people.
+  `hifinab/templates`, so the built-in bundle is called `web`.
+- **The built-in skills aren't in `templates/`.** The `hi` skill is at
+  `skills/hi/`, embedded on its own; built-in skills and bundles sit next to
+  it at the top of the repository.
 - **Writing `.hifin/agent-spec.json` into the folder** would add a file to
   every result folder; the plan goes in the box's state folder instead.

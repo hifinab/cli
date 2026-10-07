@@ -1,0 +1,5 @@
+{
+  "name": "office",
+  "description": "Read and write Word documents, Excel workbooks, and PDFs, and convert between formats.",
+  "skills": ["word-docs", "spreadsheets", "pdf-read", "convert-docs"]
+}

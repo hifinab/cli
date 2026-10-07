@@ -1,0 +1,5 @@
+{
+  "description": "Convert documents between markdown, Word, HTML, and other formats with pandoc.",
+  "layer": "heavy",
+  "apt": ["pandoc"]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "data",
+  "description": "Analyse tables with pandas and DuckDB, draw charts, and read the team's data through hi data.",
+  "skills": ["tables", "charts", "hi-data"]
+}

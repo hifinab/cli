@@ -1,0 +1,8 @@
+{
+  "description": "Drive headless Chromium with Playwright to open pages, click, fill forms, and read what a page shows after JavaScript runs.",
+  "layer": "heavy",
+  "pip": ["playwright==1.63.0"],
+  "browsers": ["chromium"],
+  "env": {"PLAYWRIGHT_BROWSERS_PATH": "/opt/ms-playwright"},
+  "network": {"mode": "open", "reason": "visits whatever sites the task needs"}
+}
