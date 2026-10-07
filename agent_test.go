@@ -180,7 +180,7 @@ func TestAgentCodex(t *testing.T) {
 			run = strings.Join(call, " ")
 		}
 	}
-	if !strings.Contains(run, "codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -o /box/home/.hi-agent/last.txt review it") {
+	if !strings.Contains(run, "exec codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -o /box/home/.hi-agent/last.txt - < /box/home/.hi-agent/task.md") {
 		t.Fatalf("codex command: %s", run)
 	}
 
@@ -212,4 +212,67 @@ func compactJSON(data json.RawMessage) string {
 	var out bytes.Buffer
 	json.Compact(&out, data)
 	return out.String()
+}
+
+func TestAgentTaskFiles(t *testing.T) {
+	project, _, _ := agentTestSetup(t)
+	os.MkdirAll(filepath.Join(project, "briefs"), 0o755)
+	brief := "# GPU prices\n\nCollect them into prices.csv.\n"
+	os.WriteFile(filepath.Join(project, "briefs", "Prices.MD"), []byte(brief), 0o644)
+	os.WriteFile(filepath.Join(project, "brief.txt"), []byte("from a txt file\n"), 0o644)
+	os.WriteFile(filepath.Join(project, "empty.md"), []byte(" \n"), 0o644)
+	os.WriteFile(filepath.Join(project, "big.md"), bytes.Repeat([]byte("x"), agentMaxTask+1), 0o644)
+	task := func(name string) string {
+		data, _ := os.ReadFile(boxStateFile(name, "home", agentResultDir, "task.md"))
+		return string(data)
+	}
+	for _, test := range []struct {
+		name, stdin, file, want string
+		args                    []string
+	}{
+		// A single word ending in .md, in any case, is a file; it needn't be committed.
+		{"f1", "", filepath.Join(project, "briefs", "Prices.MD"), "# GPU prices\n\nCollect them into prices.csv.\n\nWhen you are finished", []string{"briefs/Prices.MD"}},
+		{"f2", "", filepath.Join(project, "brief.txt"), "from a txt file\n\nWhen", []string{"--task-file", "brief.txt"}},
+		{"f3", "from stdin\n", "", "from stdin\n\nWhen", []string{"-"}},
+		// Two words are a plain task, even with a .md in them.
+		{"f4", "", "", "fix the typo in README.md\n\nWhen", []string{"fix", "the typo in README.md"}},
+	} {
+		var stdout, stderr bytes.Buffer
+		args := append([]string{"claude", "--detach", "--json", "--name", test.name}, test.args...)
+		if status := runAgent(args, strings.NewReader(test.stdin), &stdout, &stderr); status != 0 {
+			t.Fatalf("%v: status %d: %s", test.args, status, stderr.String())
+		}
+		if got := task(test.name); !strings.HasPrefix(got, test.want) {
+			t.Errorf("%v: task %q", test.args, got)
+		}
+		if meta, _ := loadBoxMeta(test.name); meta.TaskFile != test.file {
+			t.Errorf("%v: task file %q, want %q", test.args, meta.TaskFile, test.file)
+		}
+	}
+	// The report says where the task came from.
+	report := collectAgentReport(boxEngine{name: "podman", bin: "/usr/bin/podman"}, func() boxMeta { m, _ := loadBoxMeta("f1"); return m }())
+	if report.TaskFile != filepath.Join(project, "briefs", "Prices.MD") {
+		t.Errorf("report task_file %q", report.TaskFile)
+	}
+
+	for _, test := range []struct {
+		stdin, want string
+		args        []string
+	}{
+		{"", "there is no task file breif.md", []string{"breif.md"}},
+		{"", "empty.md is empty", []string{"empty.md"}},
+		{"", "at most 1 MB", []string{"big.md"}},
+		{"", "the task on stdin is empty", []string{"-"}},
+		{"", "is a folder", []string{"--task-file", "briefs"}},
+		{"", "not both", []string{"--task-file", "brief.txt", "and", "words"}},
+	} {
+		var stdout, stderr bytes.Buffer
+		args := append([]string{"claude", "--detach", "--name", "bad"}, test.args...)
+		if status := runAgent(args, strings.NewReader(test.stdin), &stdout, &stderr); status == 0 || !strings.Contains(stderr.String(), test.want) {
+			t.Errorf("%v: status %d, want %q: %s", test.args, status, test.want, stderr.String())
+		}
+	}
+	if _, err := loadBoxMeta("bad"); err == nil {
+		t.Fatal("a refused task file made a box")
+	}
 }

@@ -257,6 +257,7 @@ first unless they asked for it.
 hi agent codex --json "review the diff between main and this branch; don't change files"
 hi agent claude --json --detach "<task>"    # returns at once
 hi agent wait <name> --json                 # the report when it's done
+hi agent codex --json brief.md              # a long task: write it to a .md file
 ```
 
 The report's `status` is `done` or `failed` (exit 1), `text` is the agent's

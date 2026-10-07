@@ -301,6 +301,7 @@ the home folder.
 ```sh
 hi agent "make the flaky test reliable"        # the first agent signed in; waits for the report
 hi agent codex --json "review this branch"     # the report as JSON, for scripts and agents
+hi agent claude brief.md                       # the task from a markdown file
 hi agent claude                                # interactive, in a box
 hi box shell                                   # or hi box run -- make test
 hi box diff myproject-1                        # what it changed, flagging files that run on the host

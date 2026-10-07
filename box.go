@@ -66,6 +66,7 @@ type boxMeta struct {
 	ProxyIP    string    `json:"proxy_ip"`
 	Background bool      `json:"background,omitempty"`
 	Prompt     string    `json:"prompt,omitempty"`
+	TaskFile   string    `json:"task_file,omitempty"`
 	Created    time.Time `json:"created"`
 }
 
@@ -83,8 +84,9 @@ type boxOptions struct {
 	all      bool
 	yes      bool
 	full     bool
-	detach   bool // hi agent
-	json     bool // hi agent
+	detach   bool   // hi agent
+	json     bool   // hi agent
+	taskFile string // hi agent
 	words    []string
 }
 
@@ -215,6 +217,8 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 			options.detach = true
 		case arg == "--json" && command == "agent":
 			options.json = true
+		case command == "agent" && (arg == "--task-file" || strings.HasPrefix(arg, "--task-file=")):
+			options.taskFile, err = value()
 		case arg == "--name" || strings.HasPrefix(arg, "--name="):
 			options.name, err = value()
 		case arg == "--network" || strings.HasPrefix(arg, "--network="):
@@ -231,7 +235,7 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 		case arg == "--allow" || strings.HasPrefix(arg, "--allow="):
 			text, err = value()
 			options.allow = append(options.allow, text)
-		case strings.HasPrefix(arg, "-") && command != "run":
+		case strings.HasPrefix(arg, "-") && arg != "-" && command != "run":
 			return options, fmt.Errorf("unknown option %s", arg)
 		default:
 			// An agent's task, a box's name, or run's command.
@@ -329,7 +333,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		}
 	}
 	meta = boxMeta{Name: name, Agent: kind, Root: root, Network: network, GPU: gpu, Data: data, Engine: engine.name,
-		Created: time.Now().UTC(), Background: agent && prompt != "", Prompt: qClip(prompt)}
+		Created: time.Now().UTC(), Background: agent && prompt != "", Prompt: qClip(prompt), TaskFile: options.taskFile}
 	useWorktree := (agent && !options.here) || options.worktree
 	var mounts []string
 	var gitCommon string

@@ -206,12 +206,14 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 | Command                                  | Does                                                     |
 |------------------------------------------|----------------------------------------------------------|
 | `hi agent [claude\|codex] "<task>"`      | Run a task in a box on a new worktree and wait for the report; without a name, the first agent installed and signed in |
+| `hi agent [claude\|codex] <brief.md>`    | The task is the file's contents; `-` reads it from stdin |
 | `hi agent claude\|codex`                 | An interactive session in a box, without permission prompts |
 | `hi agent wait <name> [--json]`          | Wait for a run and print its report                      |
 | `hi agent token claude`                  | Store a long-lived token from `claude setup-token`       |
 
 Options: `--detach` to start and return, `--json` for the report as JSON on
-stdout, and the box options below. Exits with 0 when the agent is done and
+stdout, `--task-file <path>` for a task file whose name doesn't end in
+`.md`, and the box options below. Exits with 0 when the agent is done and
 1 when it failed. See [Hand tasks to agents](/guide/agent/).
 
 ## hi box

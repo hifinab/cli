@@ -52,7 +52,11 @@ hi bundle prune                               remove images unused for 30 days
 
 ## Task files (release 1)
 
-The task is joined from the command-line words today (`startAgent` in
+Built on 2026-10-07: `.md` briefs, `-`, `--task-file`, the task on stdin
+from `~/.hi-agent/task.md` in the box's home, and `task_file` in the
+report. Front matter is still to come.
+
+The task was joined from the command-line words today (`startAgent` in
 `agent.go`). Long briefs are written as files, and
 `hi agent "$(cat task.md)"` is easy to get wrong.
 

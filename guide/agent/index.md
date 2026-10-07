@@ -39,6 +39,28 @@ signed in on this machine, and Codex otherwise. The agent starts from your
 last commit, on a new worktree and the branch `hi-box/<name>`; uncommitted
 changes in the project aren't in it, and hi says so when there are some.
 
+## A task from a file
+
+Write a long task, a brief, as a markdown file and give its name instead
+of the task:
+
+```sh
+hi agent briefs/gpu-prices.md
+hi agent codex review.md
+./make-brief.sh | hi agent claude -     # - reads the task from stdin
+hi agent --task-file brief.txt          # a file whose name doesn't end in .md
+```
+
+A single word ending in `.md` is a file: its contents are the task. Two or
+more words are always the task itself, so
+`hi agent "fix the typo in README.md"` works as before. hi reads the file
+before it makes the box, so a brief you haven't committed works too. A name
+that doesn't exist stops hi with an error, instead of being sent to the
+agent as the task. A task file can be at most 1 MB, and the report's
+`task_file` says which file it was.
+
+## While it works
+
 `hi agent` waits until the agent is done. While it works,
 `hi box attach <name>` in another terminal follows it. Codex shows its
 progress; Claude Code prints only its final answer. Ctrl+C stops waiting,
@@ -95,6 +117,7 @@ hi agent codex --json "review the change on this branch; don't edit files"
 | `report`        | The agent's own summary: `status` (`complete`, `partial`, `blocked`), `summary`, `tests`, `follow_ups`; `null` if it didn't give one |
 | `changed_files` | Every file changed since the start, committed or not, from git                             |
 | `session_id`    | The agent's session, when it reports one                                                   |
+| `task_file`     | The file the task came from, when it came from one                                         |
 | `tokens`        | Input and output tokens, when the agent reports them (Claude Code)                         |
 | `warnings`      | Anything hi noticed, such as a missing summary                                             |
 
@@ -186,11 +209,12 @@ hi agent claude "make the flaky test in tests/test_sync.py reliable"
    - The Claude token in the box is the word `hi-box-placeholder`, and
      `ANTHROPIC_BASE_URL` points at the proxy, which puts your real token in
      its place on the way to Anthropic.
-   - The command is `claude -p "<task and the summary request>"
-     --output-format json --dangerously-skip-permissions`; the result goes
-     to a file in the box's home folder, and the final text to the box's
-     log. Codex runs as `codex exec
-     --dangerously-bypass-approvals-and-sandbox -o <file>`.
+   - The task and the summary request go in a file in the box's home
+     folder, and from there to the agent on stdin, so a task of any length
+     fits. The command is `claude -p --output-format json
+     --dangerously-skip-permissions`; the result goes to a file in the
+     box's home folder, and the final text to the box's log. Codex runs as
+     `codex exec --dangerously-bypass-approvals-and-sandbox -o <file> -`.
 6. **It waits** for the box to stop, then stops the proxy.
 7. **It writes the report** from the agent's result file, the box's exit
    status, and `git diff` against the commit it started from.

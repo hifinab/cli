@@ -252,12 +252,17 @@ func TestBoxStartArguments(t *testing.T) {
 		"--network hi-box-t1", "--dns 127.0.0.1", "-d", "--userns=keep-id", "--cap-drop=ALL", "no-new-privileges",
 		"CLAUDE_CODE_OAUTH_TOKEN=" + boxClaudePlacehold, "ANTHROPIC_BASE_URL=http://10.234.", ":3129",
 		"/.git/hooks:", "/.git/hooks:ro", "/.git/config:ro",
-		`claude -p "$1" --output-format json --dangerously-skip-permissions > /box/home/.hi-agent/result.json`,
-		"sh fix it\n\nWhen you are finished", "<<<REPORT",
+		"claude -p --output-format json --dangerously-skip-permissions < /box/home/.hi-agent/task.md > /box/home/.hi-agent/result.json",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("box run lacks %q:\n%s", want, joined)
 		}
+	}
+	// The task goes on stdin from a file in the box's home, not on the
+	// command line.
+	if task, _ := os.ReadFile(boxStateFile("t1", "home", agentResultDir, "task.md")); !strings.HasPrefix(string(task), "fix it\n\nWhen you are finished") ||
+		!strings.Contains(string(task), "<<<REPORT") || strings.Contains(joined, "fix it") {
+		t.Errorf("task file %q; run %s", task, joined)
 	}
 	if strings.Contains(joined, ".credentials.json") || strings.Contains(joined, "/home/.ssh") {
 		t.Fatalf("credentials reach the box:\n%s", joined)

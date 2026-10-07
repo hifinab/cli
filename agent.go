@@ -53,6 +53,7 @@ type agentReport struct {
 	Status       string          `json:"status"` // running, done, or failed
 	ExitCode     int             `json:"exit_code"`
 	SessionID    string          `json:"session_id,omitempty"`
+	TaskFile     string          `json:"task_file,omitempty"`
 	Text         string          `json:"text"`
 	Report       json.RawMessage `json:"report"`
 	Branch       string          `json:"branch,omitempty"`
@@ -100,6 +101,8 @@ waits for its report: what it said, whether it worked, and what changed.
 usage:
   hi agent [claude|codex] "<task>"  run a task on a new git worktree and wait for the report;
                                     without an agent, the first one installed and signed in
+  hi agent [claude|codex] <brief.md>
+                                    the task is the file's contents; - reads it from stdin
   hi agent claude|codex             an interactive session in a box
   hi agent wait <name> [--json]     wait for a run and print its report
   hi agent token claude             store a long-lived Claude token from claude setup-token
@@ -107,6 +110,7 @@ usage:
 options:
   --detach               start the run and return; hi agent wait <name> gets the report
   --json                 the report as JSON on stdout
+  --task-file <path>     the task from a file whose name doesn't end in .md
   --name, --network, --allow, --gpu, --data, --here, --image, --memory
                          the box's options, as for hi box
 
@@ -116,7 +120,10 @@ work on it as on any box.`)
 }
 
 func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr io.Writer) error {
-	task := strings.TrimSpace(strings.Join(options.words, " "))
+	task, err := agentTask(&options, stdin)
+	if err != nil {
+		return err
+	}
 	if task == "" && (options.detach || options.json) {
 		return usageError{"--detach and --json need a task: hi agent [claude|codex] \"<task>\""}
 	}
@@ -124,7 +131,6 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 		if task == "" {
 			return usageError{"name the agent for an interactive session: hi agent claude, or hi agent codex"}
 		}
-		var err error
 		if kind, err = chooseAgent(); err != nil {
 			return err
 		}
@@ -140,6 +146,9 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 	if options.json {
 		info = stderr
 	}
+	if options.taskFile != "" {
+		fmt.Fprintf(info, "Task from %s.\n", options.taskFile)
+	}
 	meta, err := startBox(kind, options, stdin, info, stderr)
 	if err != nil || !meta.Background {
 		return err
@@ -153,6 +162,66 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 		return nil
 	}
 	return finishAgent(meta, options.json, info, stdout)
+}
+
+// agentMaxTask is the largest task file hi agent reads.
+const agentMaxTask = 1 << 20
+
+// agentTask is the task: the words, or a file's contents when the only
+// word ends in .md or --task-file names it, or stdin when the only word is
+// -. A file's absolute path goes in options.taskFile for the report.
+func agentTask(options *boxOptions, stdin io.Reader) (string, error) {
+	words := options.words
+	switch {
+	case options.taskFile != "":
+		if len(words) > 0 {
+			return "", usageError{"give the task as --task-file or as words, not both"}
+		}
+	case len(words) == 1 && words[0] == "-":
+		data, err := io.ReadAll(io.LimitReader(stdin, agentMaxTask+1))
+		if err != nil {
+			return "", fmt.Errorf("reading the task from stdin: %w", err)
+		}
+		return checkAgentTask("the task on stdin", data)
+	case len(words) == 1 && strings.HasSuffix(strings.ToLower(words[0]), ".md"):
+		options.taskFile = words[0]
+	default:
+		return strings.TrimSpace(strings.Join(words, " ")), nil
+	}
+	path, err := filepath.Abs(options.taskFile)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("there is no task file %s; a single word ending in .md is read as a task file", options.taskFile)
+	}
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("%s is a folder, not a task file", options.taskFile)
+	}
+	if info.Size() > agentMaxTask {
+		return "", fmt.Errorf("%s is %s; a task file can be at most 1 MB", options.taskFile, formatDataSize(info.Size()))
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	options.taskFile = path
+	return checkAgentTask(options.taskFile, data)
+}
+
+func checkAgentTask(source string, data []byte) (string, error) {
+	if len(data) > agentMaxTask {
+		return "", fmt.Errorf("%s is over 1 MB; a task can be at most 1 MB", source)
+	}
+	task := strings.TrimSpace(string(data))
+	if task == "" {
+		return "", fmt.Errorf("%s is empty", source)
+	}
+	return task, nil
 }
 
 // chooseAgent is the first agent that is installed and signed in.
@@ -199,13 +268,17 @@ func codexAuthPath() string {
 // agent, adds its mounts, and returns the box's command. A task gets the
 // report contract, and the agent leaves its result in agentResultDir.
 func agentBoxSetup(kind, prompt string, meta boxMeta, homeDir string, run *[]string, env map[string]string) ([]string, error) {
+	results := "/box/home/" + agentResultDir
 	if prompt != "" {
-		prompt += "\n\n" + agentContract
+		// The task goes to the agent on stdin from a file, so its length
+		// isn't limited by the command line.
 		if err := os.MkdirAll(filepath.Join(homeDir, agentResultDir), 0o700); err != nil {
 			return nil, err
 		}
+		if err := os.WriteFile(filepath.Join(homeDir, agentResultDir, "task.md"), []byte(prompt+"\n\n"+agentContract+"\n"), 0o600); err != nil {
+			return nil, err
+		}
 	}
-	results := "/box/home/" + agentResultDir
 	switch kind {
 	case "claude":
 		binary, err := boxHostBinary("claude")
@@ -238,9 +311,9 @@ func agentBoxSetup(kind, prompt string, meta boxMeta, homeDir string, run *[]str
 		// The JSON result goes to a file, and its final text to the log, so
 		// hi box attach still shows the answer. Images without jq log the
 		// JSON.
-		script := `claude -p "$1" --output-format json --dangerously-skip-permissions > ` + results + `/result.json; status=$?; ` +
+		script := `claude -p --output-format json --dangerously-skip-permissions < ` + results + `/task.md > ` + results + `/result.json; status=$?; ` +
 			`if command -v jq >/dev/null 2>&1; then jq -r '.result // empty' ` + results + `/result.json; else cat ` + results + `/result.json; fi; exit $status`
-		return []string{"sh", "-c", script, "sh", prompt}, nil
+		return []string{"sh", "-c", script}, nil
 	case "codex":
 		binary, err := boxHostBinary("codex")
 		if err != nil {
@@ -260,8 +333,8 @@ func agentBoxSetup(kind, prompt string, meta boxMeta, homeDir string, run *[]str
 		if prompt == "" {
 			return []string{"codex", "--dangerously-bypass-approvals-and-sandbox"}, nil
 		}
-		return []string{"codex", "exec", "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check",
-			"-o", results + "/last.txt", prompt}, nil
+		return []string{"sh", "-c", "exec codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -o " +
+			results + "/last.txt - < " + results + "/task.md"}, nil
 	}
 	return nil, fmt.Errorf("unknown agent %q", kind)
 }
@@ -365,7 +438,7 @@ func agentDisplayName(kind string) string {
 // collectAgentReport builds the report from the box: the agent's result
 // files and log, the container's exit status, and git.
 func collectAgentReport(engine boxEngine, meta boxMeta) agentReport {
-	report := agentReport{Name: meta.Name, Agent: meta.Agent, Branch: meta.Branch, Status: "done", Warnings: []string{}}
+	report := agentReport{Name: meta.Name, Agent: meta.Agent, Branch: meta.Branch, TaskFile: meta.TaskFile, Status: "done", Warnings: []string{}}
 	container := "hi-box-" + meta.Name
 	switch state := engine.state(container); state {
 	case "running":
