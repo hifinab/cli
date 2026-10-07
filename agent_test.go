@@ -293,3 +293,73 @@ func TestAgentTaskFiles(t *testing.T) {
 		t.Fatal("a refused task file made a box")
 	}
 }
+
+func TestAgentWorksInPlaceOutsideGit(t *testing.T) {
+	_, calls, exited := agentTestSetup(t)
+	folder := filepath.Join(t.TempDir(), "gpu-prices")
+	os.MkdirAll(filepath.Join(folder, "notes"), 0o755)
+	os.WriteFile(filepath.Join(folder, "keep.txt"), []byte("keep"), 0o644)
+	os.WriteFile(filepath.Join(folder, "edit.txt"), []byte("old"), 0o644)
+	os.WriteFile(filepath.Join(folder, "notes", "gone.txt"), []byte("gone"), 0o644)
+	t.Chdir(folder)
+
+	var stdout, stderr bytes.Buffer
+	if status := runAgent([]string{"claude", "--detach", "--name", "p1", "collect", "prices"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s", status, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), folder+" (not a git repository: it works in place)") {
+		t.Fatalf("stdout: %s", stdout.String())
+	}
+	var run string
+	for _, call := range *calls {
+		if call[0] == "run" {
+			run = strings.Join(call, " ")
+		}
+	}
+	if !strings.Contains(run, "-v "+folder+":"+folder+" ") || strings.Contains(run, "worktree") {
+		t.Fatalf("run: %s", run)
+	}
+
+	// The agent adds, changes, and removes files.
+	os.WriteFile(filepath.Join(folder, "prices.csv"), []byte("a,b\n"), 0o644)
+	os.WriteFile(filepath.Join(folder, "edit.txt"), []byte("newer"), 0o644)
+	os.Remove(filepath.Join(folder, "notes", "gone.txt"))
+	os.WriteFile(boxStateFile("p1", "home", agentResultDir, "result.json"), []byte(`{"result":"Wrote prices.csv."}`), 0o600)
+	*exited = "0"
+
+	stdout.Reset()
+	if status := runAgent([]string{"wait", "p1", "--json"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("wait: %d %s", status, stderr.String())
+	}
+	var report agentReport
+	json.Unmarshal(stdout.Bytes(), &report)
+	if report.Folder != folder || report.Branch != "" || strings.Join(report.ChangedFiles, ",") != "edit.txt,notes/gone.txt,prices.csv" {
+		t.Fatalf("report = %+v", report)
+	}
+	stdout.Reset()
+	runAgent([]string{"wait", "p1"}, strings.NewReader(""), &stdout, &stderr)
+	if !strings.Contains(stdout.String(), "Changed in "+folder+":\n  edit.txt\n  notes/gone.txt\n  prices.csv\n") {
+		t.Fatalf("human report: %s", stdout.String())
+	}
+	stdout.Reset()
+	if status := runBox([]string{"diff", "p1"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("diff: %d %s", status, stderr.String())
+	}
+	for _, want := range []string{"changed  edit.txt", "removed  notes/gone.txt", "added    prices.csv"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("diff lacks %q:\n%s", want, stdout.String())
+		}
+	}
+
+	// Not in the home folder or above it: the box would get all of it.
+	t.Chdir(os.Getenv("HOME"))
+	stderr.Reset()
+	if status := runAgent([]string{"claude", "--detach", "--name", "p2", "anything"}, strings.NewReader(""), &stdout, &stderr); status == 0 || !strings.Contains(stderr.String(), "not in") {
+		t.Fatalf("home: %d %s", status, stderr.String())
+	}
+	t.Chdir(filepath.Dir(os.Getenv("HOME")))
+	stderr.Reset()
+	if status := runAgent([]string{"claude", "--detach", "--name", "p3", "anything"}, strings.NewReader(""), &stdout, &stderr); status == 0 || !strings.Contains(stderr.String(), "not in") {
+		t.Fatalf("above home: %d %s", status, stderr.String())
+	}
+}

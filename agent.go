@@ -58,6 +58,7 @@ type agentReport struct {
 	Text         string          `json:"text"`
 	Report       json.RawMessage `json:"report"`
 	Branch       string          `json:"branch,omitempty"`
+	Folder       string          `json:"folder,omitempty"`
 	ChangedFiles []string        `json:"changed_files"`
 	Tokens       *agentTokens    `json:"tokens,omitempty"`
 	Warnings     []string        `json:"warnings"`
@@ -100,7 +101,7 @@ func printAgentUsage(w io.Writer) {
 waits for its report: what it said, whether it worked, and what changed.
 
 usage:
-  hi agent [claude|codex] "<task>"  run a task on a new git worktree and wait for the report;
+  hi agent [claude|codex] "<task>"  run a task on a new git worktree (outside git, in the folder) and wait for the report;
                                     without an agent, the first one installed and signed in
   hi agent [claude|codex] <brief.md>
                                     the task is the file's contents; - reads it from stdin
@@ -522,6 +523,16 @@ func collectAgentReport(engine boxEngine, meta boxMeta) agentReport {
 		report.Warnings = append(report.Warnings, "the agent did not end with a report block")
 	}
 	report.ChangedFiles = agentChangedFiles(meta)
+	if !meta.Worktree {
+		report.Folder = meta.Root
+		changes, ok, complete := folderChanges(meta.Name, meta.Root)
+		for _, change := range changes {
+			report.ChangedFiles = append(report.ChangedFiles, change.Path)
+		}
+		if ok && !complete {
+			report.Warnings = append(report.Warnings, "the folder has too many files to list every change")
+		}
+	}
 	return report
 }
 
@@ -592,6 +603,18 @@ func printAgentReport(report agentReport, w io.Writer) {
 	}
 	for _, warning := range report.Warnings {
 		fmt.Fprintf(w, "\nNote: %s.\n", warning)
+	}
+	if report.Folder != "" {
+		if len(report.ChangedFiles) == 0 {
+			fmt.Fprintf(w, "\nNo files changed in %s. hi box rm %s removes the box.\n", report.Folder, report.Name)
+			return
+		}
+		fmt.Fprintf(w, "\nChanged in %s:\n", report.Folder)
+		for _, path := range report.ChangedFiles {
+			fmt.Fprintf(w, "  %s\n", path)
+		}
+		fmt.Fprintf(w, "hi box diff %s shows what was added, changed, or removed; hi box rm %s removes the box and keeps the files.\n", report.Name, report.Name)
+		return
 	}
 	if report.Branch == "" {
 		return

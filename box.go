@@ -66,6 +66,7 @@ type boxMeta struct {
 	ProxyIP    string    `json:"proxy_ip"`
 	Background bool      `json:"background,omitempty"`
 	Prompt     string    `json:"prompt,omitempty"`
+	NotGit     bool      `json:"not_git,omitempty"`
 	TaskFile   string    `json:"task_file,omitempty"`
 	Created    time.Time `json:"created"`
 }
@@ -275,7 +276,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	root, inGit := boxProjectRoot()
 	home, _ := os.UserHomeDir()
-	if root == home || root == "/" || root == "" {
+	if root == "" || root == "/" || strings.HasPrefix(home+"/", root+"/") {
 		return meta, fmt.Errorf("run hi box in a project folder, not in %s: the box gets the whole folder", firstNonEmpty(root, "/"))
 	}
 	devcontainer, err := readBoxDevcontainer(root)
@@ -334,7 +335,10 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	meta = boxMeta{Name: name, Agent: kind, Root: root, Network: network, GPU: gpu, Data: data, Engine: engine.name,
 		Created: time.Now().UTC(), Background: agent && prompt != "", Prompt: qClip(prompt), TaskFile: options.taskFile}
-	useWorktree := (agent && !options.here) || options.worktree
+	// Agents get a worktree in a git repository, and work in place outside
+	// one.
+	meta.NotGit = !inGit
+	useWorktree := (agent && !options.here && inGit) || options.worktree
 	var mounts []string
 	var gitCommon string
 	if inGit {
@@ -343,7 +347,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	if useWorktree {
 		if !inGit {
 			cleanup()
-			return meta, errors.New("agents work on a new git worktree, and this isn't a git repository; use --here to work in the folder itself")
+			return meta, errors.New("--worktree needs a git repository; without it, the box works in the folder itself")
 		}
 		meta.Worktree = true
 		meta.Branch = "hi-box/" + name
@@ -362,6 +366,12 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	} else {
 		meta.Workdir, _ = os.Getwd()
 		mounts = append(mounts, root+":"+root)
+		if agent {
+			if err := saveFolderSnapshot(name, root, stdout); err != nil {
+				cleanup()
+				return meta, err
+			}
+		}
 	}
 	if gitCommon != "" {
 		mounts = append(mounts, gitCommon+":"+gitCommon)
@@ -603,8 +613,13 @@ func fileExists(path string) bool {
 
 func describeBox(meta boxMeta, gpu bool, stdout io.Writer) {
 	where := meta.Workdir
-	if meta.Worktree {
+	switch {
+	case meta.Worktree:
 		where = fmt.Sprintf("%s (branch %s)", meta.Workdir, meta.Branch)
+	case agentKinds[meta.Agent] && meta.NotGit:
+		where += " (not a git repository: it works in place)"
+	case agentKinds[meta.Agent]:
+		where += " (it works in place)"
 	}
 	parts := []string{fmt.Sprintf("network %s", meta.Network)}
 	if meta.Data {
@@ -760,7 +775,23 @@ func attachBox(engine boxEngine, meta boxMeta, stdin io.Reader, stdout, stderr i
 
 func diffBox(meta boxMeta, full bool, stdout io.Writer) error {
 	if !meta.Worktree {
-		fmt.Fprintf(stdout, "%s worked in %s itself; see its changes there with git status.\n", meta.Name, meta.Root)
+		changes, ok, complete := folderChanges(meta.Name, meta.Root)
+		switch {
+		case ok && len(changes) == 0:
+			fmt.Fprintf(stdout, "%s has changed nothing in %s.\n", meta.Name, meta.Root)
+		case ok:
+			fmt.Fprintf(stdout, "Changed in %s since %s started:\n", meta.Root, meta.Name)
+			for _, change := range changes {
+				fmt.Fprintf(stdout, "  %-8s %s\n", change.Status, change.Path)
+			}
+			if !complete {
+				fmt.Fprintln(stdout, "The folder has too many files to compare them all.")
+			}
+		case meta.NotGit:
+			fmt.Fprintf(stdout, "%s worked in %s itself.\n", meta.Name, meta.Root)
+		default:
+			fmt.Fprintf(stdout, "%s worked in %s itself; see its changes there with git status.\n", meta.Name, meta.Root)
+		}
 		return nil
 	}
 	if !fileExists(meta.Workdir) {

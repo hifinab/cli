@@ -39,6 +39,30 @@ signed in on this machine, and Codex otherwise. The agent starts from your
 last commit, on a new worktree and the branch `hi-box/<name>`; uncommitted
 changes in the project aren't in it, and hi says so when there are some.
 
+## In a folder without git
+
+Not every task is code. In a folder that isn't a git repository, even an
+empty one, the agent works in the folder itself:
+
+```sh
+mkdir gpu-prices && cd gpu-prices
+hi agent "collect this year's GPU rental prices from RunPod and Shadeform into prices.csv"
+```
+
+```text
+Box gpu-prices-1: claude in ~/gpu-prices (not a git repository: it works in place), network dev.
+…
+Changed in ~/gpu-prices:
+  prices.csv
+```
+
+hi lists the folder's files before the run and again after, so the report
+names every file added, changed, or removed, and `hi box diff` says which.
+There's no branch to throw away: what the agent writes or deletes is in
+the folder at once. hi warns when the folder has more than 1,000 files or
+1 GB, and refuses to work in your home folder or above it, since the box
+gets the whole folder. `--here` works in place in a git repository too.
+
 ## A task from a file
 
 Write a long task, a brief, as a markdown file and give its name instead
@@ -115,7 +139,8 @@ hi agent codex --json "review the change on this branch; don't edit files"
 | `exit_code`     | The agent's exit status                                                                    |
 | `text`          | The agent's final message                                                                  |
 | `report`        | The agent's own summary: `status` (`complete`, `partial`, `blocked`), `summary`, `tests`, `follow_ups`; `null` if it didn't give one |
-| `changed_files` | Every file changed since the start, committed or not, from git                             |
+| `changed_files` | Every file changed since the start, committed or not, from git; outside git, from the folder's files before and after |
+| `folder`        | The folder the agent worked in, when it worked in place                                    |
 | `session_id`    | The agent's session, when it reports one                                                   |
 | `task_file`     | The file the task came from, when it came from one                                         |
 | `tokens`        | Input and output tokens, when the agent reports them (Claude Code)                         |

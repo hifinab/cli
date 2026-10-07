@@ -111,15 +111,23 @@ another agent, so it must not open the network on its own.
 Box gpu-prices-1: claude in ~/work/gpu-prices (not a git repository: it works in place), network dev.
 ```
 
-- **Changed files** come from a manifest of the folder taken before and
-  after the run: path, size, modification time, and a hash for files whose
-  size or time changed. Added, changed, and removed files are listed.
+- **Changed files** come from a list of the folder's files taken before
+  and after the run: path, size, modification time, and mode, without
+  `.git` and without following links, up to 200,000 files. Added, changed,
+  and removed files are listed; `hi box diff` says which. Hashes weren't
+  needed: a rewrite with the same size changes the modification time.
 - **No copy is taken.** A copy of an arbitrary folder can be huge, and the
   first use is an empty or nearly empty folder. hi warns when the folder has
   more than 1,000 files or 1 GB, and suggests a git repository or a new
   folder.
-- **hi's own files** (`.hifin/`) are left out of the list.
+- **Not the home folder or above it**, since the box gets the whole
+  folder; before, only the home folder itself was refused.
 - In a git repository nothing changes: a worktree, a branch, and `git diff`.
+  With `--here` in a git repository, the changed files come from the same
+  list.
+
+Built on 2026-10-07, and tested with Claude Code and Codex in a folder
+without git.
 
 ## Bundles and skills (release 2)
 

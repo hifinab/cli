@@ -262,7 +262,8 @@ hi agent codex --json brief.md              # a long task: write it to a .md fil
 
 The report's `status` is `done` or `failed` (exit 1), `text` is the agent's
 final message, `report` its own summary (`complete`, `partial`, or
-`blocked`, with `follow_ups`), and `changed_files` comes from git. The work
+`blocked`, with `follow_ups`), and `changed_files` comes from git, or,
+in a folder without git where the agent works in place, from the folder. The work
 is on `branch` in this repository: read it with `hi box diff <name>` before
 merging, and tell the user. Remove boxes you started with
 `hi box rm <name>` once the user has what they need. Inside a box

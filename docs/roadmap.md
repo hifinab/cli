@@ -789,7 +789,12 @@ Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
 - [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
-- [ ] Folders without git, then bundles: named sets of skills whose
+- [x] Folders without git: the agent works in place, and the report's
+  changed files come from the folder's files before and after; not in the
+  home folder or above it. Tested on 2026-10-07 with Claude Code and Codex;
+  not released yet.
+  Spec: [hi_agent_bundles.md, Folders](specs/ideas/hi_agent_bundles.md#folders-that-arent-git-repositories-release-1).
+- [ ] Bundles: named sets of skills whose
   `requires.json` builds a cached `hi-agent:<hash>` image, from the
   built-in and team template sources.
   Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md) (draft).
