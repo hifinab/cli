@@ -227,8 +227,8 @@ stdout, and the box options below. Exits with 0 when the agent is done and
 | `hi box stop\|rm <name> [--force]`   | Stop, or remove the box and its worktree                 |
 | `hi box rm --all [--force] [--yes]`  | Remove every box after one question                      |
 
-Options when starting: `--name`, `--network locked|dev|open`, `--allow
-<domain>`, `--gpu`, `--data` (the team's data through the hi server),
+Options when starting: `--name`, `--network locked|dev|open`,
+`--allow <domain>`, `--gpu`, `--data` (the team's data through the hi server),
 `--worktree`, `--here`, `--image`, and `--memory`. See
 [Run code in a box](/guide/box/).
 

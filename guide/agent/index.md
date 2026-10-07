@@ -39,9 +39,10 @@ signed in on this machine, and Codex otherwise. The agent starts from your
 last commit, on a new worktree and the branch `hi-box/<name>`; uncommitted
 changes in the project aren't in it, and hi says so when there are some.
 
-`hi agent` waits until the agent is done. While it works, `hi box attach
-<name>` in another terminal follows it. Codex shows its progress; Claude
-Code prints only its final answer. Ctrl+C stops waiting, not the agent:
+`hi agent` waits until the agent is done. While it works,
+`hi box attach <name>` in another terminal follows it. Codex shows its
+progress; Claude Code prints only its final answer. Ctrl+C stops waiting,
+not the agent:
 
 ```sh
 hi agent wait myproject-1      # wait again and print the report
