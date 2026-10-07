@@ -553,6 +553,23 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.30.0 — `hi skill` with skills.sh
+
+- [x] `hi skills` in a terminal: search skills.sh as you type, browse
+  suggestions, see a skill's description, license, and audits, and pick
+  several to install; `u` updates and `x` removes. Without a terminal,
+  `hi skill` still writes the hi skill.
+- [x] `hi skill find`, `add`, `ls`, `show`, `update` (`--check`), and `rm`:
+  skills from GitHub, any git repository, or a folder, at a recorded commit,
+  in `.agents/skills` linked from `.claude/skills`, and in the
+  `skills-lock.json` that `npx skills` uses, with the commit added.
+- [x] skills.sh's audits on find, add, show, and update; a `high` or
+  `critical` rating needs a yes or `--accept-risk`; no install telemetry,
+  and `DO_NOT_TRACK` turns off searches and audits.
+  Tested on 2026-10-07 against skills.sh and GitHub, and the selector in a
+  real terminal.
+  Spec: [hi_skills_sh.md](specs/approved/hi_skills_sh.md), release 1.
+
 ### v0.29.2 — `hi agent` in folders without git
 
 - [x] Folders without git: the agent works in place, and the report's
@@ -746,23 +763,6 @@ workstation and every provider (`hi compute run --image`), prebuilt project
 images, pinned serving images
 ([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
 and image policy on the server. Podman arrived in `hi install` in v0.22.2.
-
-### v0.30.0 — `hi skill` with skills.sh
-
-- [x] `hi skills` in a terminal: search skills.sh as you type, browse
-  suggestions, see a skill's description, license, and audits, and pick
-  several to install; `u` updates and `x` removes. Without a terminal,
-  `hi skill` still writes the hi skill.
-- [x] `hi skill find`, `add`, `ls`, `show`, `update` (`--check`), and `rm`:
-  skills from GitHub, any git repository, or a folder, at a recorded commit,
-  in `.agents/skills` linked from `.claude/skills`, and in the
-  `skills-lock.json` that `npx skills` uses, with the commit added.
-- [x] skills.sh's audits on find, add, show, and update; a `high` or
-  `critical` rating needs a yes or `--accept-risk`; no install telemetry,
-  and `DO_NOT_TRACK` turns off searches and audits.
-  Tested on 2026-10-07 against skills.sh and GitHub, and the selector in a
-  real terminal.
-  Spec: [hi_skills_sh.md](specs/approved/hi_skills_sh.md), release 1.
 
 ### v0.31.0 — Learn from agent-machine services
 
