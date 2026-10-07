@@ -8,6 +8,14 @@ box. Codex's ChatGPT sign-in still goes into the box in the first version:
 its traffic to `chatgpt.com` is encrypted end to end, and whether Codex
 accepts another base address for it is untested.
 
+**Agents moved to `hi agent` (2026-10-07).** `hi box` is now the isolated
+environment for any code, and [hi_agent.md](hi_agent.md) owns running agents
+in it: `hi box claude|codex` became `hi agent claude|codex`, and `hi box
+token claude` became `hi agent token claude`. The `locked` preset allows
+nothing by itself; `hi agent` adds the hosts of the agent it starts.
+Everything else below still holds, and where it says `hi box claude` or
+`hi box codex`, read `hi agent claude` or `hi agent codex`.
+
 Dependencies: `hi install` (Podman as a new tool), the v0.1.0 workstation
 setup (ROCm, render and video groups), `hi server` (policy, audit, Slack,
 agent devices), `hi compute` for remote sandboxes, and `hi init` templates.

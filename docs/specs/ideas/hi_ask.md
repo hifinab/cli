@@ -13,11 +13,12 @@ Let an agent ask a person a question in Slack and get the answer back as
 output and an exit status, the same way it already asks for compute. It
 turns the compute approval flow into one for any question.
 
-Unattended agents are the reason. A `hi box claude "fix the flaky test"`
-agent with no one at the terminal has two choices today when it is unsure:
-guess, or stop. Claude Code's own question tool and Codex's approvals only
-work when someone is watching the terminal. `hi ask` gives a third choice:
-ask the right person where they already are, and carry on when they answer.
+Unattended agents are the reason. An agent started with `hi agent claude
+"fix the flaky test" --detach`, with no one at the terminal, has two
+choices today when it is unsure: guess, or stop. Claude Code's own question
+tool and Codex's approvals only work when someone is watching the terminal.
+`hi ask` gives a third choice: ask the right person where they already are,
+and carry on when they answer.
 
 - **A question.** "Is 2019 data OK to include in the backtest?" goes to the
   research group; the first answer comes back as text.

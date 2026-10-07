@@ -1,11 +1,11 @@
-# `hi box race` specification
+# `hi agent race` specification
 
 Status: Draft
 
-Dependencies: `hi box` (boxes, worktrees, `diff`, the proxy, finished-agent
-messages; forks from its release 3 are useful but not required), `hi server
-ai` for the judge, `hi ask` for choosing in Slack, and `make check` from
-`hi init` templates.
+Dependencies: `hi agent` (agent runs and their reports), `hi box` (boxes,
+worktrees, `diff`, the proxy; forks from its release 3 are useful but not
+required), `hi server ai` for the judge, `hi ask` for choosing in Slack,
+and `make check` from `hi init` templates.
 
 ## Goal
 
@@ -15,7 +15,7 @@ from one attempt to the next; a few attempts plus a fair check often beat
 one careful attempt, and the boxes make it safe to run them all unattended.
 
 ```sh
-hi box race 4 "make the backtest loader 2x faster without changing results"
+hi agent race 4 "make the backtest loader 2x faster without changing results"
 ```
 
 The output is a ranked table and one kept branch, not four branches to read
@@ -24,14 +24,14 @@ by hand.
 ## Commands
 
 ```text
-hi box race <n> "<prompt>"         start n boxes on the same task
+hi agent race <n> "<prompt>"       start n boxes on the same task
     [--agents claude,codex]        which agents, round-robin (default: claude)
     [--check "<command>"]          how to check a result (default: make check)
     [--judge | --no-judge]         rank with the team's model (default: on with a server)
     [--max <duration>] [--gpu] [--network <preset>]
-hi box race ls                     races, their boxes, and their state
-hi box race show <race>            the table again, with diffs on request
-hi box race keep <race> <box>      keep one branch, remove the other boxes
+hi agent race ls                   races, their boxes, and their state
+hi agent race show <race>          the table again, with diffs on request
+hi agent race keep <race> <box>    keep one branch, remove the other boxes
 ```
 
 Every box option (`--gpu`, `--network`, `--max`, `--image`) applies to all
@@ -47,7 +47,7 @@ memory.
    agents fail in different ways, which makes the set more useful than more
    copies of one.
 2. **Run.** Each agent runs to completion, as a background box does today.
-   `hi box race ls` shows each box's state; `hi box attach` works on any of
+   `hi agent race ls` shows each box's state; `hi box attach` works on any of
    them.
 3. **Check.** When an agent finishes, hi itself runs `--check` in that box:
    not the agent, so an agent that claims its tests pass is checked, not
@@ -73,7 +73,7 @@ Race r-12 · "make the backtest loader 2x faster…" · 4 boxes · 23m
   3  loader-4   claude  ✓ 39s  +210 −9 7f   –         adds a cache that changes results on reruns
   4  loader-3   codex   ✗ 12s  +65 −30 3f   –         test_loader fails
 
-  hi box race keep r-12 loader-2     (or: hi box diff loader-2)
+  hi agent race keep r-12 loader-2     (or: hi box diff loader-2)
 ```
 
 In Slack, the message has **Keep #1**, **Keep…**, and **Discard all**
@@ -98,7 +98,7 @@ review, as with any box.
    measurements, and the table. No judge.
 2. The judge through the team's model, and the Slack message with buttons.
 3. Mixed agents tuned by results: hi records which agent won which race,
-   and `hi box race stats` shows it per project, so the team can see whether
+   and `hi agent race stats` shows it per project, so the team can see whether
    mixing pays.
 
 ## Risks

@@ -108,7 +108,8 @@ hi data get <org>/<name> [--to <dir>]    download a dataset, model, or bucket
 hi data get                              in a project: everything recorded in .hifin/data.json
 hi data run -- <command> [args]          run a command that can read the team's data
 hi data env                              print HF_ENDPOINT and HF_TOKEN for a shell
-hi box claude|codex|shell|run --data     a box whose hf and huggingface_hub reach the data
+hi box shell|run --data, hi agent --data
+                                         a box whose hf and huggingface_hub reach the data
 ```
 
 On the server box:
