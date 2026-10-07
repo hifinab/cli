@@ -553,6 +553,13 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.29.2 — `hi agent` in folders without git
+
+- [x] Folders without git: the agent works in place, and the report's
+  changed files come from the folder's files before and after; not in the
+  home folder or above it. Tested on 2026-10-07 with Claude Code and Codex.
+  Spec: [hi_agent_bundles.md, Folders](specs/ideas/hi_agent_bundles.md#folders-that-arent-git-repositories-release-1).
+
 ### v0.29.1 — Tasks from markdown files
 
 - [x] Task files: `hi agent brief.md`, `-` for stdin, and `--task-file`;
@@ -701,7 +708,7 @@ each type starts.
 
 ## Planned
 
-### v0.29.2 — Finish the team's data on every cloud machine
+### v0.29.3 — Finish the team's data on every cloud machine
 
 - [ ] `hi server expose revoke <run>` ends one run's token early; the server
   keeps the revoked run IDs until they would have expired.
@@ -789,11 +796,6 @@ Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
 - [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
-- [x] Folders without git: the agent works in place, and the report's
-  changed files come from the folder's files before and after; not in the
-  home folder or above it. Tested on 2026-10-07 with Claude Code and Codex;
-  not released yet.
-  Spec: [hi_agent_bundles.md, Folders](specs/ideas/hi_agent_bundles.md#folders-that-arent-git-repositories-release-1).
 - [ ] Bundles: named sets of skills whose
   `requires.json` builds a cached `hi-agent:<hash>` image, from the
   built-in and team template sources.
