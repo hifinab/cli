@@ -164,7 +164,7 @@ start works the same way after approval, since the device can SSH in;
 `--no-wait` refuses `--data`, because nobody is there to hand the token
 over. Community Cloud refuses `--data`. `--data` names whole
 repositories. `hi data get` is not on the machine, so the guide points to
-`hf download`.
+`hf download`. Tested on 2026-10-07 on RunPod through vmhiserver.
 
 ## Risks
 

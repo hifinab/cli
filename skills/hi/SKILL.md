@@ -209,7 +209,8 @@ hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
 8. For a RunPod or Shadeform machine from `hi compute up` that needs the
    team's data, add `--data <org>/<name>` (repeatable). Its shells then
    have `HF_ENDPOINT` and `HF_TOKEN` for those repositories until `--max`,
-   so `hf download` and `load_dataset` work over `hi compute ssh`. Never
+   so `hf download` and `load_dataset` work over `hi compute ssh` (on
+   RunPod, install them in a venv first: `python3 -m venv ~/venv`). Never
    copy a token onto a machine yourself, and never use it on Community
    Cloud (hi refuses).
 9. Inside a hi box (`$HI_BOX` is set), `HF_ENDPOINT` and a placeholder

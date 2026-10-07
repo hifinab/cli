@@ -553,6 +553,21 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.29.0 — The team's data on every cloud machine
+
+- [x] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
+  device gets a run token for the machine's lifetime before it is created,
+  and once it is up writes `HF_ENDPOINT` and the token into
+  `~/.hi/data.env` over SSH, which the machine's shells load; so
+  `hf download` and `load_dataset` work there, and the token never shows
+  in the provider's console. The same through a managed provider, after
+  approval; `--no-wait` and Community Cloud refuse `--data`.
+  Spec: [hi_server_expose.md, Cloud machines](specs/ideas/hi_server_expose.md#cloud-machines) and
+  [Releases](specs/ideas/hi_server_expose.md#releases) (2).
+  Tested on 2026-10-07 on RunPod (RTX 2000 Ada) through vmhiserver:
+  `hf download` and `load_dataset` of hifinab/bars-1d, and a refusal for a
+  repository not named.
+
 ### v0.28.0 — `hi agent`: agents get their own command
 
 - [x] `hi agent [claude|codex] "<task>"` runs the agent in a box on a new
@@ -674,17 +689,8 @@ each type starts.
 
 ## Planned
 
-### v0.29.0 — The team's data on every cloud machine
+### v0.29.1 — Finish the team's data on every cloud machine
 
-- [x] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
-  device gets a run token for the machine's lifetime before it is created,
-  and once it is up writes `HF_ENDPOINT` and the token into
-  `~/.hi/data.env` over SSH, which the machine's shells load; so
-  `hf download` and `load_dataset` work there, and the token never shows
-  in the provider's console. The same through a managed provider, after
-  approval; `--no-wait` and Community Cloud refuse `--data`.
-  Spec: [hi_server_expose.md, Cloud machines](specs/ideas/hi_server_expose.md#cloud-machines) and
-  [Releases](specs/ideas/hi_server_expose.md#releases) (2).
 - [ ] `hi server expose revoke <run>` ends one run's token early; the server
   keeps the revoked run IDs until they would have expired.
   Spec: [hi_server_expose.md, Run tokens](specs/ideas/hi_server_expose.md#run-tokens) and

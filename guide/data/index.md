@@ -138,8 +138,17 @@ those repositories, so a refusal costs nothing. Once the machine is up, hi
 writes `HF_ENDPOINT` and the token as `HF_TOKEN` into `~/.hi/data.env` on
 it (readable only by you), over SSH, and its shells load that file. The token
 never appears in the provider's console. `hf download`, `load_dataset`,
-and `from_pretrained` then work there for those repositories. Install `hf`
-with `pip install -U huggingface_hub` if the image lacks it.
+and `from_pretrained` then work there for those repositories. RunPod's
+images don't come with `hf`, and their Python refuses a plain `pip install`;
+install it in a virtual environment:
+
+```sh
+hi compute ssh train -- 'python3 -m venv ~/venv && ~/venv/bin/pip install -q huggingface_hub datasets'
+hi compute ssh train -- ~/venv/bin/hf download --repo-type dataset hifinab/bars-1d --local-dir data/bars-1d
+```
+
+A repository you didn't name answers with an error about the token's
+permissions.
 
 - Name whole repositories; download parts of them on the machine with
   `hf download --include`.
