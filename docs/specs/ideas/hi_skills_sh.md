@@ -15,8 +15,8 @@ Get skills the way most agent users already do, from
 and maintaining generic skills itself.
 
 ```sh
-hi skill find "excel"
-hi skill add anthropics/skills --skill xlsx
+hi skills                                     # search, browse, and pick, in a terminal
+hi skill add anthropics/skills --skill xlsx   # the same without a menu
 hi skill update
 ```
 
@@ -65,7 +65,8 @@ skills` is accepted as the same command, since `npx skills` users will type
 it.
 
 ```text
-hi skill                         write or update the hi skill here (as today)
+hi skill                         in a terminal: the selector (below); otherwise
+                                 write or update the hi skill here, as today
 hi skill find [query]            search skills.sh: name, source, installs, audits
 hi skill add <source>            install skills from a repository at its current commit
     [--skill a,b] [--global] [--yes] [--accept-risk] [--ref <branch|tag>]
@@ -76,9 +77,61 @@ hi skill update [name...]        move skills to their source's newest commit
 hi skill rm <name>... [--global]
 ```
 
-`hi skill --global`, `--print`, and `--force` keep working, and `hi skill`
-without arguments still writes the `hi` skill: it's what the guide, the
-templates, and agents already run.
+`hi skill --global`, `--print`, and `--force` keep writing the `hi` skill.
+`hi skill` without arguments opens the selector in a terminal, like
+`hi compute` opens its menu; without a terminal (agents, scripts, CI) it
+still writes the `hi` skill, which is what the guide, the templates, and
+agents already run.
+
+## The selector
+
+`hi skills` (or `hi skill`) in a terminal is one screen to search, browse,
+and pick:
+
+```text
+ Skills for ~/projects/pricing                       here · g: everywhere
+ Search skills.sh › excel▏
+
+ Installed
+   ✓ hi              built in                         up to date
+   ✓ xlsx            anthropics/skills        3f9c2e1  newer commit ↑
+ Results
+ › ◻ xlsx            anthropics/skills   ✓    211k    safe safe medium
+   ◻ excel-analysis  davila7/claude-code-templates  2.6k  safe low safe
+   ◻ minimax-xlsx    minimax-ai/skills          3.7k  no audit yet
+
+ ── xlsx · anthropics/skills ─────────────────────────────────────────
+ Spreadsheets: open, edit, create, and convert .xlsx, .csv, and .tsv.
+ License: Proprietary · 4 scripts (Python) · mentions openpyxl, pandas,
+ LibreOffice · audited 2026-09-15
+
+ type: search · ↑↓: move · space: pick · enter: install picked
+ u: update · x: remove · tab: installed / results / suggested · esc: quit
+```
+
+- **Search as you type**, after two characters (skills.sh's minimum),
+  waiting a moment after the last key so each word doesn't send a request.
+  Results are sorted with verified owners first, then by installs, and
+  show each partner's audit.
+- **Browse without typing.** skills.sh's open search can't list without a
+  query, and its leaderboard needs the Vercel token, so an empty search
+  shows hi's suggestions instead: the skills the built-in bundles use, and
+  popular skills from verified owners, a short list kept in this
+  repository.
+- **Details for the highlighted skill**: its description, license, scripts,
+  the tools it mentions, and its audits. Search results have no
+  description, so hi reads the skill's `SKILL.md` from GitHub when it's
+  highlighted, at the usual paths, and caches it.
+- **Install several at once**: pick with space, then enter shows the list
+  with licenses and any `high` or `critical` audit, and asks once.
+- **Installed skills** are listed first, with newer commits marked; `u`
+  shows the change and updates, `x` removes.
+- **`g`** switches between this project and every project (`--global`).
+- `DO_NOT_TRACK=1`, or skills.sh unreachable: the selector shows installed
+  skills and the suggestions, and says search is off.
+
+It's a Bubble Tea screen, like `hi compute live`; every action in it is also
+a command above, so nothing needs the selector.
 
 ## Sources
 
@@ -292,7 +345,8 @@ starts, so an agent never needs `hi skill add` mid-task.
 1. **`hi skill` with sources.** `find`, `add`, `ls`, `show`, `update`
    (with `--check`), `rm`; GitHub, git, and local sources; the shared
    `skills-lock.json`; audits and the risk question; `hi skills` as an
-   alias. `hi skill` alone unchanged.
+   alias; the selector in a terminal. Without a terminal, `hi skill` alone
+   is unchanged.
 2. **Bundles from skills.sh.** Bundle files list skills by source, commit,
    and needs; `hi skill update --bundles`; the hand-written skills removed,
    and `hi-data` folded into `hi`.
@@ -315,8 +369,8 @@ starts, so an agent never needs `hi skill add` mid-task.
 
 ## Open questions
 
-- [ ] Should `find` show only verified owners by default, with `--all` for
-  the rest?
+- [ ] Should `find` and the selector show only verified owners by default,
+  with `--all` (or a key) for the rest?
 - [ ] Is a `cite-sources`-style skill worth keeping built in, or is there a
   good first-party research skill (Tavily's needs an API key)?
 - [ ] Should `layer.json`'s `skills` in templates accept `owner/repo/skill`
@@ -328,6 +382,9 @@ starts, so an agent never needs `hi skill add` mid-task.
 
 From 2026-10-07:
 
+- The open search needs a query of at least two characters, returns no
+  descriptions, and has no leaderboard; browsing without a query has to
+  come from hi.
 - skills.sh's documented API needs a Vercel OIDC token
   ([API reference](https://www.skills.sh/docs/api),
   [changelog](https://vercel.com/changelog/the-skills-sh-api-is-now-available)).
