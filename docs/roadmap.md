@@ -676,11 +676,13 @@ each type starts.
 
 ### v0.29.0 — The team's data on every cloud machine
 
-- [ ] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
-  machine gets `HF_ENDPOINT` and a run token for its lifetime, so
-  `hf download`, `load_dataset`, and `hi data get` work over SSH. On a
-  managed provider the server issues the token when the start is approved;
-  Community Cloud refuses `--data` or asks first.
+- [x] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
+  device gets a run token for the machine's lifetime before it is created,
+  and once it is up writes `HF_ENDPOINT` and the token into
+  `~/.hi/data.env` over SSH, which the machine's shells load; so
+  `hf download` and `load_dataset` work there, and the token never shows
+  in the provider's console. The same through a managed provider, after
+  approval; `--no-wait` and Community Cloud refuse `--data`.
   Spec: [hi_server_expose.md, Cloud machines](specs/ideas/hi_server_expose.md#cloud-machines) and
   [Releases](specs/ideas/hi_server_expose.md#releases) (2).
 - [ ] `hi server expose revoke <run>` ends one run's token early; the server

@@ -106,6 +106,9 @@ type upRequest struct {
 	// brokered means a hi server starts this for a connected device; the
 	// server has no SSH access to the instance.
 	brokered bool
+	// data are the team's repositories the machine may read through the
+	// hi server (--data).
+	data []dataRunRef
 }
 
 // runRequest is either a Python script (script, args) or a container image
@@ -305,8 +308,10 @@ Options for up and run:
   --env KEY=VALUE    Environment variable for run; repeatable
   --secret KEY       Pass $KEY as an encrypted secret (Hugging Face)
   --data ORG/NAME[/PATTERN]
-                     Download the team's data into data/NAME before the script
-                     starts, through signed links from the hi server (hi data)
+                     run: download the team's data into data/NAME before the script
+                     starts, through the hi server (hi data). up (RunPod, Shadeform):
+                     the machine's shells get HF_ENDPOINT and HF_TOKEN to read
+                     ORG/NAME through the hi server until --max
   --detach           run: return after starting (Hugging Face)
   --image <image>    Container image (Hugging Face, RunPod)
   --namespace <ns>   Account to bill this once (Hugging Face; see billing)
@@ -537,11 +542,13 @@ func computeUpCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	namespace := flags.String("namespace", "", "account or organization to bill")
 	reason := flags.String("reason", "", "why you need it (managed providers)")
 	noWait := flags.Bool("no-wait", false, "return while approval is pending (managed providers)")
+	var data repeatedFlag
+	flags.Var(&data, "data", "the team's data the machine may read: <org>/<name>")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 {
-		return usageError{"usage: hi compute up [--on P] [--gpu HW] [--name N] [--max D] [--image I] [--namespace NS] [--high-mem] [--reason R] [--no-wait] [--yes] [--dry-run]"}
+		return usageError{"usage: hi compute up [--on P] [--gpu HW] [--name N] [--max D] [--image I] [--namespace NS] [--high-mem] [--data ORG/NAME] [--reason R] [--no-wait] [--yes] [--dry-run]"}
 	}
 
 	provider, err := resolveProvider(*on, *gpu)
@@ -560,6 +567,9 @@ func computeUpCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 		return err
 	}
 	if request.name, err = chooseInstanceName(*name, request.hardware.name); err != nil {
+		return err
+	}
+	if request.data, err = checkDataUp(provider, request, data); err != nil {
 		return err
 	}
 	return startInstance(provider, request, *yes, *dryRun, stdin, stdout, stderr)
@@ -598,6 +608,9 @@ func startInstance(
 
 	if dryRun {
 		fmt.Fprintf(stdout, "Would run: %s\n", strings.Join(provider.upCommand(request), " "))
+		if len(request.data) > 0 {
+			fmt.Fprintf(stdout, "Would give it a token to read %s through the hi server.\n", dataRefIDs(request.data))
+		}
 		return nil
 	}
 	if err := requireStatus(provider); err != nil {
@@ -621,6 +634,24 @@ func startInstance(
 		}
 	}
 
+	// The data token comes first: a refusal costs nothing yet.
+	var access apiRunAccess
+	if len(request.data) > 0 {
+		if access, err = requestDataUp(request); err != nil {
+			return err
+		}
+	}
+	// installData hands the machine its data token once it is up.
+	installData := func() error {
+		if len(request.data) == 0 {
+			return nil
+		}
+		if err := installDataUp(provider, request, access, stdout); err != nil {
+			return fmt.Errorf("%s is up, but hi could not give it the team's data: %w\nIt still bills; stop it with hi compute stop %s", request.name, err, request.name)
+		}
+		return nil
+	}
+
 	// Billing starts when the machine is created, not when it is ready.
 	created := computeNow()
 	if err := provider.create(request, stdout, stderr); err != nil {
@@ -628,6 +659,9 @@ func startInstance(
 	}
 	if isManaged(provider) {
 		// The server keeps the record and enforces the limit.
+		if err := installData(); err != nil {
+			return err
+		}
 		printNextSteps(request.name, stdout)
 		return nil
 	}
@@ -653,6 +687,9 @@ func startInstance(
 		if err := saveComputeRecord(record); err != nil {
 			return err
 		}
+	}
+	if err := installData(); err != nil {
+		return err
 	}
 
 	printNextSteps(request.name, stdout)

@@ -152,6 +152,20 @@ machine, so it would issue the token itself when the start is approved,
 rather than the device at request time; RunPod's Community Cloud, where
 `hi` already warns about secrets, should refuse `--data` or ask first.
 
+As built (2026-10-07): the device asks for the token, as for runs, just
+before the machine is created, so a refusal costs nothing; the token's
+lifetime is `--max` plus the usual grace, 24 hours with `--max none`.
+Once the machine is up, the device writes `HF_ENDPOINT`, `HF_TOKEN`, and
+`HI_DATA_REPOS` into `~/.hi/data.env` (mode 600) over SSH, and a line at
+the top of `~/.bashrc` and `~/.profile` loads it, so commands over `hi
+compute ssh` have it too. Pod environment variables were not used: RunPod
+shows them in its console, and they don't reach SSH sessions. A managed
+start works the same way after approval, since the device can SSH in;
+`--no-wait` refuses `--data`, because nobody is there to hand the token
+over. Community Cloud refuses `--data`. `--data` names whole
+repositories. `hi data get` is not on the machine, so the guide points to
+`hf download`.
+
 ## Risks
 
 - **The public URL is on the internet** while runs use it. Only `/hf` and

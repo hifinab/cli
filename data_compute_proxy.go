@@ -34,8 +34,9 @@ type dataRunProxyRepo struct {
 var errNoRunAccess = errors.New("no run access")
 
 // requestRunAccess asks the server for a run token for the --data
-// repositories, pinning datasets and models to their current commit.
-func requestRunAccess(refs []dataRunRef, seconds int64, run string, stderr io.Writer) ([]dataRunProxyRepo, apiRunAccess, error) {
+// repositories; with pin, it also pins datasets and models to their
+// current commit. It returns errNoRunAccess when the server can't expose.
+func requestRunAccess(refs []dataRunRef, seconds int64, run string, pin bool) ([]dataRunProxyRepo, apiRunAccess, error) {
 	var access apiRunAccess
 	client, connection, err := dataClient()
 	if err != nil {
@@ -54,7 +55,7 @@ func requestRunAccess(refs []dataRunRef, seconds int64, run string, stderr io.Wr
 			return nil, access, err
 		}
 		repo := dataRunProxyRepo{Kind: item.Kind, ID: item.ID, To: defaultDataFolder(item), Include: ref.include}
-		if item.Kind != "bucket" {
+		if pin && item.Kind != "bucket" {
 			token, endpoint, err := dataToken(client, connection, item.Kind+":"+item.ID)
 			if err != nil {
 				return nil, access, err
@@ -69,8 +70,7 @@ func requestRunAccess(refs []dataRunRef, seconds int64, run string, stderr io.Wr
 	err = client.call(http.MethodPost, "/v1/data/run-access", map[string]any{"scopes": scopes, "seconds": seconds, "run": run}, &access)
 	var reply *serverReplyError
 	if errors.As(err, &reply) && (reply.status == http.StatusNotFound || reply.status == http.StatusServiceUnavailable) {
-		fmt.Fprintf(stderr, "hi: the server can't expose the data proxy (%s); using signed links instead\n", reply.message)
-		return nil, access, errNoRunAccess
+		return nil, access, fmt.Errorf("%w: %s", errNoRunAccess, reply.message)
 	}
 	return repos, access, err
 }
@@ -218,7 +218,11 @@ func prepareDataRunProxy(request *runRequest, refs []dataRunRef, script []byte, 
 	if request.max > 0 && request.max != noLimit {
 		seconds = int64(request.max.Seconds())
 	}
-	repos, access, err := requestRunAccess(refs, seconds, request.name, stderr)
+	repos, access, err := requestRunAccess(refs, seconds, request.name, true)
+	if errors.Is(err, errNoRunAccess) {
+		fmt.Fprintf(stderr, "hi: the server can't expose the data proxy (%s); using signed links instead\n",
+			strings.TrimPrefix(err.Error(), errNoRunAccess.Error()+": "))
+	}
 	if err != nil {
 		return nil, err
 	}

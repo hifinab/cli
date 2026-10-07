@@ -123,6 +123,33 @@ On Hugging Face Jobs, the server opens a narrow public address with
 NetBird for the run, so the script can also call `load_dataset` for the
 repositories you named. See [Run a script](/guide/compute/run/#the-teams-data).
 
+## On a machine you SSH into
+
+`hi compute up --data` gives a RunPod or Shadeform machine the repositories
+you name, through the same public address, until its `--max`:
+
+```sh
+hi compute up --on runpod --gpu rtx-4090 --name train --max 4h --data hifinab/bars-1d --data hifinab/ranker
+hi compute ssh train -- hf download --repo-type dataset hifinab/bars-1d --local-dir data/bars-1d
+```
+
+Before the machine starts, hi asks the server for a token that reads only
+those repositories, so a refusal costs nothing. Once the machine is up, hi
+writes `HF_ENDPOINT` and the token as `HF_TOKEN` into `~/.hi/data.env` on
+it (readable only by you), over SSH, and its shells load that file. The token
+never appears in the provider's console. `hf download`, `load_dataset`,
+and `from_pretrained` then work there for those repositories. Install `hf`
+with `pip install -U huggingface_hub` if the image lacks it.
+
+- Name whole repositories; download parts of them on the machine with
+  `hf download --include`.
+- Not on RunPod's Community Cloud: those are third-party hosts, so hi
+  refuses.
+- Through a team server that manages the provider, the start still needs
+  its approval, and `--no-wait` can't be used: hi hands the machine its
+  token once it is up.
+- With `--max none`, the token lasts 24 hours.
+
 ## What the server does
 
 ```text

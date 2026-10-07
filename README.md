@@ -334,7 +334,9 @@ repositories directly, and `hi box --data` gives a box the same.
 `hi compute run --data hifinab/bars-1d train.py` gives a cloud job the data:
 on Hugging Face Jobs the server opens a narrow public address with
 `netbird expose` for the run, so the script can also call `load_dataset`;
-elsewhere it sends signed download links. See
+elsewhere it sends signed download links. `hi compute up --data
+hifinab/bars-1d` gives a RunPod or Shadeform machine `HF_ENDPOINT` and a
+token for those repositories in its shells. See
 [Download the team's data](https://hifin.sh/guide/data/).
 
 ## Agent skill

@@ -69,7 +69,7 @@ description: Every hi command and option in one place.
 | `--image <image>`   | ✓  |     |       | Container image (Hugging Face, RunPod)               |
 | `--env KEY=VALUE`   |    | ✓   |       | Environment variable; repeatable                     |
 | `--secret KEY`      |    | ✓   |       | Encrypted secret from your shell (Hugging Face)      |
-| `--data <org>/<name>[/<pattern>]` | | ✓ | | The team's data into `data/<name>` first, through signed links (`hi data`) |
+| `--data <org>/<name>[/<pattern>]` | ✓ | ✓ | | run: the team's data into `data/<name>` first. up (RunPod, Shadeform; whole repositories): `HF_ENDPOINT` and `HF_TOKEN` in the machine's shells (`hi data`) |
 | `--detach`          |    | ✓   |       | Return after starting (Hugging Face)                 |
 | `--quant <quant>`   |    |     | ✓     | GGUF quantization, such as `Q4_K_M`                  |
 | `--ctx <tokens>`    |    |     | ✓     | Context length                                       |
