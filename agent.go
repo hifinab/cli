@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // hi agent hands a task to a coding agent in a box, waits for it, and
@@ -264,6 +265,35 @@ func codexAuthPath() string {
 	return filepath.Join(firstNonEmpty(os.Getenv("CODEX_HOME"), filepath.Join(home, ".codex")), "auth.json")
 }
 
+// syncCodexAuth copies a sign-in that Codex refreshed in the box back to
+// this machine. A refresh token works once, so when a box refreshes the
+// sign-in, the machine's copy stops working unless it gets the new one.
+func syncCodexAuth(meta boxMeta) {
+	if meta.Agent != "codex" {
+		return
+	}
+	boxed, err := os.ReadFile(boxStateFile(meta.Name, "home", ".codex", "auth.json"))
+	if err != nil {
+		return
+	}
+	host, _ := os.ReadFile(codexAuthPath())
+	if !codexLastRefresh(boxed).After(codexLastRefresh(host)) {
+		return
+	}
+	temp := codexAuthPath() + ".hi-box"
+	if os.WriteFile(temp, boxed, 0o600) != nil || os.Rename(temp, codexAuthPath()) != nil {
+		os.Remove(temp)
+	}
+}
+
+func codexLastRefresh(data []byte) time.Time {
+	var auth struct {
+		LastRefresh time.Time `json:"last_refresh"`
+	}
+	json.Unmarshal(data, &auth)
+	return auth.LastRefresh
+}
+
 // agentBoxSetup prepares the box's home folder and environment for the
 // agent, adds its mounts, and returns the box's command. A task gets the
 // report contract, and the agent leaves its result in agentResultDir.
@@ -414,6 +444,7 @@ func finishAgent(meta boxMeta, asJSON bool, info, stdout io.Writer) error {
 		engine.interactive(nil, io.Discard, io.Discard, "wait", container)
 	}
 	engine.output("stop", "-t", "2", container+"-proxy")
+	syncCodexAuth(meta)
 	report := collectAgentReport(engine, meta)
 	if asJSON {
 		if err := printAgentJSON(report, stdout); err != nil {

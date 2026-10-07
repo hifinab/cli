@@ -184,6 +184,11 @@ func TestAgentCodex(t *testing.T) {
 		t.Fatalf("codex command: %s", run)
 	}
 
+	// Codex refreshed its sign-in in the box: the machine gets the new one,
+	// since the old refresh token no longer works.
+	refreshed := `{"tokens":{"refresh_token":"new"},"last_refresh":"2026-10-07T18:00:00Z"}`
+	os.WriteFile(boxStateFile("c1", "home", ".codex", "auth.json"), []byte(refreshed), 0o600)
+
 	// No report block is a warning, and the session ID comes from the log.
 	os.WriteFile(boxStateFile("c1", "home", agentResultDir, "last.txt"), []byte("Looks fine.\n"), 0o600)
 	*exited = "0"
@@ -195,6 +200,18 @@ func TestAgentCodex(t *testing.T) {
 	json.Unmarshal(stdout.Bytes(), &report)
 	if report.Status != "done" || report.Text != "Looks fine." || report.SessionID != "019a-codex" || len(report.Warnings) != 1 || len(report.ChangedFiles) != 0 {
 		t.Fatalf("report = %+v", report)
+	}
+	if host, _ := os.ReadFile(codexAuthPath()); string(host) != refreshed {
+		t.Fatalf("the machine's Codex sign-in = %s", host)
+	}
+	if info, _ := os.Stat(codexAuthPath()); info.Mode().Perm() != 0o600 {
+		t.Fatalf("auth.json mode %v", info.Mode())
+	}
+	// An older sign-in from a box doesn't replace a newer one.
+	os.WriteFile(boxStateFile("c1", "home", ".codex", "auth.json"), []byte(`{"last_refresh":"2026-10-01T00:00:00Z"}`), 0o600)
+	syncCodexAuth(boxMeta{Name: "c1", Agent: "codex"})
+	if host, _ := os.ReadFile(codexAuthPath()); string(host) != refreshed {
+		t.Fatalf("an older sign-in replaced the machine's: %s", host)
 	}
 }
 

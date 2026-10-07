@@ -501,6 +501,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	err = engine.interactive(stdin, stdout, stderr, run...)
 	engine.output("stop", "-t", "2", "hi-box-"+name+"-proxy")
+	syncCodexAuth(meta)
 	switch kind {
 	case "run":
 		// Pass the command's own status on.
@@ -828,6 +829,7 @@ func removeBox(engine boxEngine, meta boxMeta, force bool, stdout io.Writer) err
 		}
 	}
 	teardownBox(engine, meta)
+	syncCodexAuth(meta)
 	removeBoxWorktree(meta, force)
 	if err := os.RemoveAll(boxStateFile(meta.Name)); err != nil {
 		return err

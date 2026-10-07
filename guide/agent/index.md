@@ -153,7 +153,10 @@ hi agent token claude       # paste it; kept in ~/.config/hi, never in a box
 
 **Codex** gets a copy of its sign-in (`~/.codex/auth.json`) in the box's
 home folder for now, and its own hosts (`chatgpt.com` and OpenAI's) on top
-of the box's network preset.
+of the box's network preset. A refresh token works only once, so when
+Codex refreshes its sign-in in the box, hi copies the new one back to
+`~/.codex/auth.json` when the run ends or the box is removed. Otherwise
+Codex on your machine would stop working.
 
 ## Review and clean up
 

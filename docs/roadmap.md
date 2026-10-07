@@ -553,6 +553,18 @@ each type starts.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.29.1 — Tasks from markdown files
+
+- [x] Task files: `hi agent brief.md`, `-` for stdin, and `--task-file`;
+  the task goes to the agent on stdin, and the report has `task_file`.
+  Tested on 2026-10-07 in rootless Podman: Claude Code from an uncommitted
+  brief; Codex got its task on stdin, but its sign-in had been spent (below).
+  Spec: [hi_agent_bundles.md, Task files](specs/ideas/hi_agent_bundles.md#task-files-release-1).
+- [x] A Codex sign-in refreshed in a box is copied back to
+  `~/.codex/auth.json` when the run ends or the box is removed; before, the
+  box spent the one-time refresh token and Codex on the machine stopped
+  working.
+
 ### v0.29.0 — The team's data on every cloud machine
 
 - [x] `hi compute up --data <org>/<name>` for RunPod and Shadeform: the
@@ -689,7 +701,7 @@ each type starts.
 
 ## Planned
 
-### v0.29.1 — Finish the team's data on every cloud machine
+### v0.29.2 — Finish the team's data on every cloud machine
 
 - [ ] `hi server expose revoke <run>` ends one run's token early; the server
   keeps the revoked run IDs until they would have expired.
@@ -777,11 +789,6 @@ Dependency: extends the v0.7.1 `hi skill` and the v0.17.0 server templates.
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
 - [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
-- [x] Task files: `hi agent brief.md`, `-` for stdin, and `--task-file`;
-  the task goes to the agent on stdin, and the report has `task_file`.
-  Tested on 2026-10-07 with Claude Code and Codex in rootless Podman; not
-  released yet.
-  Spec: [hi_agent_bundles.md, Task files](specs/ideas/hi_agent_bundles.md#task-files-release-1).
 - [ ] Folders without git, then bundles: named sets of skills whose
   `requires.json` builds a cached `hi-agent:<hash>` image, from the
   built-in and team template sources.
