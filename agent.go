@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -470,7 +471,26 @@ func finishAgent(meta boxMeta, asJSON bool, info, stdout io.Writer) error {
 	container := "hi-box-" + meta.Name
 	if engine.state(container) == "running" {
 		fmt.Fprintf(info, "%s is working in %s. hi box attach %s follows it; Ctrl+C stops waiting, not the agent.\n", agentDisplayName(meta.Agent), meta.Name, meta.Name)
-		engine.interactive(nil, io.Discard, io.Discard, "wait", container)
+		// The status line goes away before anything else is printed,
+		// including after Ctrl+C.
+		interrupts := make(chan os.Signal, 1)
+		signal.Notify(interrupts, os.Interrupt)
+		defer signal.Stop(interrupts)
+		stop, waited := make(chan struct{}), make(chan struct{})
+		status := showAgentStatus(info, meta, stop)
+		go func() {
+			engine.interactive(nil, io.Discard, io.Discard, "wait", container)
+			close(waited)
+		}()
+		select {
+		case <-waited:
+			close(stop)
+			<-status
+		case <-interrupts:
+			close(stop)
+			<-status
+			return exitStatusError{code: 130, message: fmt.Sprintf("stopped waiting; %s keeps working. hi agent wait %s waits again", meta.Name, meta.Name)}
+		}
 	}
 	engine.output("stop", "-t", "2", container+"-proxy")
 	syncCodexAuth(meta)

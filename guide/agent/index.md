@@ -153,8 +153,19 @@ Network: open (agent-browser (open): visits whatever sites the task needs)
 
 ## While it works
 
-`hi agent` waits until the agent is done. While it works,
-`hi box attach <name>` in another terminal follows it. Codex shows its
+`hi agent` waits until the agent is done. While it works, one line under
+the command shows that it is: a red scanner going back and forth, the time
+so far, the tokens in and out, the steps taken, and the latest one.
+
+```text
+▬▬▬▬▬▬▬▬▬▬▬▬  4m12s · 1.2M in · 18k out · 12 steps · Bash: .venv/bin/python backtest.py
+```
+
+hi reads it from the agent's own session log in the box's home folder, so
+it works the same for Claude Code and Codex. Tokens in include cached
+ones. The line shows only in a terminal; `hi agent wait` shows it too.
+
+`hi box attach <name>` in another terminal follows the agent. Codex shows its
 progress; Claude Code prints only its final answer. Ctrl+C stops waiting,
 not the agent:
 

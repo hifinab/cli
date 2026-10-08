@@ -578,6 +578,14 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.31.4 — See that an agent is working
+
+- [x] While `hi agent` and `hi agent wait` wait, one line shows a red
+  scanner, the time so far, tokens in and out, the steps taken, and the
+  latest step, read from the agent's session log in the box's home
+  folder, for Claude Code and Codex alike. Ctrl+C clears it and says how
+  to wait again.
+
 ### v0.31.3 — timg in the terminal tools
 
 - [x] `hi install terminal` also installs
