@@ -578,6 +578,14 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.31.6 — The agent's model
+
+- [x] `hi agent --model <model>` and `model:` in a brief's front matter.
+  Without them, the box uses the model in your own Claude Code or Codex
+  settings, else `opus` for Claude Code: with only a placeholder token in
+  the box, Claude Code can't see the plan and chose Sonnet. The box's first
+  line names the model.
+
 ### v0.31.5 — Stats for each agent run
 
 - [x] The report ends with how long the run took, its steps, tokens in

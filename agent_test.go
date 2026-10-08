@@ -363,3 +363,55 @@ func TestAgentWorksInPlaceOutsideGit(t *testing.T) {
 		t.Fatalf("above home: %d %s", status, stderr.String())
 	}
 }
+
+func TestAgentModel(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("ANTHROPIC_MODEL", "")
+	// Without settings, opus for Claude Code and Codex's own default.
+	if got := defaultAgentModel("claude"); got != "opus" {
+		t.Fatalf("claude without settings: %q", got)
+	}
+	if got := defaultAgentModel("codex"); got != "" {
+		t.Fatalf("codex without settings: %q", got)
+	}
+	// With settings, the same model as on this machine.
+	writeSkillTestFile(t, filepath.Join(home, ".claude", "settings.json"), `{"model":"opus[1m]"}`, 0o644)
+	writeSkillTestFile(t, filepath.Join(home, ".codex", "config.toml"), "model = \"gpt-6.1-sol\"\nmodel_reasoning_effort = \"medium\"\n[profiles.fast]\nmodel = \"other\"\n", 0o644)
+	if got := defaultAgentModel("claude"); got != "opus[1m]" {
+		t.Fatalf("claude: %q", got)
+	}
+	if got := defaultAgentModel("codex"); got != "gpt-6.1-sol" {
+		t.Fatalf("codex: %q", got)
+	}
+
+	front, _, err := splitFrontMatter("---\nmodel: sonnet\n---\nGo.", "brief.md")
+	if err != nil || front.Model != "sonnet" {
+		t.Fatalf("%+v %v", front, err)
+	}
+	if _, _, err := splitFrontMatter("---\nmodel: x; rm -rf /\n---\nGo.", "brief.md"); err == nil {
+		t.Fatal("a model name with a shell command")
+	}
+	options := boxOptions{fromBrief: front, model: "haiku"}
+	applyFrontMatter("claude", &options, strings.NewReader(""), io.Discard)
+	if options.model != "haiku" {
+		t.Fatalf("the flag didn't win: %q", options.model)
+	}
+
+	// The model reaches each agent's command.
+	boxHome := t.TempDir()
+	for kind, want := range map[string]string{"claude": "--model 'opus[1m]'", "codex": "-m 'opus[1m]'"} {
+		writeSkillTestFile(t, filepath.Join(home, ".codex", "auth.json"), `{}`, 0o600)
+		var run []string
+		command, err := agentBoxSetup(kind, "Go.", boxMeta{Name: "m", Model: "opus[1m]", Workdir: "/w"}, boxHome, &run, map[string]string{})
+		if err != nil {
+			t.Logf("%s: %v", kind, err) // the agent isn't installed here
+			continue
+		}
+		if !strings.Contains(strings.Join(command, " "), want) {
+			t.Fatalf("%s: %v", kind, command)
+		}
+	}
+}

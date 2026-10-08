@@ -39,6 +39,18 @@ signed in on this machine, and Codex otherwise. The agent starts from your
 last commit, on a new worktree and the branch `hi-box/<name>`; uncommitted
 changes in the project aren't in it, and hi says so when there are some.
 
+### The model
+
+`--model` picks the agent's model, for example `--model sonnet` or
+`--model gpt-6.1-sol`. Without it, the box uses the model in your own
+settings (`model` in `~/.claude/settings.json`, or in
+`~/.codex/config.toml`), so it behaves like the agent on this machine. If
+your settings don't name one, Claude Code gets `opus`: in the box it only
+holds a placeholder token, so it can't see your plan and would otherwise
+choose its plan-less default, Sonnet. Codex keeps its own default. The box's
+first line says which model it runs, and the report's closing line says
+which one did the work.
+
 ## In a folder without git
 
 Not every task is code. In a folder that isn't a git repository, even an
@@ -98,7 +110,8 @@ network: open
 Find the five largest GPU cloud providers in the Nordics…
 ```
 
-It can set `agent`, `bundles`, `network`, `allow`, `data`, and `gpu`.
+It can set `agent`, `model`, `bundles`, `network`, `allow`, `data`, and
+`gpu`.
 Flags on the command line win. A brief can come from anyone, another agent
 too, so what would widen the box (`network`, `allow`, `data`, `gpu`) is
 asked about first; without a terminal it's left out, and hi says which

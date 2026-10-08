@@ -270,6 +270,7 @@ hi agent codex --json "review the diff between main and this branch; don't chang
 hi agent claude --json --detach "<task>"    # returns at once
 hi agent wait <name> --json                 # the report when it's done
 hi agent codex --json brief.md              # a long task: write it to a .md file
+hi agent claude --model sonnet --json "<task>"   # another model; default: the user's own, else opus
 hi agent claude --json --bundle web --network open "<task>"   # skills and tools for browsing
 ```
 

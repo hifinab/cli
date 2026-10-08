@@ -122,6 +122,8 @@ options:
   --detach               start the run and return; hi agent wait <name> gets the report
   --json                 the report as JSON on stdout
   --task-file <path>     the task from a file whose name doesn't end in .md
+  --model <model>        the agent's model, such as opus or gpt-6.1-sol; without it, the model in your
+                         own Claude Code or Codex settings, else opus for Claude Code
   --bundle a,b           attach bundles: their skills, and an image with what they need (hi bundle ls)
   --name, --network, --allow, --gpu, --data, --here, --image, --memory
                          the box's options, as for hi box
@@ -156,6 +158,12 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 		}
 	} else if err := agentReady(kind); err != nil {
 		return err
+	}
+	if options.model == "" {
+		options.model = defaultAgentModel(kind)
+	}
+	if options.model != "" && !agentModelName.MatchString(options.model) {
+		return fmt.Errorf("%q isn't a model name", options.model)
 	}
 	options.words = nil
 	if task != "" {
@@ -370,13 +378,21 @@ func agentBoxSetup(kind, prompt string, meta boxMeta, homeDir string, run *[]str
 		if err := os.WriteFile(filepath.Join(homeDir, ".claude.json"), data, 0o600); err != nil {
 			return nil, err
 		}
+		model := ""
+		if meta.Model != "" {
+			model = " --model " + shellQuote(meta.Model)
+		}
 		if prompt == "" {
-			return []string{"claude", "--dangerously-skip-permissions"}, nil
+			command := []string{"claude", "--dangerously-skip-permissions"}
+			if meta.Model != "" {
+				command = append(command, "--model", meta.Model)
+			}
+			return command, nil
 		}
 		// The JSON result goes to a file, and its final text to the log, so
 		// hi box attach still shows the answer. Images without jq log the
 		// JSON.
-		script := `claude -p --output-format json --dangerously-skip-permissions < ` + results + `/task.md > ` + results + `/result.json; status=$?; ` +
+		script := `claude -p --output-format json --dangerously-skip-permissions` + model + ` < ` + results + `/task.md > ` + results + `/result.json; status=$?; ` +
 			`if command -v jq >/dev/null 2>&1; then jq -r '.result // empty' ` + results + `/result.json; else cat ` + results + `/result.json; fi; exit $status`
 		return []string{"sh", "-c", script}, nil
 	case "codex":
@@ -395,10 +411,18 @@ func agentBoxSetup(kind, prompt string, meta boxMeta, homeDir string, run *[]str
 		if err := os.WriteFile(filepath.Join(homeDir, ".codex", "auth.json"), auth, 0o600); err != nil {
 			return nil, err
 		}
-		if prompt == "" {
-			return []string{"codex", "--dangerously-bypass-approvals-and-sandbox"}, nil
+		model := ""
+		if meta.Model != "" {
+			model = " -m " + shellQuote(meta.Model)
 		}
-		return []string{"sh", "-c", "exec codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check -o " +
+		if prompt == "" {
+			command := []string{"codex", "--dangerously-bypass-approvals-and-sandbox"}
+			if meta.Model != "" {
+				command = append(command, "-m", meta.Model)
+			}
+			return command, nil
+		}
+		return []string{"sh", "-c", "exec codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check" + model + " -o " +
 			results + "/last.txt - < " + results + "/task.md"}, nil
 	}
 	return nil, fmt.Errorf("unknown agent %q", kind)
@@ -702,6 +726,7 @@ func printAgentReport(report agentReport, w io.Writer) {
 // command line also takes. Flags win.
 type agentFrontMatter struct {
 	Agent   string
+	Model   string
 	Bundles []string
 	Network string
 	Allow   []string
@@ -759,6 +784,11 @@ func splitFrontMatter(task, source string) (*agentFrontMatter, string, error) {
 			if !agentKinds[front.Agent] {
 				return nil, "", fmt.Errorf("%s: agent is claude or codex, not %q", source, front.Agent)
 			}
+		case "model":
+			front.Model = strings.Trim(value, `"'`)
+			if !agentModelName.MatchString(front.Model) {
+				return nil, "", fmt.Errorf("%s: %q isn't a model name", source, front.Model)
+			}
 		case "bundles", "bundle":
 			front.Bundles = list()
 		case "network":
@@ -773,7 +803,7 @@ func splitFrontMatter(task, source string) (*agentFrontMatter, string, error) {
 		case "gpu":
 			front.GPU, err = flag()
 		default:
-			return nil, "", fmt.Errorf("%s: front matter can set agent, bundles, network, allow, data, and gpu, not %s", source, key)
+			return nil, "", fmt.Errorf("%s: front matter can set agent, model, bundles, network, allow, data, and gpu, not %s", source, key)
 		}
 		if err != nil {
 			return nil, "", err
@@ -796,6 +826,9 @@ func applyFrontMatter(kind string, options *boxOptions, stdin io.Reader, stdout 
 	}
 	if len(options.bundles) == 0 {
 		options.bundles = front.Bundles
+	}
+	if options.model == "" {
+		options.model = front.Model
 	}
 	var asks, flags []string
 	var apply []func()
@@ -891,3 +924,48 @@ func containerSeconds(engine boxEngine, container string) int {
 	}
 	return int(finished.Sub(started).Round(time.Second).Seconds())
 }
+
+// agentModelName is what --model and a brief's model: accept: a name or
+// alias such as opus, claude-opus-5-5, opus[1m], or gpt-6.1-sol.
+var agentModelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/\[\]-]{0,99}$`)
+
+// defaultAgentModel is the model a box's agent uses without --model: the
+// one in your own settings, so a box behaves like the agent on this
+// machine. Claude Code in a box can't see which plan you're on, since only
+// a placeholder token is there, so it would pick its plan-less default;
+// opus stands in for that. Codex keeps its own default.
+func defaultAgentModel(kind string) string {
+	home, _ := os.UserHomeDir()
+	switch kind {
+	case "claude":
+		var settings struct {
+			Model string `json:"model"`
+		}
+		configDir := firstNonEmpty(os.Getenv("CLAUDE_CONFIG_DIR"), filepath.Join(home, ".claude"))
+		if data, err := os.ReadFile(filepath.Join(configDir, "settings.json")); err == nil && json.Unmarshal(data, &settings) == nil && agentModelName.MatchString(settings.Model) {
+			return settings.Model
+		}
+		if model := os.Getenv("ANTHROPIC_MODEL"); agentModelName.MatchString(model) {
+			return model
+		}
+		return "opus"
+	case "codex":
+		data, err := os.ReadFile(filepath.Join(firstNonEmpty(os.Getenv("CODEX_HOME"), filepath.Join(home, ".codex")), "config.toml"))
+		if err != nil {
+			return ""
+		}
+		// Only the top-level model, before the first [table].
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "[") {
+				break
+			}
+			if match := codexConfigModel.FindStringSubmatch(line); match != nil && agentModelName.MatchString(match[1]) {
+				return match[1]
+			}
+		}
+	}
+	return ""
+}
+
+var codexConfigModel = regexp.MustCompile(`^model\s*=\s*["']([^"']+)["']`)

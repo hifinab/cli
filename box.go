@@ -69,6 +69,7 @@ type boxMeta struct {
 	Prompt     string    `json:"prompt,omitempty"`
 	NotGit     bool      `json:"not_git,omitempty"`
 	TaskFile   string    `json:"task_file,omitempty"`
+	Model      string    `json:"model,omitempty"`
 	Bundles    []string  `json:"bundles,omitempty"`
 	Skills     []string  `json:"skills,omitempty"`
 	Created    time.Time `json:"created"`
@@ -91,6 +92,7 @@ type boxOptions struct {
 	detach   bool   // hi agent
 	json     bool   // hi agent
 	taskFile string // hi agent
+	model    string // hi agent
 	bundles  []string
 	words    []string
 	// fromBrief holds what a task file's front matter asked for, to ask
@@ -228,6 +230,8 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 			options.json = true
 		case command == "agent" && (arg == "--task-file" || strings.HasPrefix(arg, "--task-file=")):
 			options.taskFile, err = value()
+		case command == "agent" && (arg == "--model" || strings.HasPrefix(arg, "--model=")):
+			options.model, err = value()
 		case arg == "--bundle" || strings.HasPrefix(arg, "--bundle="):
 			text, err = value()
 			for _, name := range strings.Split(text, ",") {
@@ -386,6 +390,9 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	meta = boxMeta{Name: name, Agent: kind, Root: root, Network: network, GPU: gpu, Data: data, Engine: engine.name,
 		Created: time.Now().UTC(), Background: agent && prompt != "", Prompt: qClip(prompt), TaskFile: options.taskFile}
+	if agent {
+		meta.Model = options.model
+	}
 	// Agents get a worktree in a git repository, and work in place outside
 	// one.
 	meta.NotGit = !inGit
@@ -697,6 +704,9 @@ func describeBox(meta boxMeta, gpu bool, stdout io.Writer) {
 		where += " (it works in place)"
 	}
 	parts := []string{fmt.Sprintf("network %s", meta.Network)}
+	if meta.Model != "" {
+		parts = append([]string{"model " + meta.Model}, parts...)
+	}
 	if meta.Data {
 		parts = append(parts, "hi data through the server")
 	}
