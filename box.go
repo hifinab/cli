@@ -320,17 +320,26 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 
 	// Bundles: their skills' files, and the network they need, before
 	// anything is made.
+	// The project's bundles come first; --bundle adds to them. Their network
+	// is asked about like any other bundle's.
 	var bundles *bundlePlan
 	var bundleHosts []string
-	if len(options.bundles) > 0 {
+	bundleNames := mergeBundleNames(custom.Bundles, options.bundles)
+	if len(bundleNames) > 0 {
 		if options.image != "" || (devcontainer != nil && (devcontainer.Image != "" || devcontainer.Build.Dockerfile != "")) {
+			if len(options.bundles) == 0 {
+				return meta, errors.New("the bundles in devcontainer.json build their image on hi's own base image, so they don't go with its image or Dockerfile yet")
+			}
 			return meta, errors.New("--bundle builds its image on hi's own base image, so it doesn't go with --image or an image from devcontainer.json yet")
 		}
 		all, err := loadAllBundles(stderr)
 		if err != nil {
 			return meta, err
 		}
-		if bundles, err = planBundles(options.bundles, all); err != nil {
+		if bundles, err = planBundles(bundleNames, all); err != nil {
+			if len(custom.Bundles) > 0 {
+				err = fmt.Errorf("%w (devcontainer.json asks for %s)", err, strings.Join(custom.Bundles, ", "))
+			}
 			return meta, err
 		}
 		if network, bundleHosts, err = bundles.widen(network, options.allow, stdin, stdout); err != nil {
@@ -1084,4 +1093,16 @@ func removeAllBoxes(options boxOptions, stdin io.Reader, stdout io.Writer) error
 		return fmt.Errorf("could not remove %s", strings.Join(failed, ", "))
 	}
 	return nil
+}
+
+// mergeBundleNames gives the project's bundles, then the ones --bundle adds,
+// each once.
+func mergeBundleNames(project, flags []string) []string {
+	var names []string
+	for _, name := range append(append([]string{}, project...), flags...) {
+		if name = strings.TrimSpace(name); name != "" && !containsString(names, name) {
+			names = append(names, name)
+		}
+	}
+	return names
 }

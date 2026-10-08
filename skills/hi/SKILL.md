@@ -278,7 +278,8 @@ need, for work that isn't code: `web` (a browser, needs `--network open`),
 `office` (Word, Excel, PowerPoint, PDF), and `data` (DuckDB and charts;
 add `--allow extensions.duckdb.org`). Without a terminal, hi refuses a
 bundle whose network the flags don't allow, and names the flag; ask the
-user before adding `--network open`.
+user before adding `--network open`. A project's `devcontainer.json` can
+list bundles under `customizations.hi.bundles`; `--bundle` adds to them.
 
 The report's `status` is `done` or `failed` (exit 1), `text` is the agent's
 final message, `report` its own summary (`complete`, `partial`, or

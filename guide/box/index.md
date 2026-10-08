@@ -89,6 +89,12 @@ Settings for hi go under `customizations.hi`:
 The repository writes `domains`, so `hi box` asks once before allowing them,
 and again when the list changes.
 
+`"bundles": ["data"]` gives every box in the project the skills and tools
+of those bundles, as `--bundle` does (see
+[Hand tasks to agents](/guide/agent/#bundles-skills-and-the-tools-they-need)).
+They build their image on hi's own base image, so they don't go with
+`image` or `build.dockerfile` yet.
+
 ## The team's data
 
 `--data`, or `"data": true`, lets `hf` and Python code in the box download

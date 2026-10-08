@@ -282,6 +282,10 @@ read the team's data through the proxy and post it anywhere.
   and `run`, which is useful for trying a bundle by hand. It doesn't go
   with `--image` or an image from `devcontainer.json` yet: the generated
   Dockerfile starts from hi's base image.
+- A project can list bundles in `devcontainer.json` under
+  `customizations.hi.bundles` (v0.31.1); `--bundle` adds to them. The
+  repository names bundles but grants nothing: their network is asked about
+  as for `--bundle`.
 - The image is `localhost/hi-agent:<first 12 hex of the Dockerfile's
   sha256>`. The Dockerfile names the base image by its content tag, so a
   new base image gives new bundle images. Packages go in

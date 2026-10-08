@@ -357,16 +357,17 @@ func lookupAudits(source skillSource, names []string) (map[string]map[string]ski
 }
 
 // checkSkillRisk asks before adding or updating a skill that a partner
-// rates high or critical; without a terminal it needs --accept-risk.
-func checkSkillRisk(name string, audits map[string]skillAudit, options skillOptions, stdin io.Reader, stdout io.Writer) error {
+// rates high or critical; without a terminal it needs --accept-risk. verb
+// is "add" or "use", for the question.
+func checkSkillRisk(name, verb string, audits map[string]skillAudit, options skillOptions, stdin io.Reader, stdout io.Writer) error {
 	risks := skillRisks(audits)
 	if len(risks) == 0 || options.acceptRisk {
 		return nil
 	}
 	if !isTerminal(stdin) {
-		return fmt.Errorf("%s is rated %s on skills.sh; read its audits, then rerun with --accept-risk to add it anyway", name, strings.Join(risks, " and "))
+		return fmt.Errorf("%s is rated %s on skills.sh; read its audits, then rerun with --accept-risk to %s it anyway", name, strings.Join(risks, " and "), verb)
 	}
-	fmt.Fprintf(stdout, "%s is rated %s on skills.sh. Add it anyway? [y/N] ", name, strings.Join(risks, " and "))
+	fmt.Fprintf(stdout, "%s is rated %s on skills.sh. %s it anyway? [y/N] ", name, strings.Join(risks, " and "), strings.ToUpper(verb[:1])+verb[1:])
 	if answer := readSkillAnswer(stdin); answer != "y" && answer != "yes" {
 		return errors.New("cancelled")
 	}
@@ -488,7 +489,7 @@ func installSkillPlans(plans []skillPlan, options skillOptions, stdin io.Reader,
 		}
 	}
 	for _, name := range names {
-		if err := checkSkillRisk(name, audits[name], options, stdin, stdout); err != nil {
+		if err := checkSkillRisk(name, "add", audits[name], options, stdin, stdout); err != nil {
 			return err
 		}
 	}
@@ -907,7 +908,7 @@ func updateOneSkill(name string, entry skillLockEntry, base, lockDir string, com
 			return skillUpdateResult{outcome: "skipped"}, nil
 		}
 	}
-	if err := checkSkillRisk(name, all[name], options, stdin, stdout); err != nil {
+	if err := checkSkillRisk(name, "use", all[name], options, stdin, stdout); err != nil {
 		fmt.Fprintf(stdout, "  Skipped: %v\n", err)
 		return skillUpdateResult{outcome: "skipped"}, nil
 	}

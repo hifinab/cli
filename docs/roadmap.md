@@ -578,6 +578,13 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.31.1 — Bundles in devcontainer.json
+
+- [x] `customizations.hi.bundles` in a project's `devcontainer.json` gives
+  every box and agent there those bundles; `--bundle` adds more.
+- [x] `hi skill update` asks "Use it anyway?" about a risky skill, not
+  "Add it anyway?".
+
 ### v0.31.0 — Bundles in `hi agent`
 
 - [x] `hi agent --bundle web,office` (and `hi box --bundle`): the bundles'

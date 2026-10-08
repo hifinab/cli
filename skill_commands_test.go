@@ -171,7 +171,7 @@ func TestSkillAddAsksAboutRiskyAudits(t *testing.T) {
 	env.audits["acme/skills"] = map[string]map[string]skillAudit{"alpha": {
 		"ath": {Risk: "safe"}, "socket": {Risk: "critical", Alerts: 2}}}
 	code, _, stderr := env.run("skill", "add", "acme/skills", "--yes")
-	if code == 0 || !strings.Contains(stderr, "alpha is rated Socket critical on skills.sh") || !strings.Contains(stderr, "--accept-risk") {
+	if code == 0 || !strings.Contains(stderr, "alpha is rated Socket critical on skills.sh") || !strings.Contains(stderr, "--accept-risk to add it anyway") {
 		t.Fatalf("risky add: %d %s", code, stderr)
 	}
 	if _, err := os.Stat(filepath.Join(env.project, ".agents/skills/alpha")); err == nil {

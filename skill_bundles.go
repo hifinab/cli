@@ -395,7 +395,7 @@ func updateBundleSkill(bundleName string, skill bundleSkill, newest map[string]s
 	if options.check {
 		return skillUpdateResult{outcome: "changed"}, nil
 	}
-	if err := checkSkillRisk(skill.Skill, audits[skill.Skill], options, stdin, stdout); err != nil {
+	if err := checkSkillRisk(skill.Skill, "use", audits[skill.Skill], options, stdin, stdout); err != nil {
 		fmt.Fprintf(stdout, "  Skipped: %v\n", err)
 		return skillUpdateResult{outcome: "skipped"}, nil
 	}

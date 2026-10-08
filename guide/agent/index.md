@@ -144,6 +144,11 @@ Network: open (agent-browser (open): visits whatever sites the task needs)
   `hi bundle ls` lists them all, and `hi bundle show <name>` what one
   installs. A bundle file is described in [Skills](/guide/reference/skill/#bundles).
 
+- **A project can ask for bundles** in its `devcontainer.json`, under
+  `customizations.hi`: `"bundles": ["data"]`. Every box and agent in that
+  project then gets them, and `--bundle` adds more. Their network is
+  asked about as above; the repository can't grant it.
+
 `hi box shell --bundle data` gives you the same box to try things in.
 
 ## While it works
