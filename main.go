@@ -135,6 +135,7 @@ Usage:
   hi q                          Chat with it; hi q --setup chooses the model and sets up the shell
   hi agent [claude|codex|hermes] [task]
                                 Hand a task to a coding agent in a box and get its report (hi agent help)
+  hi agent best-of <n> <task>   The same task in n boxes, checked and ranked; --score runs rounds that keep only gains
   hi bundle ls|show             Bundles for hi agent --bundle: skills and the tools they need
   hi box shell|run              Run a shell or a command in a rootless box with no credentials
   hi skills                     Find, install, and update agent skills from skills.sh (hi skill help);
