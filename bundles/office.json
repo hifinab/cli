@@ -1,5 +1,93 @@
 {
   "name": "office",
-  "description": "Read and write Word documents, Excel workbooks, and PDFs, and convert between formats.",
-  "skills": ["word-docs", "spreadsheets", "pdf-read", "convert-docs"]
+  "description": "Read, create, and edit Word documents, Excel workbooks, PowerPoint decks, and PDFs.",
+  "note": "Anthropic's docx, xlsx, pptx, and pdf skills are proprietary and licensed for use with Anthropic's services; hi fetches them from their repository and doesn't ship them.",
+  "skills": [
+    {
+      "source": "anthropics/skills",
+      "skill": "docx",
+      "commit": "683bc88e56f3e09ba94f7055977f3d3aa499f202",
+      "needs": {
+        "layer": "heavy",
+        "apt": [
+          "libreoffice-writer-nogui",
+          "pandoc",
+          "poppler-utils"
+        ],
+        "pip": [
+          "defusedxml==0.7.1",
+          "lxml==6.1.3"
+        ],
+        "npm": [
+          "docx@9.9.0"
+        ]
+      }
+    },
+    {
+      "source": "anthropics/skills",
+      "skill": "xlsx",
+      "commit": "683bc88e56f3e09ba94f7055977f3d3aa499f202",
+      "needs": {
+        "layer": "heavy",
+        "apt": [
+          "libreoffice-calc-nogui"
+        ],
+        "pip": [
+          "openpyxl==3.1.5",
+          "pandas==3.0.6",
+          "markitdown==0.1.8",
+          "defusedxml==0.7.1",
+          "lxml==6.1.3"
+        ]
+      }
+    },
+    {
+      "source": "anthropics/skills",
+      "skill": "pptx",
+      "commit": "683bc88e56f3e09ba94f7055977f3d3aa499f202",
+      "needs": {
+        "layer": "heavy",
+        "apt": [
+          "libreoffice-impress-nogui",
+          "poppler-utils"
+        ],
+        "pip": [
+          "markitdown[pptx]==0.1.8",
+          "Pillow==12.3.0",
+          "defusedxml==0.7.1",
+          "lxml==6.1.3"
+        ],
+        "npm": [
+          "pptxgenjs@4.0.1",
+          "react-icons@5.7.0",
+          "react@19.3.0",
+          "react-dom@19.3.0",
+          "sharp@0.35.5"
+        ]
+      }
+    },
+    {
+      "source": "anthropics/skills",
+      "skill": "pdf",
+      "commit": "683bc88e56f3e09ba94f7055977f3d3aa499f202",
+      "needs": {
+        "layer": "heavy",
+        "apt": [
+          "poppler-utils",
+          "qpdf",
+          "tesseract-ocr"
+        ],
+        "pip": [
+          "pypdf==6.19.0",
+          "pdfplumber==0.11.10",
+          "reportlab==5.0.1",
+          "pypdfium2==5.14.0",
+          "pdf2image==1.17.0",
+          "pytesseract==0.3.13",
+          "Pillow==12.3.0",
+          "pandas==3.0.6"
+        ]
+      }
+    }
+  ]
 }

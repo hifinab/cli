@@ -215,9 +215,20 @@ hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
    copy a token onto a machine yourself, and never use it on Community
    Cloud (hi refuses).
 9. Inside a hi box (`$HI_BOX` is set), `HF_ENDPOINT` and a placeholder
-   `HF_TOKEN` are already set when the box was started with `--data`; use
-   `hf` or Python directly. Without them, ask the user to start the box
-   with `--data`.
+   `HF_TOKEN` are already set when the box was started with `--data`; hi's
+   proxy outside the box adds the real token. Use `hf` or Python directly:
+
+   ```sh
+   hf download --repo-type dataset hifinab/bars-1d --include "data/2025-*" --local-dir data/bars-1d
+   python -c 'from datasets import load_dataset; print(load_dataset("hifinab/bars-1d", split="train"))'
+   ```
+
+   Without `HF_ENDPOINT`, the box was started without `--data`: stop and
+   say so (in a `hi agent` task, in your report), so the user can run it
+   again with `--data`; don't look for a token anywhere else. A 401 or 403
+   means the user may not read that repository: name it rather than try
+   other names. Keep downloads in the working folder's `data/`, out of
+   git, and mention their size.
 
 ## Share a local service (hi net expose)
 

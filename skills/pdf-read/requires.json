@@ -1,6 +1,0 @@
-{
-  "description": "Get text and tables out of PDFs with pdfplumber, pypdf, and pdftotext, and say when a PDF is a scan without text.",
-  "layer": "light",
-  "apt": ["poppler-utils"],
-  "pip": ["pdfplumber==0.11.10", "pypdf==6.19.0"]
-}

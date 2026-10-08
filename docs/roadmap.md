@@ -547,6 +547,31 @@ each type starts.
   the gfx1151 GPU through ROCm, which needs `crun` rather than Docker's
   `runc`. The first step towards `hi box`.
 
+### v0.23.0 — `hi box`: local agent boxes
+
+- [x] `hi box claude|codex [prompt]`, `shell`, and `run -- <command>`
+  start a rootless container with the project, or a new git worktree of it,
+  and nothing else from the home folder; with a prompt the agent runs on its
+  own, without permission prompts.
+- [x] No route out but hi's proxy, with `locked`, `dev`, and `open`
+  presets, domains from `customizations.hi` in `devcontainer.json` after
+  asking once, and `hi box allow`.
+- [x] Claude Code's token is added at the proxy; the box only holds a
+  placeholder. Codex's sign-in goes in for now.
+- [x] `ls`, `attach`, `diff` (flagging files that run on the host), `stop`,
+  and `rm`; `--gpu` for the Strix Halo; read-only git hooks and config.
+- [x] The safe parts of `devcontainer.json`: `image`, `build.dockerfile`,
+  `containerEnv`, and `postCreateCommand`.
+  Tested on 2026-10-03: Claude Code and Codex with Docker, and Claude Code
+  with rootless Podman on aiw9; `--gpu` with Podman on aiw11 (gfx1151).
+  Approved spec: [hi_box.md](specs/approved/hi_box.md).
+
+Still open from the container ideas, for later releases: one image on the
+workstation and every provider (`hi compute run --image`), prebuilt project
+images, pinned serving images
+([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
+and image policy on the server. Podman arrived in `hi install` in v0.22.2.
+
 ### v0.23.1 — Remove every box at once
 
 - [x] `hi box rm --all` lists every box and asks once; boxes with
@@ -725,6 +750,22 @@ each type starts.
 
 ## Planned
 
+### v0.30.1 — Bundles from skills.sh
+
+- [x] `bundles/web.json`, `office.json`, and `data.json` list skills from
+  skills.sh by source and commit, with the packages each needs:
+  `agent-browser`; Anthropic's `docx`, `xlsx`, `pptx`, and `pdf`; DuckDB's
+  `query`, `read-file`, and `convert-file`, and `data-visualization`.
+- [x] `hi skill update --bundles` (`--check`, a bundle or skill name)
+  shows each change, new mentions, and audits, asks, and rewrites the
+  bundle files; bundle files with unknown keys or unpinned packages are
+  refused.
+- [x] The ten hand-written skills are removed, and what `hi-data` added is
+  in the `hi` skill's "Team data".
+- [x] `hi skills` highlights like the other menus.
+  Pinned on 2026-10-08 against the real repositories and skills.sh.
+  Spec: [hi_skills_sh.md](specs/approved/hi_skills_sh.md), release 2.
+
 ### v0.29.3 — Finish the team's data on every cloud machine
 
 - [ ] `hi server expose revoke <run>` ends one run's token early; the server
@@ -738,31 +779,6 @@ each type starts.
   Spec: [hi_data.md, Adding organizations](specs/approved/hi_data.md#adding-organizations).
 - [ ] Approve [hi_server_expose.md](specs/ideas/hi_server_expose.md) and move it to
   `specs/approved/` once this release is out.
-
-### v0.23.0 — `hi box`: local agent boxes
-
-- [x] `hi box claude|codex [prompt]`, `shell`, and `run -- <command>`
-  start a rootless container with the project, or a new git worktree of it,
-  and nothing else from the home folder; with a prompt the agent runs on its
-  own, without permission prompts.
-- [x] No route out but hi's proxy, with `locked`, `dev`, and `open`
-  presets, domains from `customizations.hi` in `devcontainer.json` after
-  asking once, and `hi box allow`.
-- [x] Claude Code's token is added at the proxy; the box only holds a
-  placeholder. Codex's sign-in goes in for now.
-- [x] `ls`, `attach`, `diff` (flagging files that run on the host), `stop`,
-  and `rm`; `--gpu` for the Strix Halo; read-only git hooks and config.
-- [x] The safe parts of `devcontainer.json`: `image`, `build.dockerfile`,
-  `containerEnv`, and `postCreateCommand`.
-  Tested on 2026-10-03: Claude Code and Codex with Docker, and Claude Code
-  with rootless Podman on aiw9; `--gpu` with Podman on aiw11 (gfx1151).
-  Approved spec: [hi_box.md](specs/approved/hi_box.md).
-
-Still open from the container ideas, for later releases: one image on the
-workstation and every provider (`hi compute run --image`), prebuilt project
-images, pinned serving images
-([hi_compute_serve_pinning.md](specs/ideas/hi_compute_serve_pinning.md)),
-and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
 ### v0.31.0 — Learn from agent-machine services
 
@@ -795,9 +811,10 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
 - [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
-- [ ] Bundles: named sets of skills whose
-  `requires.json` builds a cached `hi-agent:<hash>` image, from the
-  built-in and team template sources.
+- [ ] Bundles in `hi agent`: `--bundle`, a cached `hi-agent:<hash>`
+  image built from the skills' `needs`, the skills in the box's home, and
+  `hi bundle ls`, `show`, and `prune`, from the built-in and team sources.
+  The bundle files themselves are done (v0.30.1).
   Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md) (draft).
 
 ### Later — `hi data` and `hi server expose`

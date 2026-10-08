@@ -1,6 +1,7 @@
 # `hi skill` with skills.sh
 
-Status: Approved (2026-10-07). Release 1 built and tested on 2026-10-07 (v0.30.0).
+Status: Approved (2026-10-07). Release 1 built and tested on 2026-10-07
+(v0.30.0); release 2 built on 2026-10-08.
 
 Dependencies: `hi skill` (v0.7.1, which this replaces and keeps working),
 `hi init` (layers name skills), `hi agent` bundles
@@ -276,9 +277,10 @@ So:
 The only built-in skill is `hi`: it's about hi and changes with it, so it
 stays embedded in the binary. The ten hand-written skills for bundles
 (`browse`, `web-extract`, `cite-sources`, `word-docs`, `spreadsheets`,
-`pdf-read`, `convert-docs`, `tables`, `charts`, `hi-data`) are removed
-once bundles use skills.sh; `hi-data`'s content moves into the `hi`
-skill, which already covers `--data`.
+`pdf-read`, `convert-docs`, `tables`, `charts`, `hi-data`) were removed
+in release 2, when the bundles moved to skills.sh; what `hi-data` said
+that the `hi` skill didn't (what to do in a box without `--data`, 401 and
+403, keeping downloads out of git) moved into its "Team data" section.
 
 `hifinab/cli` is public and keeps the skill at `skills/hi/SKILL.md`, so
 `npx skills add hifinab/cli` already installs it; skills.sh lists it once
@@ -296,35 +298,58 @@ be there), so the requirements stay with hi:
 ```json
 {
   "name": "office",
-  "description": "Read and write Word, Excel, PowerPoint, and PDF files.",
+  "description": "Read, create, and edit Word documents, Excel workbooks, PowerPoint decks, and PDFs.",
+  "note": "Anthropic's docx, xlsx, pptx, and pdf skills are proprietary …",
   "skills": [
     {
-      "source": "anthropics/skills", "skill": "xlsx", "commit": "3f9c2e1d…",
-      "needs": {"layer": "heavy", "apt": ["libreoffice-calc-nogui"],
-                "pip": ["openpyxl==3.1.5", "pandas==3.0.6", "markitdown==0.1.8"]}
+      "source": "anthropics/skills",
+      "skill": "xlsx",
+      "commit": "683bc88e56f3e09ba94f7055977f3d3aa499f202",
+      "needs": {
+        "layer": "heavy",
+        "apt": ["libreoffice-calc-nogui"],
+        "pip": ["openpyxl==3.1.5", "pandas==3.0.6", "markitdown==0.1.8", "defusedxml==0.7.1", "lxml==6.1.3"]
+      }
     }
   ]
 }
 ```
 
+`needs` has the closed keys of
+[hi_agent_bundles.md](../ideas/hi_agent_bundles.md#needs): `layer`, `apt`,
+`pip` (`name==version`, extras allowed), `npm` (`name@version`),
+`browsers` (`chromium` from Playwright, `chrome` from
+`agent-browser install`), `env`, `network` (`mode`, `hosts`, `reason`), and
+`gpu`. hi refuses a bundle file with an unknown key, an unpinned package, a
+short commit, a one-skill source (`owner/repo/skill`), or the `hi` skill,
+which every bundle gets anyway.
+
 In the box, hi fetches each skill at its commit into the box's home, as
 `hi skill add` does, cached by commit under `~/.cache/hi/skills/`. A
 maintainer moves the commits with `hi skill update --bundles` in this
-repository, which shows each change and audit, like `update`, and rewrites
-the bundle files. The `needs` follow the skill by hand, which is the
-remaining upkeep; it's small, and a changed skill that mentions a new tool
-shows up in the update's "Mentions".
+repository (or a team source with `bundles/`), which shows each change and
+audit, like `update`, and rewrites the bundle files. `--check` lists what
+would change and exits 1, and a bundle or skill name limits it. A skill
+not pinned yet shows its license, files, and the tools it mentions. The
+`needs` follow the skill by hand, which is the remaining upkeep; a changed
+skill that mentions a tool it didn't before shows "New mentions" and asks
+to check the needs.
 
-Candidates for the built-in bundles, to check when bundles are built:
+The built-in bundles, pinned on 2026-10-08:
 
-| Bundle | Skills |
-|---|---|
-| `web` | `vercel-labs/agent-browser` (browser automation, 975,694 installs; its skill loads instructions from the installed CLI, so they match its version) |
-| `office` | `anthropics/skills`: `docx`, `xlsx`, `pptx`, `pdf` (proprietary; see Trust) |
-| `data` | `duckdb/duckdb-skills`: `query`, `read-file`, `convert-file`; `anthropics/knowledge-work-plugins`: `data-visualization` |
+| Bundle | Skills | Needs |
+|---|---|---|
+| `web` | `vercel-labs/agent-browser` | `agent-browser` from npm and its Chrome; network `open`. Its skill loads instructions from the installed CLI, so they match its version. |
+| `office` | `anthropics/skills`: `docx`, `xlsx`, `pptx`, `pdf` (proprietary; see Trust) | LibreOffice (writer, calc, impress), pandoc, Poppler, qpdf, Tesseract; openpyxl, pandas, markitdown, pypdf, pdfplumber, reportlab, and others; `docx` and `pptxgenjs` from npm |
+| `data` | `duckdb/duckdb-skills`: `query`, `read-file`, `convert-file`; `anthropics/knowledge-work-plugins`: `data-visualization` | the DuckDB CLI (`duckdb-cli` from PyPI) and `extensions.duckdb.org`; matplotlib, seaborn, plotly, pandas |
 
-The `hi` skill is added to every bundle, and `cite-sources` has no
-first-party counterpart yet; it stays a question below.
+The needs come from each skill's "Dependencies" section and the imports
+in its scripts. The `docx`, `xlsx`, and `pptx` skills are rated critical
+by Socket (1–2 alerts, about their bundled Office scripts); pinning them
+needed `--accept-risk` or a yes. `cite-sources` has no first-party
+counterpart yet; it stays a question below. Pinned with the real
+repositories on 2026-10-08, including moving `query` and `read-file` from
+an older commit to see the diff.
 
 ## Inside a box
 
@@ -351,7 +376,7 @@ starts, so an agent never needs `hi skill add` mid-task.
    is unchanged.
 2. **Bundles from skills.sh.** Bundle files list skills by source, commit,
    and needs; `hi skill update --bundles`; the hand-written skills removed,
-   and `hi-data` folded into `hi`.
+   and `hi-data` folded into `hi`. Built on 2026-10-08.
 3. **Team skills and policy** through `hi server`.
 
 ## Risks

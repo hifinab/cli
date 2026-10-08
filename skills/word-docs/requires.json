@@ -1,5 +1,0 @@
-{
-  "description": "Read and write Word documents (.docx) with python-docx: headings, paragraphs, lists, tables, and images.",
-  "layer": "light",
-  "pip": ["python-docx==1.2.0"]
-}

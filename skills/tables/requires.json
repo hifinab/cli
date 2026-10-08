@@ -1,5 +1,0 @@
-{
-  "description": "Load, clean, join, and summarise CSV, Parquet, and Excel tables with pandas and DuckDB.",
-  "layer": "heavy",
-  "pip": ["pandas==3.0.6", "duckdb==1.5.6", "pyarrow==25.0.1"]
-}

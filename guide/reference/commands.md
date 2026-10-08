@@ -245,6 +245,7 @@ Options when starting: `--name`, `--network locked|dev|open`,
 | `hi skill ls`                        | Installed skills, their source, commit, and state        |
 | `hi skill show <name\|source>`       | Description, license, files, and audits                  |
 | `hi skill update [name…] [--check]`  | Move skills to their source's newest commit              |
+| `hi skill update --bundles`          | Move the skills in `bundles/<name>.json` to newer commits |
 | `hi skill rm <name>…`                | Remove skills                                            |
 | `hi skill --print`                   | Print the `hi` skill; write nothing                      |
 

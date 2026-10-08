@@ -18,6 +18,7 @@ import (
 
 type skillOptions struct {
 	global, yes, acceptRisk, force, check, json bool
+	bundles                                     bool
 	skills                                      []string
 	ref                                         string
 	limit                                       int
@@ -51,6 +52,8 @@ func parseSkillOptions(args []string) (skillOptions, error) {
 			options.force = true
 		case arg == "--check":
 			options.check = true
+		case arg == "--bundles":
+			options.bundles = true
 		case arg == "--json":
 			options.json = true
 		case arg == "--skill" || arg == "-s" || strings.HasPrefix(arg, "--skill="):
@@ -103,6 +106,8 @@ options:
   --yes, -y        don't ask; add every skill a source has
   --accept-risk    add or update a skill a partner rates high or critical
   --check          update: only list what would change; exit 1 if anything would
+  --bundles        update: move the skills in bundles/<name>.json instead, in
+                   the folder that has them
   --ref <ref>      add: a branch or tag instead of the default branch
   --force          replace skills hi didn't install, or local changes
   --json           find, ls: JSON on stdout
@@ -112,6 +117,9 @@ DO_NOT_TRACK=1 turns them off. hi sends skills.sh no install events.`)
 }
 
 func skillCommand(command string, options skillOptions, stdin io.Reader, stdout, stderr io.Writer) error {
+	if options.bundles && command != "update" && command != "upgrade" {
+		return usageError{"--bundles goes with hi skill update"}
+	}
 	switch command {
 	case "find", "search":
 		return skillFind(options, stdin, stdout, stderr)
@@ -698,6 +706,9 @@ func skillShow(options skillOptions, stdout io.Writer) error {
 // update
 
 func skillUpdate(options skillOptions, stdin io.Reader, stdout io.Writer) error {
+	if options.bundles {
+		return skillUpdateBundles(options, stdin, stdout)
+	}
 	base, err := skillBase(options.global)
 	if err != nil {
 		return err
@@ -875,19 +886,8 @@ func updateOneSkill(name string, entry skillLockEntry, base, lockDir string, com
 	}
 	fmt.Fprintln(stdout, header)
 	skillPathInRepo, _ := filepath.Rel(prepared.root, skill.Dir)
-	canDiff := source.Kind != "local" && entry.Commit != "" && entry.Commit != newCommit
-	if canDiff {
-		if stat, err := skillGit(prepared.root, "diff", "--numstat", entry.Commit, newCommit, "--", filepath.ToSlash(skillPathInRepo)); err == nil {
-			for _, line := range strings.Split(strings.TrimSpace(stat), "\n") {
-				if fields := strings.Fields(line); len(fields) == 3 {
-					path := strings.TrimPrefix(fields[2], filepath.ToSlash(skillPathInRepo)+"/")
-					fmt.Fprintf(stdout, "  %s +%s −%s\n", path, fields[0], fields[1])
-				}
-			}
-		} else {
-			canDiff = false
-		}
-	}
+	canDiff := source.Kind != "local" && entry.Commit != "" && entry.Commit != newCommit &&
+		printSkillNumstat(prepared.root, entry.Commit, newCommit, filepath.ToSlash(skillPathInRepo), stdout)
 	all, note := lookupAudits(source, []string{name})
 	if note != "" {
 		fmt.Fprintf(stdout, "  Audits: %s\n", note)
@@ -911,28 +911,8 @@ func updateOneSkill(name string, entry skillLockEntry, base, lockDir string, com
 		fmt.Fprintf(stdout, "  Skipped: %v\n", err)
 		return skillUpdateResult{outcome: "skipped"}, nil
 	}
-	if !options.yes {
-		if !isTerminal(stdin) {
-			fmt.Fprintf(stdout, "  Skipped: rerun with --yes to update without a terminal.\n")
-			return skillUpdateResult{outcome: "skipped"}, nil
-		}
-		for {
-			if canDiff {
-				fmt.Fprint(stdout, "  Update? [Y/n/d: show the diff] ")
-			} else {
-				fmt.Fprint(stdout, "  Update? [Y/n] ")
-			}
-			answer := readSkillAnswer(stdin)
-			if answer == "d" && canDiff {
-				diff, _ := skillGit(prepared.root, "diff", entry.Commit, newCommit, "--", filepath.ToSlash(skillPathInRepo))
-				fmt.Fprint(stdout, diff)
-				continue
-			}
-			if answer == "n" || answer == "no" {
-				return skillUpdateResult{outcome: "skipped"}, nil
-			}
-			break
-		}
+	if !confirmSkillUpdate(prepared.root, entry.Commit, newCommit, filepath.ToSlash(skillPathInRepo), canDiff, options, stdin, stdout) {
+		return skillUpdateResult{outcome: "skipped"}, nil
 	}
 	if err := installSkillFiles(base, skill); err != nil {
 		return skillUpdateResult{}, err

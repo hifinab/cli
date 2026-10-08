@@ -76,6 +76,7 @@ hi skill add hi                              # the hi skill
 | `--ref <ref>`   | `add`: a branch or tag instead of the default branch             |
 | `--force`       | Replace a skill `hi` didn't install, or changes made to one here  |
 | `--json`        | `find` and `ls`: JSON on stdout                                  |
+| `--bundles`     | `update`: move the skills in `bundles/<name>.json` instead       |
 
 Without a terminal, `add`, `update`, and `rm` need `--yes`, and a source
 with several skills needs `--skill` or `--yes`.
@@ -133,6 +134,31 @@ scripts it runs, so `hi` never changes one by itself:
 - **No tracking.** `hi` sends skills.sh your searches and asks it for audits
   of public repositories, but no install events. `DO_NOT_TRACK=1` turns off
   searches and audits too; installing and updating still work, through git.
+
+## Bundles
+
+A bundle is a named set of skills for one kind of work, with the packages
+each skill needs, so that `hi agent` can prepare a box for it (still to
+come). `hi` has three, in [`bundles/`](https://github.com/hifinab/cli/tree/main/bundles):
+
+| Bundle   | Skills                                                                 |
+|----------|------------------------------------------------------------------------|
+| `web`    | `agent-browser` from vercel-labs/agent-browser                         |
+| `office` | `docx`, `xlsx`, `pptx`, `pdf` from anthropics/skills (proprietary)      |
+| `data`   | `query`, `read-file`, `convert-file` from duckdb/duckdb-skills; `data-visualization` from anthropics/knowledge-work-plugins |
+
+Each skill is pinned to a commit, and the `hi` skill goes in every bundle.
+Whoever looks after the bundles moves the commits in the folder that has
+`bundles/`:
+
+```sh
+hi skill update --bundles --check    # what would change; exit 1 if anything would
+hi skill update --bundles            # show each change and its audits, ask, rewrite the files
+hi skill update --bundles office     # one bundle, or one skill
+```
+
+When a newer commit mentions a tool the old one didn't, `hi` says so,
+since the bundle's packages may need to change too.
 
 ## The hi skill
 

@@ -1,5 +1,24 @@
 {
   "name": "web",
-  "description": "Browse the web, read pages as clean text, and write findings with their sources.",
-  "skills": ["browse", "web-extract", "cite-sources"]
+  "description": "Browse and automate websites with agent-browser: open pages, click, fill forms, take screenshots, and read what a page shows.",
+  "skills": [
+    {
+      "source": "vercel-labs/agent-browser",
+      "skill": "agent-browser",
+      "commit": "0207911f1bd4d0393eddaa90f2e50f96e0fb8974",
+      "needs": {
+        "layer": "heavy",
+        "npm": [
+          "agent-browser@0.38.2"
+        ],
+        "browsers": [
+          "chrome"
+        ],
+        "network": {
+          "mode": "open",
+          "reason": "visits whatever sites the task needs"
+        }
+      }
+    }
+  ]
 }

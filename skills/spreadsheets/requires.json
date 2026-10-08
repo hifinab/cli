@@ -1,5 +1,0 @@
-{
-  "description": "Read and write Excel workbooks (.xlsx) with openpyxl: sheets, formulas, number formats, and column widths.",
-  "layer": "light",
-  "pip": ["openpyxl==3.1.5"]
-}

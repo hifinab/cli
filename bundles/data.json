@@ -1,5 +1,77 @@
 {
   "name": "data",
-  "description": "Analyse tables with pandas and DuckDB, draw charts, and read the team's data through hi data.",
-  "skills": ["tables", "charts", "hi-data"]
+  "description": "Query CSV, Parquet, JSON, and Excel files with DuckDB, convert between them, and draw charts. The hi skill covers the team's data through --data.",
+  "skills": [
+    {
+      "source": "duckdb/duckdb-skills",
+      "skill": "query",
+      "commit": "7feda8e01e22bc0886c86123f3884947e36d8c69",
+      "needs": {
+        "layer": "light",
+        "pip": [
+          "duckdb-cli==1.5.6"
+        ],
+        "network": {
+          "mode": "dev",
+          "hosts": [
+            "extensions.duckdb.org"
+          ],
+          "reason": "DuckDB downloads its excel, json, and httpfs extensions on first use"
+        }
+      }
+    },
+    {
+      "source": "duckdb/duckdb-skills",
+      "skill": "read-file",
+      "commit": "7feda8e01e22bc0886c86123f3884947e36d8c69",
+      "needs": {
+        "layer": "light",
+        "pip": [
+          "duckdb-cli==1.5.6"
+        ],
+        "network": {
+          "mode": "dev",
+          "hosts": [
+            "extensions.duckdb.org"
+          ],
+          "reason": "DuckDB downloads its excel, json, and httpfs extensions on first use"
+        }
+      }
+    },
+    {
+      "source": "duckdb/duckdb-skills",
+      "skill": "convert-file",
+      "commit": "7feda8e01e22bc0886c86123f3884947e36d8c69",
+      "needs": {
+        "layer": "light",
+        "pip": [
+          "duckdb-cli==1.5.6"
+        ],
+        "network": {
+          "mode": "dev",
+          "hosts": [
+            "extensions.duckdb.org"
+          ],
+          "reason": "DuckDB downloads its excel, json, and httpfs extensions on first use"
+        }
+      }
+    },
+    {
+      "source": "anthropics/knowledge-work-plugins",
+      "skill": "data-visualization",
+      "commit": "ae1513ea94dcb74a7f1505ddcf3b0ec3fab327f1",
+      "needs": {
+        "layer": "heavy",
+        "pip": [
+          "matplotlib==3.11.2",
+          "seaborn==0.13.2",
+          "plotly==7.1.0",
+          "pandas==3.0.6"
+        ],
+        "env": {
+          "MPLBACKEND": "Agg"
+        }
+      }
+    }
+  ]
 }

@@ -131,92 +131,87 @@ without git.
 
 ## Bundles and skills (release 2)
 
-Changed on 2026-10-07 by [hi_skills_sh.md](../approved/hi_skills_sh.md#bundles):
-bundles list skills from skills.sh by source and commit, with each skill's
-`needs` (the keys of `requires.json` below) in the bundle file, instead of
-hand-written skills with their own `requires.json`. The format and the image
-generator below stay the same.
+Changed on 2026-10-07 by [hi_skills_sh.md](../approved/hi_skills_sh.md#bundles),
+and done in this repository on 2026-10-08: bundles list skills from
+skills.sh by source and commit, each with its `needs`, instead of
+hand-written skills with their own `requires.json`. The hand-written
+skills are gone. The image generator below stays the same, reading `needs`.
 
 ### Where they live
 
-Bundles live where skills already do, so team bundles need no new server
-command, signing, or cache. Built-in and team sources have the same three
-kinds of content:
+Bundles live where templates and skills already do, so team bundles need no
+new server command, signing, or cache:
 
 ```text
                 this repository (built-in)    a team source (hifinab/templates)
 layers          templates/<layer>/            <layer>/
-skills          skills/<name>/                skills/<name>/
 bundles         bundles/<name>.json           bundles/<name>.json
 ```
 
-A skill lives once, in `skills/<name>/` with its `SKILL.md` and, when it
-needs packages, a `requires.json`; a template (`layer.json`'s `skills`) and a
-bundle can both use it. The template loader already skips top-level folders
-without a `layer.json`, so a `bundles/` folder in a team source is ignored by
+The skills themselves come from their own repositories, at the commit the
+bundle names. The template loader already skips top-level folders without
+a `layer.json`, so a `bundles/` folder in a team source is ignored by
 `hi init`. Team sources are served and signed as
 [hi_init.md](../approved/hi_init.md#where-templates-and-skills-live)
-describes.
+describes; a team bundle may also name the team source's own
+`skills/<name>`, to decide when team bundles are built.
 
 What goes where follows the templates' rule: generic bundles that anyone
 using `hi` can use are built in; anything about Hifin's own work (quant
 skills, internal sources, report styles) goes in `hifinab/templates`.
 
 A local folder in `HI_BUNDLES_DIR` (default `~/.local/share/hi/bundles/`)
-with the same `bundles/` and `skills/` layout is the person's own and isn't
-signed. When names clash, local wins over the team's, and the team's over
-built-in. `hi bundle ls` and the plan line show the source.
+with the same `bundles/` layout is the person's own and isn't signed. When
+names clash, local wins over the team's, and the team's over built-in.
+`hi bundle ls` and the plan line show the source.
 
 ### The built-in bundles
 
-Written on 2026-10-07; every code example in their skills was run in the
-box's base image with the pinned packages.
+Pinned on 2026-10-08 with `hi skill update --bundles`; the list and how
+the needs were found are in
+[hi_skills_sh.md](../approved/hi_skills_sh.md#bundles).
 
 | Bundle   | Skills                                                  | Network |
 |----------|---------------------------------------------------------|---------|
-| `web`    | `browse` (Playwright and Chromium), `web-extract` (trafilatura), `cite-sources` | `open` |
-| `office` | `word-docs` (python-docx), `spreadsheets` (openpyxl), `pdf-read` (pdfplumber, pypdf, pdftotext), `convert-docs` (pandoc) | preset |
-| `data`   | `tables` (pandas, DuckDB, pyarrow), `charts` (matplotlib), `hi-data` (`hf` and `datasets` through `--data`) | preset |
+| `web`    | `agent-browser` (vercel-labs/agent-browser)             | `open`  |
+| `office` | `docx`, `xlsx`, `pptx`, `pdf` (anthropics/skills, proprietary) | preset |
+| `data`   | `query`, `read-file`, `convert-file` (duckdb/duckdb-skills), `data-visualization` (anthropics/knowledge-work-plugins) | preset, plus `extensions.duckdb.org` |
 
-The document skills are written for hi rather than copied: Anthropic's
-public `docx`, `xlsx`, `pptx`, and `pdf` skills are source-available, not
-open source.
+Every bundle also gets the `hi` skill, from the `hi` binary; its "Team
+data" section replaces the old `hi-data` skill. Anthropic's document skills
+are licensed for use with Anthropic's services, so `office` says so in its
+`note`, and a run with Codex should show it.
 
-`bundles/<name>.json` only names skills:
+A bundle never names an image. Only skills have needs, so bundles stack
+without conflicts.
 
-```json
-{
-  "name": "web",
-  "description": "Browse the web, read pages as clean text, and write findings with their sources.",
-  "skills": ["browse", "web-extract", "cite-sources"]
-}
-```
-
-A bundle never names an image. Only skills have requirements, so bundles
-stack without conflicts.
-
-### `requires.json`
+### `needs`
 
 ```json
 {
-  "description": "Drive headless Chromium with Playwright to open pages, click, fill forms, and read what a page shows after JavaScript runs.",
-  "layer": "heavy",
-  "pip": ["playwright==1.63.0"],
-  "browsers": ["chromium"],
-  "env": {"PLAYWRIGHT_BROWSERS_PATH": "/opt/ms-playwright"},
-  "network": {"mode": "open", "reason": "visits whatever sites the task needs"}
+  "source": "vercel-labs/agent-browser",
+  "skill": "agent-browser",
+  "commit": "0207911f1bd4d0393eddaa90f2e50f96e0fb8974",
+  "needs": {
+    "layer": "heavy",
+    "npm": ["agent-browser@0.38.2"],
+    "browsers": ["chrome"],
+    "network": {"mode": "open", "reason": "visits whatever sites the task needs"}
+  }
 }
 ```
 
-The keys are closed: `description`, `layer` (`base`, `heavy`, `light`),
-`apt`, `pip`, `npm`, `browsers` (Playwright's `install --with-deps`), `env`,
-`network` (`mode`, `hosts`, `reason`), and `gpu`. Each key maps to one fixed
-install step, so no manifest can run its own shell. An unknown key, or a
-package name that isn't a plain name and version, refuses the whole bundle.
-`pip` and `npm` versions must be pinned with `==` and `@`, or the image
-changes under a cached tag; `apt` packages follow the base image.
+The keys are closed: `layer` (`base`, `heavy`, `light`), `apt`, `pip`,
+`npm`, `browsers` (`chromium` with Playwright's `install --with-deps`,
+`chrome` with `agent-browser install`), `env`, `network` (`mode`, `hosts`,
+`reason`), and `gpu`. Each key maps to one fixed install step, so no bundle
+can run its own shell. An unknown key, or a package name that isn't a plain
+name and version, refuses the whole bundle; `hi skill update --bundles`
+and a test check this today. `pip` and `npm` versions must be pinned with
+`==` and `@`, or the image changes under a cached tag; `apt` packages
+follow the base image.
 
-A skill without `requires.json` needs nothing beyond the base image.
+A skill without `needs` needs nothing beyond the base image.
 
 What the check in the base image showed the generator must do:
 
@@ -225,11 +220,13 @@ What the check in the base image showed the generator must do:
 - **The box sets `PATH` when it starts** (`-e PATH=…`), which replaces the
   image's, so the box must put `/opt/hi/venv/bin` first itself.
 - **Anything in the box's home is hidden**, because the home folder is
-  mounted over it. Playwright's browsers go to `/opt/ms-playwright`, through
-  the skill's `env`, which the generator sets before the install steps and
-  the box sets at run time.
-- **Chromium ignores `HTTPS_PROXY`**; the `browse` skill passes the proxy to
-  `launch()` itself.
+  mounted over it. Browsers and global npm packages must go under `/opt`
+  (Playwright's to `/opt/ms-playwright`; `agent-browser install`'s Chrome
+  to be checked), through `env` the generator sets before the install
+  steps and the box sets at run time.
+- **Chromium ignores `HTTPS_PROXY`**; the old `browse` skill passed the
+  proxy to `launch()` itself. Whether `agent-browser` honours the proxy is
+  to be checked when the image generator is built.
 
 ### From skills to an image
 
@@ -251,9 +248,9 @@ hi tags the image `hi-agent:<hash of the Dockerfile>`, and a run whose tag
 exists skips the build. The plan says which:
 
 ```text
-Plan: skills browse, web-extract, cite-sources (3 of 7 attached)
+Plan: skills agent-browser, hi (2 of 10 attached)
 Image: hi-agent:7f3a91c (cached)
-Network: open (browse: visits whatever sites the task needs)
+Network: open (agent-browser: visits whatever sites the task needs)
 Folder: ~/work/gpu-prices (not a git repository: it works in place)
 ```
 
@@ -315,8 +312,9 @@ The same report as today, with:
    `--task-file`; the task on stdin; agents in any folder, with changed files
    from a manifest. Done when an empty folder and a brief file give a correct
    report with both agents.
-2. **Bundles.** `bundle.json` and `requires.json` in the built-in, team,
-   and local sources; the Dockerfile generator and `hi-agent:<hash>` images;
+2. **Bundles.** Bundle files with skills by commit and their `needs`
+   (done in this repository on 2026-10-08) in the built-in, team, and
+   local sources; the Dockerfile generator and `hi-agent:<hash>` images;
    skills in the box's home; the network check; `hi bundle ls`, `show`, and
    `prune`; front matter. Every skill in a bundle is installed. Done when
    `web` builds once and the second run starts from the cache, and a
