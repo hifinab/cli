@@ -33,7 +33,7 @@ now separate commands with one job each:
 |---|---|---|
 | What it is | An isolated environment for any code | An isolated agent session |
 | Examples | `hi box shell`, `hi box run -- python train.py --gpu` | `hi agent claude`, `hi agent "fix the flaky test"` |
-| Owns | The image, worktree, network presets, proxy, GPU, `ls`, `attach`, `diff`, `allow`, `stop`, `rm` | Which agent, its sign-in, the task, the report, resume, nesting, races |
+| Owns | The image, worktree, network presets, proxy, GPU, `ls`, `attach`, `diff`, `allow`, `stop`, `rm` | Which agent, its sign-in, the task, the report, resume, nesting, best-of runs |
 | Uses | Nothing from agents | `hi box`, always |
 
 Every agent run is a box, so `hi box ls`, `attach`, `diff`, `stop`, and
@@ -88,7 +88,7 @@ Later releases add:
     [--tier read|edit|full]            what the run may change (release 2)
     [--max <duration>]                 wall-clock limit (release 2)
 hi agent resume <name> "<follow-up>"   continue the same agent session (release 2)
-hi agent race <n> "<task>"             the same task in n boxes (hi_agent_race.md)
+hi agent best-of <n> "<task>"          the same task in n boxes (hi_agent_best_of.md)
 ```
 
 - **Choosing the agent.** Without a name, hi takes the first agent that is
@@ -299,7 +299,7 @@ calling device needs neither the agent nor a sign-in.
    concurrency, and time limits.
 3. **Sign-ins on the server**, audit, and the live view.
 4. **Elsewhere and more agents.** `--on` and `--remote`; Antigravity CLI
-   (`hi install agy`, its sign-in, its adapter); `hi agent race`.
+   (`hi install agy`, its sign-in, its adapter); `hi agent best-of`.
 
 ## Risks
 

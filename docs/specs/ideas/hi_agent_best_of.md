@@ -1,4 +1,4 @@
-# `hi agent race` specification
+# `hi agent best-of` specification
 
 Status: Draft
 
@@ -15,7 +15,7 @@ from one attempt to the next; a few attempts plus a fair check often beat
 one careful attempt, and the boxes make it safe to run them all unattended.
 
 ```sh
-hi agent race 4 "make the backtest loader 2x faster without changing results"
+hi agent best-of 4 "make the backtest loader 2x faster without changing results"
 ```
 
 The output is a ranked table and one kept branch, not four branches to read
@@ -28,35 +28,35 @@ boxes, and the table.
 ## Commands
 
 ```text
-hi agent race <n> "<prompt>"       start n boxes on the same task
-    [--agents claude,codex]        which agents, round-robin (default: claude)
-    [--check "<command>"]          how to check a result (default: make check)
-    [--judge | --no-judge]         rank with the team's model (default: on with a server)
+hi agent best-of <n> "<prompt>"     start n boxes on the same task
+    [--agents claude,codex]         which agents, round-robin (default: claude)
+    [--check "<command>"]           how to check a result (default: make check)
+    [--judge | --no-judge]          rank with the team's model (default: on with a server)
     [--max <duration>] [--gpu] [--network <preset>]
-hi agent race ls                   races, their boxes, and their state
-hi agent race show <race>          the table again, with diffs on request
-hi agent race keep <race> <box>    keep one branch, remove the other boxes
+hi agent best-of ls                 best-of runs, their boxes, and their state
+hi agent best-of show <run>         the table again, with diffs on request
+hi agent best-of keep <run> <box>   keep one branch, remove the other boxes
 ```
 
 Every box option (`--gpu`, `--network`, `--max`, `--image`) applies to all
-boxes in the race. `n` is between 2 and 8, and `policy.json` can lower the
-upper limit per group (`max_race`), because each box costs agent tokens and
+boxes in the run. `n` is between 2 and 8, and `policy.json` can lower the
+upper limit per group (`max_best_of`), because each box costs agent tokens and
 memory.
 
-## How a race runs
+## How a best-of run works
 
 1. **Start.** hi creates `n` worktrees from the current commit, on branches
-   `race/<race>/<i>`, and starts one box per worktree with the same prompt.
+   `best-of/<run>/<i>`, and starts one box per worktree with the same prompt.
    With `--agents claude,codex`, boxes alternate between agents: different
    agents fail in different ways, which makes the set more useful than more
    copies of one.
 2. **Run.** Each agent runs to completion, as a background box does today.
-   `hi agent race ls` shows each box's state; `hi box attach` works on any of
+   `hi agent best-of ls` shows each box's state; `hi box attach` works on any of
    them.
 3. **Check.** When an agent finishes, hi itself runs `--check` in that box:
    not the agent, so an agent that claims its tests pass is checked, not
    believed. The check runs on the box's final state, with the network
-   preset of the race. It records the exit status, the last 50 lines of
+   preset of the run. It records the exit status, the last 50 lines of
    output, and how long it took.
 4. **Measure.** For each box: check passed or not, files and lines changed,
    files flagged by `hi box diff` as running on the host later, agent run
@@ -69,7 +69,7 @@ memory.
 6. **Report.** A table, and with Slack a message to the owner:
 
 ```text
-Race r-12 · "make the backtest loader 2x faster…" · 4 boxes · 23m
+Best-of b-12 · "make the backtest loader 2x faster…" · 4 boxes · 23m
 
   #  box        agent   check  diff        flags     judge
   1  loader-2   codex   ✓ 41s  +38 −12 2f   –         best: vectorizes the parse, same output hash
@@ -77,7 +77,7 @@ Race r-12 · "make the backtest loader 2x faster…" · 4 boxes · 23m
   3  loader-4   claude  ✓ 39s  +210 −9 7f   –         adds a cache that changes results on reruns
   4  loader-3   codex   ✗ 12s  +65 −30 3f   –         test_loader fails
 
-  hi agent race keep r-12 loader-2     (or: hi box diff loader-2)
+  hi agent best-of keep b-12 loader-2     (or: hi box diff loader-2)
 ```
 
 In Slack, the message has **Keep #1**, **Keep…**, and **Discard all**
@@ -92,17 +92,17 @@ review, as with any box.
   Agents pass `--yes` only after their person agreed, as with compute.
 - On the Strix Halo workstation, `n` boxes share 128 GB of memory and one
   GPU; with `--gpu`, boxes share it and hi warns above 2.
-- `--max` applies to each box, and the whole race stops at `--max` plus
+- `--max` applies to each box, and the whole run stops at `--max` plus
   the time to run checks.
-- Races on rented GPUs come with remote boxes (release 4 of `hi box`).
+- Best-of runs on rented GPUs come with remote boxes (release 4 of `hi box`).
 
 ## Releases
 
-1. `race`, `ls`, `show`, `keep` with local boxes, the check run by hi, the
+1. `best-of`, `ls`, `show`, `keep` with local boxes, the check run by hi, the
    measurements, and the table. No judge.
 2. The judge through the team's model, and the Slack message with buttons.
-3. Mixed agents tuned by results: hi records which agent won which race,
-   and `hi agent race stats` shows it per project, so the team can see whether
+3. Mixed agents tuned by results: hi records which agent won which run,
+   and `hi agent best-of stats` shows it per project, so the team can see whether
    mixing pays.
 
 ## Risks
@@ -125,7 +125,7 @@ review, as with any box.
 2. Whether the judge should also run the code (for example a benchmark the
    prompt names) rather than only read diffs. That is closer to a second
    check than to judging, and may belong in `--check`.
-3. Whether a race should stop early when the first box passes, to save
+3. Whether a run should stop early when the first box passes, to save
    tokens, as an option (`--first`).
 
 ## Findings
@@ -150,7 +150,7 @@ Checked on 2026-10-02.
 
 This is the design above: the project's own check first, run by hi, then a
 model judge among the passing boxes, then a person. A weak check is the
-main way it goes wrong, which is why the report flags races where no test
+main way it goes wrong, which is why the report flags runs where no test
 touched the changed files.
 
 ## Sources

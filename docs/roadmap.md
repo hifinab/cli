@@ -892,7 +892,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   limits. Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (2).
 - [ ] Agents' sign-ins kept on the hi server, with spend limits, audit, and
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
-- [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
+- [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent best-of`.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
   Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md) (draft).
 

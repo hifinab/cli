@@ -239,7 +239,7 @@ that grows.
 2. Whether the server should sign in itself with stored credentials and
    Lightpanda's `$LP_*` placeholders, for sites without two-factor, so
    sessions renew without a person.
-3. Whether `check` should become part of `hi box race`'s check for web
+3. Whether `check` should become part of `hi agent best-of`'s check for web
    projects.
 4. Whether to strip the 188 MB binary, and whether that is allowed without
    rebuilding (it is AGPL, so redistribution of a modified binary needs the

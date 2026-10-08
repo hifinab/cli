@@ -4,14 +4,14 @@ Status: Draft (2026-10-08).
 
 Dependencies: `hi agent` (runs, reports, `--detach` and `wait`, the live
 line, the stats), `hi box` (boxes, worktrees, mounts, the proxy),
-[hi_agent_race.md](hi_agent_race.md) (the table, `ls`, `show`, the Slack
+[hi_agent_best_of.md](hi_agent_best_of.md) (the table, `ls`, `show`, the Slack
 message), and [hi_agent_bundles.md](hi_agent_bundles.md) (front matter in
 briefs).
 
 ## Goal
 
 Run many different tasks at once, each in its own box, and get one report
-for all of them. A race tries one task several ways and keeps one result;
+for all of them. A best-of run tries one task several ways and keeps one result;
 a fan-out does several tasks and keeps them all.
 
 ```sh
@@ -141,12 +141,12 @@ files.
   `--agents` spreads the load.
 - `--max` is per run. The fan-out has no limit of its own beyond its runs.
 
-## Shared with `hi agent race`
+## Shared with `hi agent best-of`
 
-A race is a fan-out of one task n times plus a check and a choice, so both
+A best-of run is a fan-out of one task n times plus a check and a choice, so both
 are built on the same parts: the queue, the per-run boxes, the table, `ls`,
 `show`, `rm`, the Slack message, and the policy limits. Whichever is built
-first builds those; the other adds only its own steps (race: check, judge,
+first builds those; the other adds only its own steps (best-of: check, judge,
 keep; fan-out: tasks from files, `--then`, `merge`, the read-only folder).
 
 ## Releases
