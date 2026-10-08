@@ -359,10 +359,10 @@ func (s *hiServer) exposeName() string {
 // admin
 
 type apiExposure struct {
-	Listen  string    `json:"listen"`
-	URL     string    `json:"url,omitempty"`
-	Started time.Time `json:"started,omitzero"`
-	Until   time.Time `json:"until,omitzero"`
+	Listen  string      `json:"listen"`
+	URL     string      `json:"url,omitempty"`
+	Started time.Time   `json:"started,omitzero"`
+	Until   time.Time   `json:"until,omitzero"`
 	LastUse time.Time   `json:"last_use,omitzero"`
 	Problem string      `json:"problem,omitempty"`
 	Runs    []serverRun `json:"runs,omitempty"`
