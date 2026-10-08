@@ -18,9 +18,10 @@ import (
 // agentProgress is what an agent's own session log says so far: tokens
 // in (with cached ones) and out, the tool calls it made, and the latest.
 type agentProgress struct {
-	in, out int
-	steps   int
-	step    string
+	in, out, cached int
+	steps           int
+	step            string
+	model           string
 }
 
 // agentProgressReader follows the newest session log in a box's home
@@ -34,12 +35,12 @@ type agentProgressReader struct {
 	carry  []byte
 	// Claude Code writes one line per content block, each with its
 	// message's usage, so usage is kept per message.
-	usage map[string][2]int
+	usage map[string][3]int
 	agentProgress
 }
 
 func newAgentProgressReader(kind, home string) *agentProgressReader {
-	return &agentProgressReader{kind: kind, home: home, usage: map[string][2]int{}}
+	return &agentProgressReader{kind: kind, home: home, usage: map[string][3]int{}}
 }
 
 func (r *agentProgressReader) pattern() string {
@@ -62,7 +63,7 @@ func (r *agentProgressReader) poll() agentProgress {
 		return r.agentProgress
 	}
 	if newest != r.path {
-		*r = agentProgressReader{kind: r.kind, home: r.home, path: newest, usage: map[string][2]int{}}
+		*r = agentProgressReader{kind: r.kind, home: r.home, path: newest, usage: map[string][3]int{}}
 	}
 	file, err := os.Open(r.path)
 	if err != nil {
@@ -91,10 +92,11 @@ func (r *agentProgressReader) poll() agentProgress {
 		}
 	}
 	if r.kind == "claude" {
-		r.in, r.out = 0, 0
+		r.in, r.out, r.cached = 0, 0, 0
 		for _, usage := range r.usage {
 			r.in += usage[0]
 			r.out += usage[1]
+			r.cached += usage[2]
 		}
 	}
 	return r.agentProgress
@@ -105,6 +107,7 @@ func (r *agentProgressReader) claudeLine(line []byte) {
 		Type    string `json:"type"`
 		Message struct {
 			ID    string `json:"id"`
+			Model string `json:"model"`
 			Usage *struct {
 				Input       int `json:"input_tokens"`
 				CacheRead   int `json:"cache_read_input_tokens"`
@@ -118,7 +121,10 @@ func (r *agentProgressReader) claudeLine(line []byte) {
 		return
 	}
 	if usage := entry.Message.Usage; usage != nil && entry.Message.ID != "" {
-		r.usage[entry.Message.ID] = [2]int{usage.Input + usage.CacheRead + usage.CacheCreate, usage.Output}
+		r.usage[entry.Message.ID] = [3]int{usage.Input + usage.CacheRead + usage.CacheCreate, usage.Output, usage.CacheRead}
+	}
+	if model := entry.Message.Model; model != "" && !strings.HasPrefix(model, "<") {
+		r.model = model
 	}
 	var blocks []struct {
 		Type  string         `json:"type"`
@@ -159,6 +165,7 @@ func (r *agentProgressReader) codexLine(line []byte) {
 		Type    string `json:"type"`
 		Payload struct {
 			Type      string `json:"type"`
+			Model     string `json:"model"`
 			Name      string `json:"name"`
 			Arguments string `json:"arguments"`
 			Input     string `json:"input"`
@@ -169,6 +176,7 @@ func (r *agentProgressReader) codexLine(line []byte) {
 			Info *struct {
 				Total struct {
 					Input  int `json:"input_tokens"`
+					Cached int `json:"cached_input_tokens"`
 					Output int `json:"output_tokens"`
 				} `json:"total_token_usage"`
 			} `json:"info"`
@@ -179,8 +187,10 @@ func (r *agentProgressReader) codexLine(line []byte) {
 	}
 	payload := entry.Payload
 	switch {
+	case entry.Type == "turn_context" && payload.Model != "":
+		r.model = payload.Model
 	case entry.Type == "event_msg" && payload.Type == "token_count" && payload.Info != nil:
-		r.in, r.out = payload.Info.Total.Input, payload.Info.Total.Output
+		r.in, r.out, r.cached = payload.Info.Total.Input, payload.Info.Total.Output, payload.Info.Total.Cached
 	case entry.Type == "response_item" && payload.Type == "function_call":
 		r.steps++
 		var arguments map[string]any

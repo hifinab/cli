@@ -14,12 +14,12 @@ func TestClaudeProgress(t *testing.T) {
 	home := t.TempDir()
 	path := filepath.Join(home, ".claude", "projects", "-home-hi-projects-test", "s.jsonl")
 	writeSkillTestFile(t, path, `{"type":"user","message":{"content":"go"}}
-{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":2,"cache_read_input_tokens":30000,"cache_creation_input_tokens":2000,"output_tokens":10},"content":[{"type":"thinking"}]}}
-{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":2,"cache_read_input_tokens":30000,"cache_creation_input_tokens":2000,"output_tokens":400},"content":[{"type":"tool_use","name":"Bash","input":{"command":"python3 -m venv .venv &&\n  pip install yfinance"}}]}}
+{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":2,"cache_read_input_tokens":30000,"cache_creation_input_tokens":2000,"output_tokens":10},"content":[{"type":"thinking"}]}}
+{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":2,"cache_read_input_tokens":30000,"cache_creation_input_tokens":2000,"output_tokens":400},"content":[{"type":"tool_use","name":"Bash","input":{"command":"python3 -m venv .venv &&\n  pip install yfinance"}}]}}
 `, 0o644)
 	reader := newAgentProgressReader("claude", home)
 	progress := reader.poll()
-	if progress.in != 32002 || progress.out != 400 || progress.steps != 1 || progress.step != "Bash: python3 -m venv .venv &&\n  pip install yfinance" {
+	if progress.in != 32002 || progress.cached != 30000 || progress.model != "claude-sonnet-5-5" || progress.out != 400 || progress.steps != 1 || progress.step != "Bash: python3 -m venv .venv &&\n  pip install yfinance" {
 		t.Fatalf("%+v", progress)
 	}
 
@@ -40,13 +40,14 @@ func TestClaudeProgress(t *testing.T) {
 func TestCodexProgress(t *testing.T) {
 	home := t.TempDir()
 	writeSkillTestFile(t, filepath.Join(home, ".codex", "sessions", "2026", "10", "08", "rollout-1.jsonl"), `{"type":"session_meta","payload":{}}
+{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}
 {"type":"response_item","payload":{"type":"reasoning"}}
 {"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","input":"text( await tools.exec_command({cmd:\"rg -n \\\"sharpe\\\" .\",\"max_output_tokens\":3500}));"}}
 {"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":17422,"cached_input_tokens":12160,"output_tokens":89}}}}
 {"type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"python3 backtest.py\"]}"}}
 `, 0o644)
 	progress := newAgentProgressReader("codex", home).poll()
-	if progress.in != 17422 || progress.out != 89 || progress.steps != 2 || progress.step != "shell: python3 backtest.py" {
+	if progress.in != 17422 || progress.cached != 12160 || progress.model != "gpt-6.1-sol" || progress.out != 89 || progress.steps != 2 || progress.step != "shell: python3 backtest.py" {
 		t.Fatalf("%+v", progress)
 	}
 }
@@ -75,5 +76,19 @@ func TestAgentStatusLine(t *testing.T) {
 	}
 	if line := agentStatusLine(0, 3*time.Second, agentProgress{}, 80); !strings.Contains(line, "3s · starting") {
 		t.Fatalf("before the log: %q", line)
+	}
+}
+
+func TestAgentStats(t *testing.T) {
+	report := agentReport{Seconds: 401, Steps: 14, Model: "claude-sonnet-5-5", CostUSD: 2.104,
+		Tokens: &agentTokens{Input: 1_234_567, Cached: 1_100_000, Output: 18_400}}
+	if got := agentStats(report); got != "Took 6m41s · 14 steps · 1.2M tokens in (1.1M cached) · 18k out · claude-sonnet-5-5 · $2.10 at API prices" {
+		t.Fatalf("%q", got)
+	}
+	if got := agentStats(agentReport{Seconds: 11, Steps: 1, Model: "gpt-6.1-sol", Tokens: &agentTokens{Input: 28000, Output: 119}}); got != "Took 11s · 1 step · 28k tokens in · 119 out · gpt-6.1-sol" {
+		t.Fatalf("%q", got)
+	}
+	if agentStats(agentReport{}) != "" {
+		t.Fatal("stats with nothing to say")
 	}
 }

@@ -578,6 +578,14 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.31.5 — Stats for each agent run
+
+- [x] The report ends with how long the run took, its steps, tokens in
+  (and how many were cached) and out, the model, and for Claude Code its
+  cost at API prices; `--json` gives `seconds`, `steps`, `model`,
+  `tokens.cached`, and `cost_usd`. Codex's tokens come from its session
+  log, so its runs have them too.
+
 ### v0.31.4 — See that an agent is working
 
 - [x] While `hi agent` and `hi agent wait` wait, one line shows a red

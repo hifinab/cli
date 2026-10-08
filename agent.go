@@ -65,11 +65,16 @@ type agentReport struct {
 	Folder       string          `json:"folder,omitempty"`
 	ChangedFiles []string        `json:"changed_files"`
 	Tokens       *agentTokens    `json:"tokens,omitempty"`
+	Seconds      int             `json:"seconds,omitempty"`
+	Steps        int             `json:"steps,omitempty"`
+	Model        string          `json:"model,omitempty"`
+	CostUSD      float64         `json:"cost_usd,omitempty"` // Claude Code's figure at API prices
 	Warnings     []string        `json:"warnings"`
 }
 
 type agentTokens struct {
-	Input  int `json:"input"`
+	Input  int `json:"input"` // with cached input
+	Cached int `json:"cached"`
 	Output int `json:"output"`
 }
 
@@ -538,9 +543,10 @@ func collectAgentReport(engine boxEngine, meta boxMeta) agentReport {
 	switch meta.Agent {
 	case "claude":
 		var result struct {
-			Result    string `json:"result"`
-			SessionID string `json:"session_id"`
-			IsError   bool   `json:"is_error"`
+			Result    string  `json:"result"`
+			SessionID string  `json:"session_id"`
+			IsError   bool    `json:"is_error"`
+			Cost      float64 `json:"total_cost_usd"`
 			Usage     struct {
 				Input       int `json:"input_tokens"`
 				CacheRead   int `json:"cache_read_input_tokens"`
@@ -549,9 +555,9 @@ func collectAgentReport(engine boxEngine, meta boxMeta) agentReport {
 			} `json:"usage"`
 		}
 		if data, err := os.ReadFile(filepath.Join(results, "result.json")); err == nil && json.Unmarshal(data, &result) == nil {
-			report.Text, report.SessionID, failed = result.Result, result.SessionID, result.IsError
+			report.Text, report.SessionID, failed, report.CostUSD = result.Result, result.SessionID, result.IsError, result.Cost
 			if usage := result.Usage; usage.Input+usage.Output > 0 {
-				report.Tokens = &agentTokens{Input: usage.Input + usage.CacheRead + usage.CacheCreate, Output: usage.Output}
+				report.Tokens = &agentTokens{Input: usage.Input + usage.CacheRead + usage.CacheCreate, Cached: usage.CacheRead, Output: usage.Output}
 			}
 		}
 	case "codex":
@@ -565,9 +571,16 @@ func collectAgentReport(engine boxEngine, meta boxMeta) agentReport {
 		}
 	}
 	report.Text, report.Report = splitAgentReport(report.Text)
+	// The session log gives the steps and the model, and Codex's tokens.
+	progress := newAgentProgressReader(meta.Agent, boxStateFile(meta.Name, "home")).poll()
+	report.Steps, report.Model = progress.steps, progress.model
+	if report.Tokens == nil && progress.in+progress.out > 0 {
+		report.Tokens = &agentTokens{Input: progress.in, Cached: progress.cached, Output: progress.out}
+	}
 	if report.Status == "running" {
 		return report
 	}
+	report.Seconds = containerSeconds(engine, container)
 	if report.ExitCode != 0 || failed || strings.TrimSpace(report.Text) == "" && string(report.Report) == "null" {
 		report.Status = "failed"
 	}
@@ -655,6 +668,9 @@ func printAgentReport(report agentReport, w io.Writer) {
 	}
 	for _, warning := range report.Warnings {
 		fmt.Fprintf(w, "\nNote: %s.\n", warning)
+	}
+	if stats := agentStats(report); stats != "" {
+		fmt.Fprintf(w, "\n%s\n", stats)
 	}
 	if report.Folder != "" {
 		if len(report.ChangedFiles) == 0 {
@@ -820,4 +836,58 @@ func applyFrontMatter(kind string, options *boxOptions, stdin io.Reader, stdout 
 		fmt.Fprintln(stdout, "Starting without them.")
 	}
 	return kind, nil
+}
+
+// agentStats is the report's closing line: how long the run took, its
+// steps, tokens, model, and, for Claude Code, its cost at API prices.
+func agentStats(report agentReport) string {
+	var parts []string
+	if report.Seconds > 0 {
+		parts = append(parts, formatAgentElapsed(time.Duration(report.Seconds)*time.Second))
+	}
+	if report.Steps > 0 {
+		parts = append(parts, plural(report.Steps, "step"))
+	}
+	if tokens := report.Tokens; tokens != nil {
+		in := formatTokenCount(tokens.Input) + " tokens in"
+		if tokens.Cached > 0 {
+			in += " (" + formatTokenCount(tokens.Cached) + " cached)"
+		}
+		parts = append(parts, in, formatTokenCount(tokens.Output)+" out")
+	}
+	if report.Model != "" {
+		parts = append(parts, report.Model)
+	}
+	if report.CostUSD > 0 {
+		parts = append(parts, fmt.Sprintf("$%.2f at API prices", report.CostUSD))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Took " + strings.Join(parts, " · ")
+}
+
+// containerSeconds is how long a finished container ran.
+func containerSeconds(engine boxEngine, container string) int {
+	out, err := engine.output("container", "inspect", "--format", "{{.State.StartedAt}}|{{.State.FinishedAt}}", container)
+	if err != nil {
+		return 0
+	}
+	times := strings.SplitN(strings.TrimSpace(out), "|", 2)
+	if len(times) != 2 {
+		return 0
+	}
+	parse := func(text string) time.Time {
+		for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05.999999999 -0700 MST"} {
+			if t, err := time.Parse(layout, text); err == nil {
+				return t
+			}
+		}
+		return time.Time{}
+	}
+	started, finished := parse(times[0]), parse(times[1])
+	if started.IsZero() || finished.Before(started) {
+		return 0
+	}
+	return int(finished.Sub(started).Round(time.Second).Seconds())
 }

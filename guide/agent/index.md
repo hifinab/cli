@@ -165,6 +165,16 @@ hi reads it from the agent's own session log in the box's home folder, so
 it works the same for Claude Code and Codex. Tokens in include cached
 ones. The line shows only in a terminal; `hi agent wait` shows it too.
 
+When the agent is done, the report gives the same numbers for the whole
+run, above the changed files:
+
+```text
+Took 6m41s · 14 steps · 1.2M tokens in (1.1M cached) · 18k out · claude-sonnet-5-5 · $2.10 at API prices
+```
+
+The cost is Claude Code's own figure at API prices; on a Claude
+subscription nothing is charged per run. Codex gives no cost.
+
 `hi box attach <name>` in another terminal follows the agent. Codex shows its
 progress; Claude Code prints only its final answer. Ctrl+C stops waiting,
 not the agent:
@@ -224,7 +234,9 @@ hi agent codex --json "review the change on this branch; don't edit files"
 | `session_id`    | The agent's session, when it reports one                                                   |
 | `task_file`     | The file the task came from, when it came from one                                         |
 | `bundles`, `skills`, `image` | With `--bundle`: the bundles, the skills in the box, and the image it ran on   |
-| `tokens`        | Input and output tokens, when the agent reports them (Claude Code)                         |
+| `tokens`        | `input` (with cached input), `cached`, and `output` tokens                                  |
+| `seconds`, `steps`, `model` | How long the run took, the agent's tool calls, and the model it used              |
+| `cost_usd`      | Claude Code's figure for the run at API prices; on a subscription nothing is charged       |
 | `warnings`      | Anything hi noticed, such as a missing summary                                             |
 
 hi asks every agent to end with a short summary block, and takes it out of
