@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // The selector: hi skill (or hi skills) in a terminal. Type to search
@@ -416,6 +417,9 @@ func (m *skillSelector) finish(action skillSelectorAction) (tea.Model, tea.Cmd) 
 
 func (m *skillSelector) View() string {
 	var b strings.Builder
+	title := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(colorDim)
+	mint := lipgloss.NewStyle().Foreground(colorMint)
 	width := max(m.width, 60)
 	where, other := m.base, "everywhere"
 	if m.global {
@@ -423,10 +427,12 @@ func (m *skillSelector) View() string {
 	} else if home, _ := os.UserHomeDir(); home != "" && strings.HasPrefix(where, home) {
 		where = "~" + strings.TrimPrefix(where, home)
 	}
-	fmt.Fprintf(&b, " Skills for %s%s\n", truncate(where, width-30), padLeft("g: "+other, width-12-len([]rune(truncate(where, width-30)))))
+	where = truncate(where, width-30)
+	header := " Skills for " + where
+	fmt.Fprintf(&b, "%s%s\n", title.Render(header), dim.Render(padLeft("g: "+other, width-1-len([]rune(header)))))
 	cursorMark := " "
 	if m.cursor < 0 {
-		cursorMark = "›"
+		cursorMark = mint.Bold(true).Render("❯")
 	}
 	status := ""
 	switch {
@@ -437,7 +443,11 @@ func (m *skillSelector) View() string {
 	case m.searchErr != "":
 		status = "  " + truncate(m.searchErr, width-40)
 	}
-	fmt.Fprintf(&b, "%s Search skills.sh › %s▏%s\n\n", cursorMark, m.query, status)
+	query := m.query + mint.Render("▏")
+	if m.query == "" && m.cursor < 0 {
+		query = mint.Render("▏") + dim.Render("type words to search, for example pdf")
+	}
+	fmt.Fprintf(&b, "%s %s %s%s\n\n", cursorMark, title.Render("Search skills.sh ›"), query, dim.Render(status))
 
 	items := m.items()
 	// Room for the header, two section titles, the details, and the help.
@@ -462,27 +472,28 @@ func (m *skillSelector) View() string {
 			}
 		}
 		if section != heading {
-			fmt.Fprintf(&b, " %s\n", section)
+			fmt.Fprintf(&b, " %s\n", dim.Bold(true).Render(section))
 			heading = section
 		}
 		mark := "  "
 		if i == m.cursor {
-			mark = " ›"
+			mark = " " + mint.Bold(true).Render("❯")
 		}
-		b.WriteString(mark + " " + m.itemLine(item, width-4) + "\n")
+		b.WriteString(mark + " " + m.itemLine(item, width-4, i == m.cursor) + "\n")
 	}
 	if len(items) == len(m.installed) && len(strings.TrimSpace(m.query)) >= 2 && !m.searching && m.searchErr == "" {
-		fmt.Fprintf(&b, " Results for %q\n   nothing found\n", m.query)
+		fmt.Fprintf(&b, " %s\n   %s\n", dim.Bold(true).Render(fmt.Sprintf("Results for %q", m.query)), dim.Render("nothing found"))
 	}
 	b.WriteString("\n" + m.details(width))
 	if m.message != "" {
-		b.WriteString(" " + m.message + "\n")
+		b.WriteString(" " + lipgloss.NewStyle().Foreground(colorAmber).Render(m.message) + "\n")
 	}
 	picked := ""
 	if len(m.picked) > 0 {
-		picked = fmt.Sprintf(" · %d picked", len(m.picked))
+		picked = " · " + mint.Bold(true).Render(fmt.Sprintf("%d picked", len(m.picked)))
 	}
-	fmt.Fprintf(&b, "\n type: search · ↓↑: move · space: pick · enter: install%s\n u: update · x: remove · g: here/everywhere · esc: quit\n", picked)
+	fmt.Fprintf(&b, "\n %s%s\n %s\n", dim.Render("type: search · ↓↑: move · space: pick · enter: install"), picked,
+		dim.Render("u: update · x: remove · g: here/everywhere · esc: quit"))
 	return b.String()
 }
 
@@ -493,39 +504,80 @@ func padLeft(text string, width int) string {
 	return "  " + text
 }
 
-func (m *skillSelector) itemLine(item skillItem, width int) string {
+func (m *skillSelector) itemLine(item skillItem, width int, highlighted bool) string {
+	text := lipgloss.NewStyle().Foreground(colorText)
+	dim := lipgloss.NewStyle().Foreground(colorDim)
+	mint := lipgloss.NewStyle().Foreground(colorMint)
+	name := text
+	if highlighted {
+		name = mint.Bold(true)
+	}
+	// Each column is padded before it is colored, so the columns line up.
+	col := func(value string, size int) string { return fmt.Sprintf("%-*s", size, truncate(value, size)) }
 	if item.installed {
 		status := item.row.Status
+		statusStyle := dim
 		if commit, ok := m.newer[item.row.Name]; ok {
 			status = "newer commit " + shortCommit(commit) + " · u updates"
+			statusStyle = lipgloss.NewStyle().Foreground(colorAmber)
 		}
 		commit := firstNonEmpty(shortCommit(item.row.Commit), "")
-		return truncate(fmt.Sprintf("✓ %-22s %-32s %-8s %s", item.row.Name, truncate(item.row.Source, 32), commit, status), width)
+		rest := max(width-2-23-33-9, 0)
+		return mint.Render("✓") + " " + name.Render(col(item.row.Name, 22)) + " " + dim.Render(col(item.row.Source, 32)) + " " +
+			dim.Render(col(commit, 8)) + " " + statusStyle.Render(truncate(status, rest))
 	}
-	box := "◻"
+	box := dim.Render("◻")
 	if _, ok := m.picked[item.key()]; ok {
-		box = "◼"
+		box = mint.Bold(true).Render("◼")
 	}
 	source := item.hit.Source
-	if item.hit.verified() {
-		source += " ✓"
-	}
 	if item.hit.Source == "hi" {
 		source = "built in"
 	}
-	tail := skillAuditShort(m.audits[item.hit.Source][item.hit.SkillID])
-	if !m.asked[item.hit.Source] {
-		tail = ""
+	sourceCell := dim.Render(col(source, 34))
+	if item.hit.verified() && item.hit.Source != "hi" {
+		source = truncate(source, 32)
+		sourceCell = dim.Render(source) + " " + mint.Render("✓") + strings.Repeat(" ", max(34-len([]rune(source))-2, 0))
 	}
 	installs := ""
 	if item.hit.Installs > 0 {
 		installs = formatInstalls(item.hit.Installs)
 	}
-	if item.why != "" {
+	rest := max(width-2-23-35-8, 0)
+	var tail string
+	switch {
+	case item.why != "":
 		installs = ""
-		tail = item.why
+		tail = dim.Render(truncate(item.why, rest))
+	case m.asked[item.hit.Source]:
+		tail = skillAuditColored(m.audits[item.hit.Source][item.hit.SkillID], rest)
 	}
-	return truncate(fmt.Sprintf("%s %-22s %-34s %6s  %s", box, truncate(item.hit.SkillID, 22), truncate(source, 34), installs, tail), width)
+	return box + " " + name.Render(col(item.hit.SkillID, 22)) + " " + sourceCell + " " + dim.Render(fmt.Sprintf("%6s", installs)) + "  " + tail
+}
+
+// skillAuditColored is skillAuditShort with each verdict colored by risk.
+func skillAuditColored(audits map[string]skillAudit, width int) string {
+	plain := skillAuditShort(audits)
+	if len([]rune(plain)) > width {
+		return lipgloss.NewStyle().Foreground(colorDim).Render(truncate(plain, width))
+	}
+	var parts []string
+	for _, word := range strings.Fields(plain) {
+		parts = append(parts, lipgloss.NewStyle().Foreground(skillRiskColor(word)).Render(word))
+	}
+	return strings.Join(parts, " ")
+}
+
+func skillRiskColor(risk string) lipgloss.TerminalColor {
+	switch risk {
+	case "safe", "low":
+		return colorMint
+	case "medium":
+		return colorAmber
+	case "high", "critical":
+		return colorRed
+	}
+	return colorDim
 }
 
 // details describes the highlighted skill.
@@ -536,7 +588,7 @@ func (m *skillSelector) details(width int) string {
 	}
 	var b strings.Builder
 	if item.installed {
-		fmt.Fprintf(&b, " ── %s · %s %s\n", item.row.Name, item.row.Source, strings.Repeat("─", max(width-len(item.row.Name)-len(item.row.Source)-9, 3)))
+		fmt.Fprintf(&b, " %s\n", skillDetailsTitle(item.row.Name, item.row.Source, width))
 		dir := skillInstallDir(m.base, item.row.Name)
 		if item.row.Name == "hi" {
 			fmt.Fprintf(&b, " Teaches agents to use hi; it comes with hi %s.\n", version)
@@ -549,7 +601,7 @@ func (m *skillSelector) details(width int) string {
 		fmt.Fprintf(&b, " %s\n", truncate(item.row.Status, width-2))
 		return b.String()
 	}
-	fmt.Fprintf(&b, " ── %s · %s %s\n", item.hit.SkillID, item.hit.Source, strings.Repeat("─", max(width-len(item.hit.SkillID)-len(item.hit.Source)-9, 3)))
+	fmt.Fprintf(&b, " %s\n", skillDetailsTitle(item.hit.SkillID, item.hit.Source, width))
 	key := item.key()
 	meta := m.pages[key]
 	switch {
@@ -572,9 +624,27 @@ func (m *skillSelector) details(width int) string {
 		fmt.Fprintf(&b, " Reading its SKILL.md…\n")
 	}
 	if m.asked[item.hit.Source] {
-		fmt.Fprintf(&b, " Audits: %s\n", truncate(skillAuditSummary(m.audits[item.hit.Source][item.hit.SkillID]), width-10))
+		summary := truncate(skillAuditSummary(m.audits[item.hit.Source][item.hit.SkillID]), width-10)
+		color := colorMint
+		for _, word := range strings.Fields(summary) {
+			if word == "medium" && color == colorMint {
+				color = colorAmber
+			}
+			if word == "high" || word == "critical" {
+				color = colorRed
+			}
+		}
+		fmt.Fprintf(&b, " %s %s\n", lipgloss.NewStyle().Foreground(colorDim).Render("Audits:"), lipgloss.NewStyle().Foreground(color).Render(summary))
 	}
 	return b.String()
+}
+
+// skillDetailsTitle is the rule above the details: ── name · source ────
+func skillDetailsTitle(name, source string, width int) string {
+	rule := lipgloss.NewStyle().Foreground(colorLine)
+	return rule.Render("──") + " " + lipgloss.NewStyle().Foreground(colorAccent).Bold(true).Render(name) +
+		lipgloss.NewStyle().Foreground(colorDim).Render(" · "+source) + " " +
+		rule.Render(strings.Repeat("─", max(width-len([]rune(name))-len([]rune(source))-9, 3)))
 }
 
 func wrapText(text string, width int) []string {
