@@ -578,6 +578,22 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.30.1 — Bundles from skills.sh
+
+- [x] `bundles/web.json`, `office.json`, and `data.json` list skills from
+  skills.sh by source and commit, with the packages each needs:
+  `agent-browser`; Anthropic's `docx`, `xlsx`, `pptx`, and `pdf`; DuckDB's
+  `query`, `read-file`, and `convert-file`, and `data-visualization`.
+- [x] `hi skill update --bundles` (`--check`, a bundle or skill name)
+  shows each change, new mentions, and audits, asks, and rewrites the
+  bundle files; bundle files with unknown keys or unpinned packages are
+  refused.
+- [x] The ten hand-written skills are removed, and what `hi-data` added is
+  in the `hi` skill's "Team data".
+- [x] `hi skills` highlights like the other menus.
+  Pinned on 2026-10-08 against the real repositories and skills.sh.
+  Spec: [hi_skills_sh.md](specs/approved/hi_skills_sh.md), release 2.
+
 ### v0.30.0 — `hi skill` with skills.sh
 
 - [x] `hi skills` in a terminal: search skills.sh as you type, browse
@@ -749,22 +765,6 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   Spec: [hi_data.md](specs/approved/hi_data.md).
 
 ## Planned
-
-### v0.30.1 — Bundles from skills.sh
-
-- [x] `bundles/web.json`, `office.json`, and `data.json` list skills from
-  skills.sh by source and commit, with the packages each needs:
-  `agent-browser`; Anthropic's `docx`, `xlsx`, `pptx`, and `pdf`; DuckDB's
-  `query`, `read-file`, and `convert-file`, and `data-visualization`.
-- [x] `hi skill update --bundles` (`--check`, a bundle or skill name)
-  shows each change, new mentions, and audits, asks, and rewrites the
-  bundle files; bundle files with unknown keys or unpinned packages are
-  refused.
-- [x] The ten hand-written skills are removed, and what `hi-data` added is
-  in the `hi` skill's "Team data".
-- [x] `hi skills` highlights like the other menus.
-  Pinned on 2026-10-08 against the real repositories and skills.sh.
-  Spec: [hi_skills_sh.md](specs/approved/hi_skills_sh.md), release 2.
 
 ### v0.29.3 — Finish the team's data on every cloud machine
 
