@@ -40,8 +40,8 @@ type installItem struct {
 }
 
 var installItems = []installItem{
-	{id: "terminal", title: "Terminal tools", description: "tmux sessions and the btop system monitor",
-		packages: []string{"tmux", "btop"}, essential: true},
+	{id: "terminal", title: "Terminal tools", description: "tmux, the btop monitor, and timg for images",
+		packages: []string{"tmux", "btop", "timg"}, essential: true},
 	{id: "uv", title: "uv", description: "Python versions, projects, and tools",
 		commands: []string{"uv"}, essential: true},
 	{id: "gh", title: "GitHub CLI", description: "gh, for repositories, pull requests, and sign-in",

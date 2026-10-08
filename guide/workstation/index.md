@@ -30,7 +30,7 @@ hi install
 ```text
 ┃ What should this machine have?
 ┃ Space toggles, enter continues. Unchecking an installed tool removes it.
-┃ > [x] Terminal tools      tmux sessions and the btop system monitor
+┃ > [x] Terminal tools      tmux, the btop monitor, and timg for images
 ┃   [x] uv                  Python versions, projects, and tools
 ┃   [x] GitHub CLI          gh, for repositories, pull requests, and sign-in
 ┃   [ ] Node.js             node and npm from Ubuntu
@@ -77,7 +77,7 @@ Removing Strix Halo support keeps you in the `render` and `video` groups.
 
 | Menu item          | Name       | Installs                                                  |
 |--------------------|------------|-----------------------------------------------------------|
-| Terminal tools     | `terminal` | tmux, btop                                                |
+| Terminal tools     | `terminal` | tmux, btop, timg                                          |
 | uv                 | `uv`       | uv                                                        |
 | GitHub CLI         | `gh`       | `gh`                                                      |
 | Node.js            | `node`     | Node.js, npm                                              |

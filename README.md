@@ -390,8 +390,10 @@ under the name in brackets for `hi install <tool>` and `hi uninstall <tool>`:
 - [Docker Engine](https://docs.docker.com/engine/) and Docker Compose [`docker`]
 - [Podman](https://podman.io), rootless, with `crun` [`podman`]
 - [NetBird](https://netbird.io) [`netbird`]
-- [btop](https://github.com/aristocratos/btop) and
-  [tmux](https://github.com/tmux/tmux) [`terminal`]
+- [btop](https://github.com/aristocratos/btop),
+  [tmux](https://github.com/tmux/tmux), and
+  [timg](https://github.com/hzeller/timg), which shows images and videos in
+  the terminal [`terminal`]
 - Strix Halo support [`strix`]: [AMD ROCm](https://rocm.docs.amd.com) 10 for
   `gfx1151`, [amd-debug-tools](https://pypi.org/project/amd-debug-tools/), and
   `render` and `video` group membership. It requires amd64 and a reboot.

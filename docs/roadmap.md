@@ -578,6 +578,12 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.31.3 — timg in the terminal tools
+
+- [x] `hi install terminal` also installs
+  [timg](https://github.com/hzeller/timg) from Ubuntu, which shows images
+  and videos in the terminal; `hi uninstall terminal` removes it too.
+
 ### v0.31.2 — Screenshots with every image
 
 - [x] The `web` bundle's Chrome doesn't say it's headless: it gives a

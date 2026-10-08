@@ -169,7 +169,7 @@ EOF
 remove_tool() {
   log "Removing $1"
   case "$1" in
-    terminal) apt_remove tmux btop ;;
+    terminal) apt_remove tmux btop timg ;;
     node) apt_remove nodejs npm ;;
     uv)
       if [[ -x "$HOME/.local/bin/uv" ]]; then
@@ -265,7 +265,7 @@ if ((${#install_ids[@]} > 0)) || [[ "$upgrade" == "1" ]]; then
 fi
 
 packages=()
-installing terminal && packages+=(tmux btop)
+installing terminal && packages+=(tmux btop timg)
 if installing gh; then
   log "Configuring the GitHub CLI repository"
   add_github_repo
