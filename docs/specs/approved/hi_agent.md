@@ -88,8 +88,11 @@ Later releases add:
     [--tier read|edit|full]            what the run may change (release 2)
     [--max <duration>]                 wall-clock limit (release 2)
 hi agent resume <name> "<follow-up>"   continue the same agent session (release 2)
-hi agent best-of <n> "<task>"          the same task in n boxes (hi_agent_best_of.md)
 ```
+
+`hi agent best-of <n> "<task>"` runs the same task in n boxes, checks and
+ranks them; it is built (v0.33.0) and specified in
+[hi_agent_best_of.md](../ideas/hi_agent_best_of.md).
 
 - **Choosing the agent.** Without a name, hi takes the first agent that is
   installed and signed in, Claude Code before Codex. Release 2 makes the
@@ -299,7 +302,7 @@ calling device needs neither the agent nor a sign-in.
    concurrency, and time limits.
 3. **Sign-ins on the server**, audit, and the live view.
 4. **Elsewhere and more agents.** `--on` and `--remote`; Antigravity CLI
-   (`hi install agy`, its sign-in, its adapter); `hi agent best-of`.
+   (`hi install agy`, its sign-in, its adapter).
 
 ## Risks
 

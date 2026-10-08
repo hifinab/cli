@@ -211,6 +211,11 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 | `hi agent [claude\|codex] <brief.md>`    | The task is the file's contents; `-` reads it from stdin |
 | `hi agent claude\|codex`                 | An interactive session in a box, without permission prompts |
 | `hi agent wait <name> [--json]`          | Wait for a run and print its report                      |
+| `hi agent best-of <n> "<task>"`          | The same task in n boxes (2 to 8) at once; hi checks each and ranks them |
+| `hi agent best-of ls`                    | Best-of runs and their state                             |
+| `hi agent best-of show <run> [--full]`   | The table again; `--full` adds each box's diff           |
+| `hi agent best-of keep <run> <box>`      | Keep one box and its branch, remove the others           |
+| `hi agent best-of rm <run>`              | Remove every box of a run and its branches               |
 | `hi agent token claude`                  | Store a long-lived token from `claude setup-token`       |
 
 Options: `--detach` to start and return, `--json` for the report as JSON on
@@ -221,6 +226,11 @@ own Claude Code, Codex, or Hermes settings, else `opus` for Claude Code),
 options below. A brief's front matter can set `agent`, `model`, `bundles`,
 `network`, `allow`, `data`, and `gpu`. Exits with 0 when the agent is done and
 1 when it failed. See [Hand tasks to agents](/guide/agent/).
+
+`best-of` also takes `--agents claude,codex` (taken in turn), `--check
+"<command>"` (default: `make check`), `--max <duration>` per agent, and
+`--yes` to start without asking; it exits with 1 when no box passed. See
+[Several attempts at once](/guide/agent/#several-attempts-at-once).
 
 ## hi box
 

@@ -578,6 +578,18 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.33.0 — `hi agent best-of`
+
+- [x] `hi agent best-of <n> "<task>"` runs the same task in 2 to 8 boxes
+  at once, with `--agents claude,codex` taken in turn. hi runs the check
+  (`make check`, or `--check`) in each box after its agent ends, kills
+  what the agent left running first, and keeps `--max` per agent. A table
+  ranks the boxes by the check, flagged files, and diff size; `keep`
+  keeps one and removes the others with their branches; `ls`, `show`,
+  `rm`. No judge yet. Spec:
+  [hi_agent_best_of.md](specs/ideas/hi_agent_best_of.md) (release 1).
+  Tested on 2026-10-08 with two Claude Code boxes.
+
 ### v0.32.0 — Hermes Agent
 
 - [x] `hi install hermes` runs Nous Research's installer without its setup
@@ -892,7 +904,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   limits. Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (2).
 - [ ] Agents' sign-ins kept on the hi server, with spend limits, audit, and
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
-- [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent best-of`.
+- [ ] `--on <machine>` and `--remote`, and Antigravity CLI.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
   Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md) (draft).
 

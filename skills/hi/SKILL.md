@@ -285,6 +285,20 @@ list bundles under `customizations.hi.bundles`; `--bundle` adds to them.
 In a `web` box, before a full-page screenshot scroll to the bottom and
 back so lazy images load, then open the PNG to check it.
 
+For a task where attempts vary and a check can tell them apart, `hi agent
+best-of` runs it in several boxes at once and ranks them. It costs n times
+the tokens, so start with 3 and only after the user agreed to the cost:
+
+```sh
+hi agent best-of 3 --agents claude,codex --check "pytest -q" --yes --json "<task>"
+hi agent best-of show <run> --json     # the table again; --detach returns at once
+```
+
+hi runs the check in each box after its agent ends; `best` is the first
+box that passed, changed something, and whose agent finished. Read its
+diff (`hi box diff <box>`) and let the user choose before
+`hi agent best-of keep <run> <box> --yes`, which removes the other boxes.
+
 The report's `status` is `done` or `failed` (exit 1), `text` is the agent's
 final message, `report` its own summary (`complete`, `partial`, or
 `blocked`, with `follow_ups`), and `changed_files` comes from git, or,

@@ -1,6 +1,7 @@
 # `hi agent best-of` specification
 
-Status: Draft
+Status: Draft. Release 1 built on 2026-10-08 (see
+[As built](#as-built-release-1)).
 
 Dependencies: `hi agent` (agent runs and their reports), `hi box` (boxes,
 worktrees, `diff`, the proxy; forks from its release 3 are useful but not
@@ -36,6 +37,7 @@ hi agent best-of <n> "<prompt>"     start n boxes on the same task
 hi agent best-of ls                 best-of runs, their boxes, and their state
 hi agent best-of show <run>         the table again, with diffs on request
 hi agent best-of keep <run> <box>   keep one branch, remove the other boxes
+hi agent best-of rm <run>           remove every box of a run and its branches
 ```
 
 Every box option (`--gpu`, `--network`, `--max`, `--image`) applies to all
@@ -95,6 +97,50 @@ review, as with any box.
 - `--max` applies to each box, and the whole run stops at `--max` plus
   the time to run checks.
 - Best-of runs on rented GPUs come with remote boxes (release 4 of `hi box`).
+
+### As built (release 1)
+
+- `hi agent best-of <n> "<task>"` takes the task as words, a `.md` brief,
+  or `-` for stdin, like `hi agent`; a brief's front matter applies to
+  every box. Without `--agents`, every box gets the first agent that is
+  ready, Claude Code first. `--model` goes with one agent only.
+- Boxes are named `<project>-b<run>-<i>` and work on `best-of/<run>/<i>`.
+  They start one after another, each in the background, so they run at
+  once; the first box's network questions (bundles) are not asked again.
+- Without `--check`, the project's Makefile needs a `check` target; hi
+  reads the Makefile and doesn't run make to find it.
+- hi wraps the agent's command in the box: the agent runs under
+  `timeout` when `--max` is given, then `kill -9 -1` stops whatever it left
+  running, then the check runs from `$HI_CHECK` and hi writes
+  `check.json` and `check.log` in the box's `.hi-agent` folder. The box
+  exits with the agent's status. So the check runs on the box's network
+  and its final state even if nobody is waiting, and an agent can't
+  rewrite the result afterwards. Tested on 2026-10-08 in Podman: a
+  `setsid` process left by the agent was gone before the check, and
+  `--max` gave exit 124, shown as "ran out of time".
+- Without a judge, the order is: boxes that passed, changed something, and
+  whose agent finished; then other passing boxes (no change, failed, or
+  out of time); then running boxes; then failing ones. Within each:
+  fewer flagged files, a smaller diff, a shorter run. The table says the
+  order is not a judgement, and the suggested `keep` names the first box
+  of the top group.
+- The weak-check note is a heuristic: every box passed, no box changed a
+  test file, and no test file in the project is named after a changed file
+  (`loader.py`, `test_loader.py`).
+- `keep` takes a box's name or its rank, refuses a box that is still
+  working, removes the other boxes with their work and branches after one
+  question, and keeps the run's record. `rm` removes every box but a kept
+  one. Both need `--yes` without a terminal. `--detach`, `--json`, and
+  `show --full` (each box's diff) are there for agents and scripts.
+- Not yet: `max_best_of` in `policy.json`. The policy lives on the hi
+  server and the boxes run locally, so the per-group limit waits for the
+  server to see agent runs (release 2 of `hi agent`); until then `n` is 2
+  to 8. Two Codex boxes that both refresh their sign-in during a run can
+  invalidate each other's refresh token; mixing agents makes that less
+  likely.
+- Tested on 2026-10-08 with two Claude Code boxes on Haiku: both finished
+  in about 6 seconds, `make check` ran in each, and `keep` removed the
+  other box and its branch.
 
 ## Releases
 

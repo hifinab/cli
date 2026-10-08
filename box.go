@@ -89,10 +89,13 @@ type boxOptions struct {
 	all      bool
 	yes      bool
 	full     bool
-	detach   bool   // hi agent
-	json     bool   // hi agent
-	taskFile string // hi agent
-	model    string // hi agent
+	detach   bool          // hi agent
+	json     bool          // hi agent
+	taskFile string        // hi agent
+	model    string        // hi agent
+	branch   string        // hi agent best-of: the worktree's branch
+	check    string        // hi agent best-of: run after the agent, by hi
+	maxTime  time.Duration // hi agent best-of: the agent's time limit
 	bundles  []string
 	words    []string
 	// fromBrief holds what a task file's front matter asked for, to ask
@@ -408,7 +411,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 			return meta, errors.New("--worktree needs a git repository; without it, the box works in the folder itself")
 		}
 		meta.Worktree = true
-		meta.Branch = "hi-box/" + name
+		meta.Branch = firstNonEmpty(options.branch, "hi-box/"+name)
 		meta.Base = boxGit(root, "rev-parse", "HEAD")
 		work := filepath.Join(stateDir, "work")
 		var out bytes.Buffer
@@ -560,6 +563,10 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		command = options.words
 	default:
 		command, err = agentBoxSetup(kind, prompt, meta, homeDir, &run, env)
+		if err == nil && options.check != "" && prompt != "" {
+			command = bestOfBoxCommand(command, options.maxTime)
+			env["HI_CHECK"] = options.check
+		}
 	}
 	if err != nil {
 		return meta, fail(err)

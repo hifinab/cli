@@ -303,6 +303,7 @@ the home folder.
 hi agent "make the flaky test reliable"        # the first agent signed in; waits for the report
 hi agent codex --json "review this branch"     # the report as JSON, for scripts and agents
 hi agent claude brief.md                       # the task from a markdown file
+hi agent best-of 3 --agents claude,codex "<task>"   # the same task in 3 boxes, checked and ranked
 hi agent --bundle web,office "compare GPU clouds in a Word document"   # skills and tools for work that isn't code
 hi agent claude                                # interactive, in a box
 hi box shell                                   # or hi box run -- make test

@@ -86,6 +86,9 @@ func runAgent(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		printAgentUsage(stdout)
 		return 0
 	}
+	if args[0] == "best-of" {
+		return runBestOf(args[1:], stdin, stdout, stderr)
+	}
 	kind, rest := "", args
 	switch {
 	case args[0] == "wait" || args[0] == "token":
@@ -119,6 +122,8 @@ usage:
                                     the task is the file's contents; - reads it from stdin
   hi agent claude|codex|hermes      an interactive session in a box
   hi agent wait <name> [--json]     wait for a run and print its report
+  hi agent best-of <n> "<task>"     the same task in n boxes at once, checked and ranked
+                                    (hi agent best-of help)
   hi agent token claude             store a long-lived Claude token from claude setup-token
 
 options:
