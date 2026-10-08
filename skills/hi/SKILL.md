@@ -280,6 +280,8 @@ add `--allow extensions.duckdb.org`). Without a terminal, hi refuses a
 bundle whose network the flags don't allow, and names the flag; ask the
 user before adding `--network open`. A project's `devcontainer.json` can
 list bundles under `customizations.hi.bundles`; `--bundle` adds to them.
+In a `web` box, before a full-page screenshot scroll to the bottom and
+back so lazy images load, then open the PNG to check it.
 
 The report's `status` is `done` or `failed` (exit 1), `text` is the agent's
 final message, `report` its own summary (`complete`, `partial`, or

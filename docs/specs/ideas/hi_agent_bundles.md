@@ -295,7 +295,11 @@ read the team's data through the proxy and post it anywhere.
   `HOME=/opt/hi/agent-browser`, and a stand-in `sudo` for that step only,
   because it calls `sudo apt-get` and the box image has no sudo. The box
   sets `AGENT_BROWSER_EXECUTABLE_PATH`, and `AGENT_BROWSER_PROXY` to hi's
-  proxy, since Chrome ignores `HTTPS_PROXY`. Chrome ran without
+  proxy, since Chrome ignores `HTTPS_PROXY`. `/opt/hi/bin/chrome` is a
+  wrapper that gives Chrome the user agent of a normal Chrome of the same
+  major version and `--disable-blink-features=AutomationControlled`, so
+  `navigator.webdriver` is false (v0.31.2): CloudFront in front of plejd.com's images
+  refused `HeadlessChrome` with 403, so screenshots showed broken images. Chrome ran without
   `--no-sandbox` in rootless Podman.
 - Skill files are fetched at their commit into `~/.cache/hi/skills/` and
   reused; a team source's own skills are cached by the source's commit,

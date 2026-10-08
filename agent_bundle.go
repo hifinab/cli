@@ -577,10 +577,18 @@ func (p *bundlePlan) dockerfile(base string) (string, error) {
 				// under /opt.
 				// Its --with-deps runs sudo apt-get; the build is root
 				// already, so a stand-in sudo lives for this step only.
+				// Headless Chrome names itself HeadlessChrome and sets
+				// navigator.webdriver, which some CDNs refuse (plejd.com's
+				// images, for one), so /opt/hi/bin/chrome passes the user
+				// agent a normal Chrome of the same version gives and turns
+				// the automation flag off.
 				b.WriteString(`RUN printf '#!/bin/sh\nexec "$@"\n' > /usr/local/bin/sudo && chmod +x /usr/local/bin/sudo` +
 					` && HOME=/opt/hi/agent-browser /opt/hi/npm/bin/agent-browser install --with-deps` +
 					` && rm -f /usr/local/bin/sudo && rm -rf /var/lib/apt/lists/*` +
-					` && ln -sf "$(find /opt/hi/agent-browser -type f -name chrome -perm -u+x | head -n 1)" /opt/hi/bin/chrome && test -x /opt/hi/bin/chrome` + "\n")
+					` && real="$(find /opt/hi/agent-browser -type f -name chrome -perm -u+x | head -n 1)"` +
+					` && major="$("$real" --version | grep -o '[0-9][0-9]*' | head -n 1)" && test -n "$major"` +
+					` && printf '#!/bin/sh\nexec %s --disable-blink-features=AutomationControlled --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/%s.0.0.0 Safari/537.36" "$@"\n' "$real" "$major" > /opt/hi/bin/chrome` +
+					` && chmod +x /opt/hi/bin/chrome && /opt/hi/bin/chrome --version` + "\n")
 			}
 		}
 	}

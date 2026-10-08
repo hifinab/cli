@@ -578,6 +578,15 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.31.2 — Screenshots with every image
+
+- [x] The `web` bundle's Chrome doesn't say it's headless: it gives a
+  normal Chrome's user agent, not `HeadlessChrome`, and
+  `navigator.webdriver` is false. Some CDNs refuse headless Chrome;
+  plejd.com's images were broken in screenshots and now load.
+- [x] The `hi` skill tells agents to scroll before a full-page screenshot,
+  so lazy images load, and to open the PNG to check it.
+
 ### v0.31.1 — Bundles in devcontainer.json
 
 - [x] `customizations.hi.bundles` in a project's `devcontainer.json` gives
