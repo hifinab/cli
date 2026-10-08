@@ -21,6 +21,10 @@ hi agent race 4 "make the backtest loader 2x faster without changing results"
 The output is a ranked table and one kept branch, not four branches to read
 by hand.
 
+Many different tasks at once, all kept, are a fan-out instead
+([hi_agent_fanout.md](hi_agent_fanout.md)); the two share the queue, the
+boxes, and the table.
+
 ## Commands
 
 ```text
