@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -194,5 +196,84 @@ func TestDataRunProxyWrapper(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(filepath.Join(dir, "data/bars/README.md")); string(data) != "hello" {
 		t.Fatalf("README = %q", data)
+	}
+}
+
+func TestRevokeARunToken(t *testing.T) {
+	ts, _, public := newExposedDataServer(t)
+	socket := filepath.Join(ts.dir, "admin.sock")
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Skipf("no Unix socket here: %v", err)
+	}
+	admin := &http.Server{Handler: ts.server.adminHandler()}
+	go admin.Serve(listener)
+	defer admin.Close()
+
+	client, _, err := dataClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var first, second apiRunAccess
+	for run, access := range map[string]*apiRunAccess{"job1": &first, "job2": &second} {
+		if err := client.call(http.MethodPost, "/v1/data/run-access", map[string]any{"scopes": []string{"model:hifinab/ranker"}, "seconds": 3600, "run": run}, access); err != nil {
+			t.Fatal(err)
+		}
+	}
+	status := func(token string) int {
+		request, _ := http.NewRequest(http.MethodHead, public+"/hf/hifinab/ranker/resolve/main/config.json", nil)
+		request.Header.Set("Authorization", "Bearer "+token)
+		response, err := (&http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		return response.StatusCode
+	}
+	if status(first.Token) != http.StatusTemporaryRedirect {
+		t.Fatal("the run token doesn't work before revoking")
+	}
+	code, stdout, stderr := runHi("server", "expose", "--dir", ts.dir)
+	if code != 0 || !strings.Contains(stdout, "job1") || !strings.Contains(stdout, "job2") || !strings.Contains(stdout, "model:hifinab/ranker") {
+		t.Fatalf("expose: %d %s %s", code, stdout, stderr)
+	}
+	code, stdout, stderr = runHi("server", "expose", "revoke", "job1", "--dir", ts.dir)
+	if code != 0 || !strings.Contains(stdout, "Revoked the run token of job1") {
+		t.Fatalf("revoke: %d %s %s", code, stdout, stderr)
+	}
+	// Only job1's token stops working, and job1 can't get a new one.
+	if status(first.Token) != http.StatusUnauthorized || status(second.Token) != http.StatusTemporaryRedirect {
+		t.Fatal("revoking job1 changed the wrong tokens")
+	}
+	var again apiRunAccess
+	if err := client.call(http.MethodPost, "/v1/data/run-access", map[string]any{"scopes": []string{"model:hifinab/ranker"}, "run": "job1"}, &again); err == nil || !strings.Contains(err.Error(), "revoked") {
+		t.Fatalf("a new token for a revoked run: %v", err)
+	}
+	if _, stdout, _ := runHi("server", "expose", "--dir", ts.dir); !strings.Contains(stdout, "revoked") {
+		t.Fatalf("list after revoke: %s", stdout)
+	}
+	if code, _, stderr := runHi("server", "expose", "revoke", "nope", "--dir", ts.dir); code == 0 || !strings.Contains(stderr, "no run nope") {
+		t.Fatalf("unknown run: %d %s", code, stderr)
+	}
+	// The revocation survives a restart, and is forgotten once the token
+	// would have expired.
+	reopened, err := openServer(ts.dir, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reopened.runRevoked("job1") {
+		t.Fatal("the revocation was lost on restart")
+	}
+	later := time.Now().Add(2 * time.Hour)
+	previous := computeNow
+	computeNow = func() time.Time { return later }
+	defer func() { computeNow = previous }()
+	ts.server.pruneRuns()
+	if ts.server.runRevoked("job1") || len(ts.server.runList()) != 0 {
+		t.Fatal("expired runs are kept")
+	}
+	audit, _ := os.ReadFile(filepath.Join(ts.dir, "audit.jsonl"))
+	if !strings.Contains(string(audit), `"action":"run token revoked"`) {
+		t.Fatalf("audit = %s", audit)
 	}
 }

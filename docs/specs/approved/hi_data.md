@@ -411,12 +411,12 @@ server:
 - **Colab runs use signed links**, not the proxy, because Colab has no
   secret store for a run token: the links last about an hour, and the
   script can't call `load_dataset` itself
-  ([hi_server_expose.md](../ideas/hi_server_expose.md#cloud-machines)).
+  ([hi_server_expose.md](hi_server_expose.md#cloud-machines)).
 - **Container runs** (`hi compute run <image> -- <command>`) don't take
   `--data`; an image may have no Python for the wrapper. A shell-only
   downloader (curl or wget) would lift this.
 - **`hi compute up` machines (RunPod, Shadeform)** get no data yet; release
-  2 of [hi_server_expose.md](../ideas/hi_server_expose.md#releases).
+  2 of [hi_server_expose.md](hi_server_expose.md#releases).
 - **A box running longer than a day** needs a restart: its hi data token
   is asked for once, when the box starts. The proxy could ask for a fresh
   one before it expires.

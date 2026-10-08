@@ -152,7 +152,7 @@ direct-message notifications.
   address, where it serves the client API and nothing else. The one
   exception is a second listener with only the `hi data` proxy, which it
   publishes with `netbird expose` while cloud runs need it
-  ([hi_server_expose.md](../ideas/hi_server_expose.md)). It keeps its state
+  ([hi_server_expose.md](hi_server_expose.md)). It keeps its state
   in a JSON file with an append-only JSON Lines audit log, which is enough for
   one organization and adds no database to the binary. Its provider keys live
   in a `0600` file on an encrypted disk.

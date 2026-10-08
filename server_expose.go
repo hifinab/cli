@@ -10,8 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
+	"text/tabwriter"
 	"time"
 )
 
@@ -19,7 +21,7 @@ import (
 // use (the hi data proxy), published with `netbird expose` while runs need
 // it. The client API stays inside NetBird. Cloud machines authenticate with
 // run tokens: hi data tokens marked for cloud use, for named repositories,
-// for the run's lifetime (docs/specs/ideas/hi_server_expose.md).
+// for the run's lifetime (docs/specs/approved/hi_server_expose.md).
 
 const (
 	exposeDefaultPort   = 7374
@@ -39,6 +41,7 @@ type serverExposure struct {
 	mu      sync.Mutex
 	listen  string // the instance listener's address; "" when off
 	cmd     *exec.Cmd
+	done    chan struct{} // closed once cmd has exited and it's audited
 	url     string
 	started time.Time
 	// until is when the last run token issued expires; lastUse is the
@@ -121,8 +124,10 @@ func (s *hiServer) ensureExposure(name string) (string, error) {
 		}
 		time.Sleep(time.Second)
 	}
-	e.cmd, e.url, e.started, e.problem = cmd, url, time.Now(), ""
+	done := make(chan struct{})
+	e.cmd, e.done, e.url, e.started, e.problem = cmd, done, url, time.Now(), ""
 	go func() {
+		defer close(done)
 		cmd.Wait()
 		e.mu.Lock()
 		if e.cmd == cmd {
@@ -138,6 +143,7 @@ func (s *hiServer) ensureExposure(name string) (string, error) {
 // reapExposure stops the exposure once no run token is valid and nothing
 // has called for a while.
 func (s *hiServer) reapExposure() {
+	s.pruneRuns()
 	e := &s.exposure
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -147,12 +153,19 @@ func (s *hiServer) reapExposure() {
 	e.cmd.Process.Signal(os.Interrupt)
 }
 
+// stopExposure stops `netbird expose` and waits until it has exited.
 func (s *hiServer) stopExposure() {
 	e := &s.exposure
 	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.cmd != nil {
-		e.cmd.Process.Signal(os.Interrupt)
+	cmd, done := e.cmd, e.done
+	e.mu.Unlock()
+	if cmd == nil {
+		return
+	}
+	cmd.Process.Signal(os.Interrupt)
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
 	}
 }
 
@@ -201,6 +214,17 @@ func (s *hiServer) handleRunAccess(w http.ResponseWriter, _ *http.Request, devic
 			return
 		}
 	}
+	run := strings.TrimSpace(input.Run)
+	if run == "" {
+		run = newServerID("run")
+	}
+	s.mu.Lock()
+	revoked := s.state.Runs[run] != nil && !s.state.Runs[run].Revoked.IsZero()
+	s.mu.Unlock()
+	if revoked {
+		writeAPIError(w, http.StatusForbidden, fmt.Sprintf("the run %s was revoked on this server; start it under another name", run))
+		return
+	}
 	lifetime := 24 * time.Hour
 	if input.Seconds > 0 {
 		lifetime = time.Duration(input.Seconds) * time.Second
@@ -213,15 +237,111 @@ func (s *hiServer) handleRunAccess(w http.ResponseWriter, _ *http.Request, devic
 	}
 	expires := computeNow().Add(lifetime)
 	token := s.issueDataToken(dataClaims{Device: device.Fingerprint, User: device.User, Scopes: input.Scopes,
-		Cloud: true, Run: input.Run, Expires: expires.Unix()})
+		Cloud: true, Run: run, Expires: expires.Unix()})
+	s.mu.Lock()
+	if s.state.Runs == nil {
+		s.state.Runs = map[string]*serverRun{}
+	}
+	entry := s.state.Runs[run]
+	if entry == nil {
+		entry = &serverRun{Run: run, Issued: computeNow().UTC()}
+		s.state.Runs[run] = entry
+	}
+	entry.User, entry.Device, entry.Hostname, entry.Scopes = device.User, device.Fingerprint, device.Hostname, input.Scopes
+	if expires.After(entry.Expires) {
+		entry.Expires = expires.UTC()
+	}
+	s.saveLocked()
+	s.mu.Unlock()
 	s.exposure.mu.Lock()
 	if expires.After(s.exposure.until) {
 		s.exposure.until = expires
 	}
 	s.exposure.mu.Unlock()
 	s.audit(device.User, "run token", strings.Join(input.Scopes, ", "),
-		fmt.Sprintf("run %s from %s, until %s, through %s", firstNonEmpty(input.Run, "-"), device.Hostname, expires.Format(time.RFC3339), url))
+		fmt.Sprintf("run %s from %s, until %s, through %s", run, device.Hostname, expires.Format(time.RFC3339), url))
 	writeJSON(w, http.StatusOK, apiRunAccess{Endpoint: url + dataProxyPath, Token: token, Expires: expires})
+}
+
+// serverRun is a cloud run that was given a run token.
+type serverRun struct {
+	Run      string    `json:"run"`
+	User     string    `json:"user"`
+	Device   string    `json:"device"`
+	Hostname string    `json:"hostname,omitempty"`
+	Scopes   []string  `json:"scopes"`
+	Issued   time.Time `json:"issued"`
+	Expires  time.Time `json:"expires"`
+	Revoked  time.Time `json:"revoked,omitzero"`
+}
+
+// runRevoked reports whether a run's tokens were revoked.
+func (s *hiServer) runRevoked(run string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entry := s.state.Runs[run]
+	return entry != nil && !entry.Revoked.IsZero()
+}
+
+// revokeRun ends a run's tokens now. The server keeps the run until its
+// tokens would have expired.
+func (s *hiServer) revokeRun(run, actor string) (*serverRun, error) {
+	s.mu.Lock()
+	entry := s.state.Runs[run]
+	if entry == nil {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("no run %s has a valid run token; see hi server expose", run)
+	}
+	already := !entry.Revoked.IsZero()
+	if !already {
+		entry.Revoked = computeNow().UTC()
+	}
+	copied := *entry
+	s.saveLocked()
+	// The exposure stays up only for runs that weren't revoked.
+	var until time.Time
+	for _, other := range s.state.Runs {
+		if other.Revoked.IsZero() && other.Expires.After(until) {
+			until = other.Expires
+		}
+	}
+	s.mu.Unlock()
+	s.exposure.mu.Lock()
+	s.exposure.until = until
+	s.exposure.mu.Unlock()
+	if !already {
+		s.audit(actor, "run token revoked", run, fmt.Sprintf("%s from %s, for %s", copied.User, copied.Hostname, strings.Join(copied.Scopes, ", ")))
+	}
+	return &copied, nil
+}
+
+// pruneRuns forgets runs whose tokens have expired.
+func (s *hiServer) pruneRuns() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changed := false
+	for run, entry := range s.state.Runs {
+		if computeNow().After(entry.Expires) {
+			delete(s.state.Runs, run)
+			changed = true
+		}
+	}
+	if changed {
+		s.saveLocked()
+	}
+}
+
+func (s *hiServer) runList() []serverRun {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var runs []serverRun
+	for _, entry := range s.state.Runs {
+		if computeNow().Before(entry.Expires) {
+			runs = append(runs, *entry)
+		}
+	}
+	sort.Slice(runs, func(i, j int) bool { return runs[i].Issued.Before(runs[j].Issued) })
+	return runs
 }
 
 // exposeName is the prefix for NetBird's generated service name.
@@ -243,16 +363,33 @@ type apiExposure struct {
 	URL     string    `json:"url,omitempty"`
 	Started time.Time `json:"started,omitzero"`
 	Until   time.Time `json:"until,omitzero"`
-	LastUse time.Time `json:"last_use,omitzero"`
-	Problem string    `json:"problem,omitempty"`
+	LastUse time.Time   `json:"last_use,omitzero"`
+	Problem string      `json:"problem,omitempty"`
+	Runs    []serverRun `json:"runs,omitempty"`
 }
 
 func (s *hiServer) exposeAdminRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/expose", func(w http.ResponseWriter, _ *http.Request) {
+		runs := s.runList()
 		e := &s.exposure
 		e.mu.Lock()
 		defer e.mu.Unlock()
-		writeJSON(w, http.StatusOK, apiExposure{Listen: e.listen, URL: e.url, Started: e.started, Until: e.until, LastUse: e.lastUse, Problem: e.problem})
+		writeJSON(w, http.StatusOK, apiExposure{Listen: e.listen, URL: e.url, Started: e.started, Until: e.until, LastUse: e.lastUse, Problem: e.problem, Runs: runs})
+	})
+	mux.HandleFunc("POST /admin/expose/revoke", func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Run string `json:"run"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil || input.Run == "" {
+			writeAPIError(w, http.StatusBadRequest, "name the run to revoke")
+			return
+		}
+		run, err := s.revokeRun(input.Run, "admin")
+		if err != nil {
+			writeAPIError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, run)
 	})
 	mux.HandleFunc("POST /admin/expose/stop", func(w http.ResponseWriter, _ *http.Request) {
 		s.stopExposure()
@@ -286,6 +423,20 @@ func serverExposeCommand(args []string, stdout, stderr io.Writer) error {
 		if status.Problem != "" {
 			fmt.Fprintf(stdout, "Last problem: %s\n", status.Problem)
 		}
+		if len(status.Runs) > 0 {
+			fmt.Fprintln(stdout, "\nRuns with run tokens:")
+			table := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+			fmt.Fprintln(table, "  RUN\tUSER\tFROM\tDATA\tUNTIL")
+			for _, run := range status.Runs {
+				until := run.Expires.Local().Format("2006-01-02 15:04")
+				if !run.Revoked.IsZero() {
+					until = "revoked " + run.Revoked.Local().Format("2006-01-02 15:04")
+				}
+				fmt.Fprintf(table, "  %s\t%s\t%s\t%s\t%s\n", run.Run, run.User, firstNonEmpty(run.Hostname, "-"), strings.Join(run.Scopes, ", "), until)
+			}
+			table.Flush()
+			fmt.Fprintln(stdout, "hi server expose revoke <run> ends one run's token now.")
+		}
 		return nil
 	case len(positional) == 1 && positional[0] == "stop":
 		if err := adminCall(*dirFlag, http.MethodPost, "/admin/expose/stop", nil, nil); err != nil {
@@ -293,6 +444,14 @@ func serverExposeCommand(args []string, stdout, stderr io.Writer) error {
 		}
 		fmt.Fprintln(stdout, "Stopped the exposure. Runs using it fail until they ask again.")
 		return nil
+	case len(positional) == 2 && positional[0] == "revoke":
+		var run serverRun
+		if err := adminCall(*dirFlag, http.MethodPost, "/admin/expose/revoke", map[string]string{"run": positional[1]}, &run); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Revoked the run token of %s (%s, for %s). The run can't read the team's data any more;\nthe server remembers this until %s.\n",
+			run.Run, run.User, strings.Join(run.Scopes, ", "), run.Expires.Local().Format("2006-01-02 15:04"))
+		return nil
 	}
-	return usageError{"usage: hi server expose [stop]"}
+	return usageError{"usage: hi server expose [stop | revoke <run>]"}
 }

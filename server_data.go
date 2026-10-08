@@ -104,10 +104,27 @@ type hubWhoami struct {
 		Name string `json:"name"`
 	} `json:"orgs"`
 	Auth struct {
+		Type        string `json:"type"`
 		AccessToken struct {
 			Role string `json:"role"`
 		} `json:"accessToken"`
 	} `json:"auth"`
+}
+
+// role is the token's access: read, write, fineGrained, or oauth for a
+// sign-in from hf auth login, which has the account's own access.
+func (w hubWhoami) role() string {
+	if w.Auth.AccessToken.Role == "" && w.Auth.Type == "oauth" {
+		return "oauth"
+	}
+	return w.Auth.AccessToken.Role
+}
+
+// dataTokenOwner is whose token reads a data organization.
+type dataTokenOwner struct {
+	Account string    `json:"account"`
+	Role    string    `json:"role,omitempty"`
+	Checked time.Time `json:"checked"`
 }
 
 var hubClient = &http.Client{Timeout: 30 * time.Second}
@@ -250,7 +267,7 @@ func sortedKeys[V any](values map[string]V) []string {
 // checkDataOrg checks that a token reads an organization and counts what
 // it can see.
 func checkDataOrg(token, org string, who hubWhoami) apiDataOrgStatus {
-	status := apiDataOrgStatus{Org: org, Account: who.Name, Role: who.Auth.AccessToken.Role}
+	status := apiDataOrgStatus{Org: org, Account: who.Name, Role: who.role()}
 	member := strings.EqualFold(who.Name, org)
 	for _, candidate := range who.Orgs {
 		member = member || strings.EqualFold(candidate.Name, org)
@@ -313,6 +330,7 @@ func (s *hiServer) addDataOrgs(orgs []string, token, actor string) ([]apiDataOrg
 		s.keys[dataKeyPrefix+org] = token
 	}
 	err = s.saveKeysLocked()
+	s.recordDataTokenOwnersLocked(results)
 	s.mu.Unlock()
 	if err != nil {
 		return nil, err
@@ -337,6 +355,10 @@ func (s *hiServer) removeDataOrg(org, actor string) error {
 	}
 	delete(s.keys, dataKeyPrefix+org)
 	err := s.saveKeysLocked()
+	if s.state.DataTokens[org] != nil {
+		delete(s.state.DataTokens, org)
+		s.saveLocked()
+	}
 	s.mu.Unlock()
 	if err != nil {
 		return err
@@ -367,7 +389,22 @@ func (s *hiServer) testDataOrgs(only string) ([]apiDataOrgStatus, error) {
 		}
 		results = append(results, checkDataOrg(orgs[org], org, who))
 	}
+	s.mu.Lock()
+	s.recordDataTokenOwnersLocked(results)
+	s.mu.Unlock()
 	return results, nil
+}
+
+func (s *hiServer) recordDataTokenOwnersLocked(results []apiDataOrgStatus) {
+	if s.state.DataTokens == nil {
+		s.state.DataTokens = map[string]*dataTokenOwner{}
+	}
+	for _, status := range results {
+		if status.Account != "" {
+			s.state.DataTokens[status.Org] = &dataTokenOwner{Account: status.Account, Role: status.Role, Checked: computeNow().UTC()}
+		}
+	}
+	s.saveLocked()
 }
 
 // dataListings returns every organization's listing, fetching those older
@@ -744,6 +781,9 @@ func (s *hiServer) handleDataProxy(w http.ResponseWriter, r *http.Request) {
 func (s *hiServer) serveDataProxy(w http.ResponseWriter, r *http.Request, cloud bool, public string) {
 	token, _ := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	claims, err := s.verifyDataToken(strings.TrimSpace(token))
+	if err == nil && claims.Cloud && s.runRevoked(claims.Run) {
+		err = fmt.Errorf("the run token of %s was revoked on the hi server", claims.Run)
+	}
 	if err == nil && claims.Cloud != cloud {
 		err = errors.New("this token is for a cloud machine's run, which reaches the server through its public URL")
 		if cloud {
@@ -928,6 +968,11 @@ func (s *hiServer) dataOrgList() []apiDataOrgStatus {
 		listing := listings[org]
 		status := apiDataOrgStatus{Org: org, Problem: listing.problem}
 		status.Datasets, status.Models, status.Buckets = countDataKinds(listing.items)
+		s.mu.Lock()
+		if owner := s.state.DataTokens[org]; owner != nil {
+			status.Account, status.Role = owner.Account, owner.Role
+		}
+		s.mu.Unlock()
 		list = append(list, status)
 	}
 	return list
@@ -1074,13 +1119,19 @@ type dataAdminOps struct {
 }
 
 func serverDataMenu(ui menuUI, ops dataAdminOps, stdout io.Writer) error {
+	// The list is shown at the start and after a removal; adding and
+	// testing print the organizations they checked.
+	showList := true
 	for {
 		list, err := ops.list()
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(stdout)
-		printDataOrgs(list, stdout)
+		if showList {
+			fmt.Fprintln(stdout)
+			printDataOrgs(list, stdout)
+		}
+		showList = false
 		choice, err := ui.choose("Hugging Face organizations for hi data", []string{
 			"+  Add organizations and their token",
 			"✓  Test the tokens",
@@ -1130,6 +1181,7 @@ func serverDataMenu(ui menuUI, ops dataAdminOps, stdout io.Writer) error {
 			}
 			ui.command("hi server data remove " + names[picked])
 			actionErr = ops.remove(names[picked])
+			showList = true
 		default:
 			return nil
 		}
@@ -1154,9 +1206,14 @@ func printDataOrgs(list []apiDataOrgStatus, stdout io.Writer) {
 			line += fmt.Sprintf(" (token of %s, %s)", org.Account, describeHubRole(org.Role))
 		}
 		fmt.Fprintln(stdout, line)
-		if org.Role == "write" {
+		switch org.Role {
+		case "write":
 			fmt.Fprintln(stdout, "  warning: this token can also write. hi data only passes on reads, but a fine-grained,")
 			fmt.Fprintln(stdout, "  read-only token limited to these organizations is safer if the server box is compromised.")
+		case "oauth":
+			fmt.Fprintln(stdout, "  warning: this is a sign-in from hf auth login, with everything the account may do. hi data")
+			fmt.Fprintln(stdout, "  only passes on reads, but a fine-grained, read-only token limited to these organizations")
+			fmt.Fprintln(stdout, "  is safer if the server box is compromised.")
 		}
 	}
 }
@@ -1175,6 +1232,8 @@ func describeHubRole(role string) string {
 		return "read-only"
 	case "fineGrained":
 		return "fine-grained"
+	case "oauth":
+		return "a sign-in"
 	case "":
 		return "unknown access"
 	}

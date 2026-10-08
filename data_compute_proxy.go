@@ -195,7 +195,7 @@ def _download():
     for repo in _REPOS:
         files = _tree(repo)
         total = sum(entry["size"] for entry in files)
-        print("hi data: %%s: %%d files, %%.1f MB into %%s" %% (repo["id"], len(files), total / 1e6, repo["to"]), flush=True)
+        print("hi data: %%s: %%d file%%s, %%.1f MB into %%s" %% (repo["id"], len(files), "" if len(files) == 1 else "s", total / 1e6, repo["to"]), flush=True)
         with ThreadPoolExecutor(max_workers=8) as pool:
             for job in [pool.submit(_fetch, repo, entry) for entry in files]:
                 job.result()

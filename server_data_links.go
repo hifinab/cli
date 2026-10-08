@@ -278,7 +278,7 @@ func (s *hiServer) handleDataLinks(w http.ResponseWriter, _ *http.Request, devic
 	if links.Revision != "" {
 		at = " at " + shortCommit(links.Revision)
 	}
-	s.audit(device.User, "data links", input.Scope, fmt.Sprintf("%d files%s, for a compute run from %s", len(links.Files), at, device.Hostname))
+	s.audit(device.User, "data links", input.Scope, fmt.Sprintf("%s%s, for a compute run from %s", plural(len(links.Files), "file"), at, device.Hostname))
 	writeJSON(w, http.StatusOK, links)
 }
 

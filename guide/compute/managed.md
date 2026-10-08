@@ -520,7 +520,10 @@ hi server data list|test|remove <org>
 
 - Use a fine-grained, read-only token limited to the organizations. It
   stays in `keys.json`; the proxy passes on only reads, but a read-only
-  token is safer if the box is ever compromised.
+  token is safer if the box is ever compromised. The sign-in that
+  `hf auth login` saves works too, but it can do everything the account
+  can, so hi warns about it as it does about a write token. `list` and
+  `test` show whose token each organization uses.
 - Every group reads everything by default. To limit one, add
   `"data": ["hifinab/bars-1d", "hifinab/public-*"]` to it in `policy.json`;
   `[]` allows nothing.
@@ -537,8 +540,13 @@ minutes.
 - Turn on **Peer Expose** in the NetBird dashboard (Settings > Clients),
   once. Without it, runs fall back to signed download links, which work
   but last about an hour and are limited in size on Hugging Face.
-- `hi server expose` shows the current public address and until when run
-  tokens are valid; `hi server expose stop` closes it now.
+- `hi server expose` shows the current public address, and each run with
+  a run token: who started it, from which device, for which data, and
+  until when. `hi server expose stop` closes the address now.
+- `hi server expose revoke <run>` ends one run's token at once, for
+  example a run left going on a machine you no longer trust. The server
+  remembers it until the token would have expired, and refuses that run a
+  new token; other runs keep working.
 - `"expose_listen"` in `config.json` moves the listener, or `"off"` turns
   exposure off.
 

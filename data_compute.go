@@ -96,7 +96,7 @@ func fetchDataRunLinks(refs []dataRunRef, stderr io.Writer) ([]dataRunRepo, erro
 		if links.Revision != "" {
 			at = " at " + shortCommit(links.Revision)
 		}
-		fmt.Fprintf(stderr, "  %d files, %s%s, into %s on the instance\n", len(links.Files), formatDataSize(size), at, defaultDataFolder(item))
+		fmt.Fprintf(stderr, "  %s, %s%s, into %s on the instance\n", plural(len(links.Files), "file"), formatDataSize(size), at, defaultDataFolder(item))
 		repos = append(repos, dataRunRepo{ID: item.ID, To: filepath.ToSlash(defaultDataFolder(item)), Files: links.Files})
 	}
 	return repos, nil
@@ -209,7 +209,7 @@ def _download():
     started = time.time()
     for repo in _MANIFEST:
         total = sum(entry["size"] for entry in repo["files"])
-        print("hi data: %%s: %%d files, %%.1f MB into %%s" %% (repo["id"], len(repo["files"]), total / 1e6, repo["to"]), flush=True)
+        print("hi data: %%s: %%d file%%s, %%.1f MB into %%s" %% (repo["id"], len(repo["files"]), "" if len(repo["files"]) == 1 else "s", total / 1e6, repo["to"]), flush=True)
         with ThreadPoolExecutor(max_workers=8) as pool:
             jobs = [pool.submit(_fetch, os.path.join(repo["to"], entry["path"]), entry) for entry in repo["files"]]
             for job in jobs:

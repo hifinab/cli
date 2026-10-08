@@ -1,8 +1,10 @@
 # `hi server expose` specification
 
-Status: Draft (2026-10-04). Release 1 (the team's data on cloud machines)
-shipped in v0.26.0, tested end to end on a real Hugging Face job. Not yet built from the spec: `hi server expose revoke`, and the
-`on|off` command (`expose_listen: "off"` in `config.json` does it).
+Status: Approved (2026-10-08). Drafted 2026-10-04. Release 1 (the team's data on cloud machines)
+shipped in v0.26.0, tested end to end on a real Hugging Face job; release 2
+(`hi compute up --data`) in v0.29.0; `hi server expose revoke` built on
+2026-10-08. Not built: the `on|off` command (`expose_listen: "off"` in
+`config.json` does it).
 
 Dependencies: `hi server` (signed client API inside NetBird, server key,
 policy, audit), `hi data` ([hi_data.md](../approved/hi_data.md)), NetBird's
@@ -71,6 +73,13 @@ It names the device that asked for it, and stops working at once when that
 device or its user is removed, or when policy no longer allows a
 repository. `hi server expose revoke <run>` ends one early; the server keeps
 a short list of revoked run IDs until they would have expired.
+
+As built: the server records each run given a token (`runs` in
+`state.json`: user, device, repositories, until when) and forgets it once
+its tokens expire. A run is named by the job or machine name the device
+sends, or `run-…` when it sends none. Revoking refuses that run's tokens on
+the instance listener at once, and refuses it new ones; the run must start
+again under another name. `hi server expose` lists the runs.
 
 ## The exposure's lifetime
 
@@ -201,9 +210,9 @@ repositories. `hi data get` is not on the machine, so the guide points to
    name, and runs already going lose the proxy until they ask again.
 3. Whether NetBird's dashboard-only static header check is worth setting
    up as a second lock for a permanent service.
-4. `hi server expose on|off` and `revoke <run>` (see [Commands](#commands))
-   aren't built yet; `"expose_listen": "off"` in `config.json` turns
-   exposure off, and removing the device or user ends its run tokens.
+4. `hi server expose on|off` (see [Commands](#commands)) isn't built;
+   `"expose_listen": "off"` in `config.json` turns exposure off. `revoke
+   <run>` was built on 2026-10-08.
 
 ## Findings
 

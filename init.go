@@ -712,7 +712,7 @@ func executeInit(catalog *templateCatalog, request initRequest, yes, dryRun bool
 			break
 		}
 	}
-	fmt.Fprintf(stdout, "\nCreated %s from the %s template (%d files).\n", plan.target, request.template, len(changes))
+	fmt.Fprintf(stdout, "\nCreated %s from the %s template (%s).\n", plan.target, request.template, plural(len(changes), "file"))
 	fmt.Fprintln(stdout, "Next:")
 	if relative, err := filepath.Rel(mustGetwd(), plan.target); err == nil && relative != "." {
 		fmt.Fprintf(stdout, "  cd %s\n", relative)

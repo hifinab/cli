@@ -578,6 +578,21 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.30.2 — Finish the team's data on every cloud machine
+
+- [x] `hi server expose revoke <run>` ends one run's token now; the server
+  keeps the run until its tokens would have expired and refuses it new
+  ones. `hi server expose` lists the runs with run tokens.
+  Spec: [hi_server_expose.md, Run tokens](specs/approved/hi_server_expose.md#run-tokens).
+- [x] "1 file", not "1 files", in `hi compute run --data`'s output, on
+  the instance, and in `hi data info`.
+- [x] The `hi server data` menu, tried in a real terminal against a running
+  server: add, test, and remove an organization. It now shows whose token
+  each organization uses in `list`, names a `hf auth login` sign-in and
+  warns about it, and doesn't print each result twice.
+- [x] [hi_server_expose.md](specs/approved/hi_server_expose.md) approved.
+  Tested on 2026-10-08.
+
 ### v0.30.1 — Bundles from skills.sh
 
 - [x] `bundles/web.json`, `office.json`, and `data.json` list skills from
@@ -639,8 +654,8 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   `hf download` and `load_dataset` work there, and the token never shows
   in the provider's console. The same through a managed provider, after
   approval; `--no-wait` and Community Cloud refuse `--data`.
-  Spec: [hi_server_expose.md, Cloud machines](specs/ideas/hi_server_expose.md#cloud-machines) and
-  [Releases](specs/ideas/hi_server_expose.md#releases) (2).
+  Spec: [hi_server_expose.md, Cloud machines](specs/approved/hi_server_expose.md#cloud-machines) and
+  [Releases](specs/approved/hi_server_expose.md#releases) (2).
   Tested on 2026-10-07 on RunPod (RTX 2000 Ada) through vmhiserver:
   `hf download` and `load_dataset` of hifinab/bars-1d, and a refusal for a
   repository not named.
@@ -696,7 +711,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   and the script can call `load_dataset` itself. Signed links remain for
   Colab and when the server can't expose. `hi server expose [stop]`.
   Tested on a real Hugging Face job through a server on vmhiserver.
-  Spec: [hi_server_expose.md](specs/ideas/hi_server_expose.md).
+  Spec: [hi_server_expose.md](specs/approved/hi_server_expose.md).
 
 ### v0.25.2 — A clear message from an older server
 
@@ -766,20 +781,6 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
 ## Planned
 
-### v0.29.3 — Finish the team's data on every cloud machine
-
-- [ ] `hi server expose revoke <run>` ends one run's token early; the server
-  keeps the revoked run IDs until they would have expired.
-  Spec: [hi_server_expose.md, Run tokens](specs/ideas/hi_server_expose.md#run-tokens) and
-  [Commands](specs/ideas/hi_server_expose.md#commands).
-- [ ] "1 file", not "1 files", in `hi compute run --data`'s output and on
-  the instance.
-- [ ] Try the `hi server data` admin menu in a real terminal: add, test,
-  and remove an organization.
-  Spec: [hi_data.md, Adding organizations](specs/approved/hi_data.md#adding-organizations).
-- [ ] Approve [hi_server_expose.md](specs/ideas/hi_server_expose.md) and move it to
-  `specs/approved/` once this release is out.
-
 ### v0.31.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
@@ -830,14 +831,14 @@ Follow-ups to v0.24–v0.28, not scheduled yet.
 - [ ] A stable public address for `hi server expose`: a custom domain
   (`--with-custom-domain`), so a restart of `netbird expose` doesn't cut
   off runs already going.
-  Spec: [hi_server_expose.md, Open questions](specs/ideas/hi_server_expose.md#open-questions) (2) and
-  [The exposure's lifetime](specs/ideas/hi_server_expose.md#the-exposures-lifetime).
+  Spec: [hi_server_expose.md, Open questions](specs/approved/hi_server_expose.md#open-questions) (2) and
+  [The exposure's lifetime](specs/approved/hi_server_expose.md#the-exposures-lifetime).
 - [ ] `hi server expose on|off`, in place of `"expose_listen": "off"`.
-  Spec: [hi_server_expose.md, Commands](specs/ideas/hi_server_expose.md#commands).
+  Spec: [hi_server_expose.md, Commands](specs/approved/hi_server_expose.md#commands).
 - [ ] Colab through the proxy: a way to hand Colab the run token, so its
   runs get no one-hour links and can call `load_dataset`.
   Spec: [hi_data.md, Known limits](specs/approved/hi_data.md#known-limits) and
-  [hi_server_expose.md, Cloud machines](specs/ideas/hi_server_expose.md#cloud-machines).
+  [hi_server_expose.md, Cloud machines](specs/approved/hi_server_expose.md#cloud-machines).
 - [ ] `--data` for container runs (`hi compute run <image> -- <command>`),
   with a shell-only downloader.
   Spec: [hi_data.md, Known limits](specs/approved/hi_data.md#known-limits).
@@ -848,10 +849,10 @@ Follow-ups to v0.24–v0.28, not scheduled yet.
 - [ ] More routes on the instance listener, each its own scope on the run
   token: the team model for `hi q` on cloud machines, and an idle signal so
   a machine can stop itself (with [hi_compute_idle.md](specs/ideas/hi_compute_idle.md)).
-  Spec: [hi_server_expose.md, Releases](specs/ideas/hi_server_expose.md#releases) (3).
+  Spec: [hi_server_expose.md, Releases](specs/approved/hi_server_expose.md#releases) (3).
 - [ ] Decide one exposure for all runs or one per run, and whether to add
   NetBird's dashboard-only header check as a second lock.
-  Spec: [hi_server_expose.md, Open questions](specs/ideas/hi_server_expose.md#open-questions) (1, 3).
+  Spec: [hi_server_expose.md, Open questions](specs/approved/hi_server_expose.md#open-questions) (1, 3).
 - [ ] The S3-compatible gateway for buckets (`s3.hf.co`), for tools that
   only speak S3.
   Spec: [hi_data.md, Open questions](specs/approved/hi_data.md#open-questions).

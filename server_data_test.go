@@ -398,7 +398,7 @@ func TestServerDataCommandWorksWithoutARunningServer(t *testing.T) {
 		t.Fatalf("add: code %d\n%s%s", code, stdout, stderr)
 	}
 	code, stdout, _ = runHi("server", "data", "list", "--dir", ts.dir)
-	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 bucket") {
+	if code != 0 || !strings.Contains(stdout, "✓ hifinab: 2 datasets, 2 models, 1 bucket (token of svc, read-only)") {
 		t.Fatalf("list: code %d\n%s", code, stdout)
 	}
 	code, stdout, _ = runHi("server", "data", "test", "--dir", ts.dir)
@@ -407,7 +407,8 @@ func TestServerDataCommandWorksWithoutARunningServer(t *testing.T) {
 	}
 	code, _, _ = runHi("server", "data", "remove", "hifinab", "--dir", ts.dir)
 	keys, _ := os.ReadFile(filepath.Join(ts.dir, "keys.json"))
-	if code != 0 || strings.Contains(string(keys), "hf_team") {
+	state, _ := os.ReadFile(filepath.Join(ts.dir, "state.json"))
+	if code != 0 || strings.Contains(string(keys), "hf_team") || strings.Contains(string(state), `"account"`) {
 		t.Fatalf("remove: code %d, keys %s", code, keys)
 	}
 	if code, _, stderr = runHi("server", "data", "add", "hifinab", "--dir", ts.dir); code == 0 || !strings.Contains(stderr, "no token given") {
@@ -688,5 +689,18 @@ func TestPrepareDataRunWrapsTheScript(t *testing.T) {
 	}
 	if _, err := prepareDataRun(&runRequest{image: "python:3.12"}, []string{"hifinab/bars"}, "hf", &stderr); err == nil {
 		t.Fatal("--data with an image run was accepted")
+	}
+}
+
+func TestOAuthDataTokensAreNamed(t *testing.T) {
+	who := hubWhoami{Name: "quantbert"}
+	who.Auth.Type = "oauth"
+	if who.role() != "oauth" || describeHubRole(who.role()) != "a sign-in" {
+		t.Fatalf("role %q", who.role())
+	}
+	var out strings.Builder
+	printDataOrgs([]apiDataOrgStatus{{Org: "hifinab", Account: "quantbert", Role: "oauth", Datasets: 1}}, &out)
+	if !strings.Contains(out.String(), "(token of quantbert, a sign-in)") || !strings.Contains(out.String(), "hf auth login") {
+		t.Fatal(out.String())
 	}
 }

@@ -343,7 +343,7 @@ func dataInfoCommand(args []string, stdout, stderr io.Writer) error {
 	if item.Private {
 		fmt.Fprintln(stdout, "  private")
 	}
-	fmt.Fprintf(stdout, "  %d files, %s\n", len(info.Siblings), formatDataSize(total))
+	fmt.Fprintf(stdout, "  %s, %s\n", plural(len(info.Siblings), "file"), formatDataSize(total))
 	if item.Commit != "" {
 		fmt.Fprintf(stdout, "  updated %s, at %s\n", describeDataAge(item.Updated), shortCommit(item.Commit))
 	} else {
@@ -536,7 +536,7 @@ func downloadData(client *serverClient, connection *serverConnection, item dataI
 func dataMenuLabel(item dataItem) string {
 	size := formatDataSize(item.Size)
 	if item.Kind == "bucket" {
-		size += fmt.Sprintf(", %d files", item.Files)
+		size += ", " + plural(item.Files, "file")
 	}
 	return fmt.Sprintf("%-7s  %s  ·  %s  ·  updated %s", item.Kind, item.ID, size, describeDataAge(item.Updated))
 }

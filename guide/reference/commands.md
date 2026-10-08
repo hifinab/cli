@@ -118,7 +118,8 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server data`                                    | Menu: Hugging Face organizations for `hi data`       |
 | `hi server data add <org>... [--token-file <f>]`    | Serve organizations' datasets, models, and buckets; asks for a read token |
 | `hi server data list\|test\|remove [<org>]`          | Show, check, or stop serving organizations           |
-| `hi server expose [stop]`                           | The public address cloud runs reach `hi data` through, if open; close it |
+| `hi server expose [stop]`                           | The public address cloud runs reach `hi data` through, and the runs using it; close it |
+| `hi server expose revoke <run>`                     | End one cloud run's token now                                             |
 
 ## hi data
 

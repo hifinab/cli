@@ -73,6 +73,12 @@ type serverState struct {
 	TemplateSources map[string]*templateSource `json:"template_sources,omitempty"`
 	// Reported records the last period each Slack report covered.
 	Reported map[string]string `json:"reported,omitempty"`
+	// Runs are the cloud runs given run tokens, kept until their tokens
+	// expire, so one can be revoked (server_expose.go).
+	Runs map[string]*serverRun `json:"runs,omitempty"`
+	// DataTokens says whose token reads each data organization, and with
+	// what access, as of the last add or test (server_data.go).
+	DataTokens map[string]*dataTokenOwner `json:"data_tokens,omitempty"`
 }
 
 type serverUser struct {
