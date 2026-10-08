@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -127,6 +128,44 @@ ENV HOME=/box/home LANG=C.UTF-8 TERM=xterm-256color
 WORKDIR /box
 `
 
+// dockerfileSources lists the files a Dockerfile's COPY and ADD lines take
+// from the build context, in order; folders are walked. COPY --from takes
+// from another image, so it adds nothing.
+func dockerfileSources(dockerfile []byte, context string) []string {
+	var paths []string
+	for _, line := range strings.Split(strings.ReplaceAll(string(dockerfile), "\\\n", " "), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || (!strings.EqualFold(fields[0], "COPY") && !strings.EqualFold(fields[0], "ADD")) {
+			continue
+		}
+		var sources []string
+		for _, field := range fields[1 : len(fields)-1] {
+			if strings.HasPrefix(field, "--from") {
+				sources = nil
+				break
+			}
+			if !strings.HasPrefix(field, "--") {
+				sources = append(sources, field)
+			}
+		}
+		for _, source := range sources {
+			if strings.Contains(source, "://") {
+				continue
+			}
+			matches, _ := filepath.Glob(filepath.Join(context, filepath.FromSlash(source)))
+			for _, match := range matches {
+				filepath.WalkDir(match, func(path string, entry os.DirEntry, err error) error {
+					if err == nil && !entry.IsDir() {
+						paths = append(paths, path)
+					}
+					return nil
+				})
+			}
+		}
+	}
+	return paths
+}
+
 func boxBaseImage() string {
 	digest := sha256.Sum256([]byte(boxContainerfile))
 	return "localhost/hi-box:" + hex.EncodeToString(digest[:])[:12]
@@ -155,19 +194,39 @@ func (e boxEngine) ensureBaseImage(stdout, stderr io.Writer) (string, error) {
 }
 
 // ensureProjectImage builds a project's Dockerfile from devcontainer.json,
-// tagged by the Dockerfile's content.
-func (e boxEngine) ensureProjectImage(dockerfile, context string, stdout, stderr io.Writer) (string, error) {
+// tagged by the Dockerfile's content, its build args, and the files it
+// copies in, so a new uv.lock gives a new image.
+func (e boxEngine) ensureProjectImage(dockerfile, context string, args map[string]string, stdout, stderr io.Writer) (string, error) {
 	data, err := os.ReadFile(dockerfile)
 	if err != nil {
 		return "", err
 	}
-	digest := sha256.Sum256(append(data, []byte(context)...))
-	image := "localhost/hi-box-project:" + hex.EncodeToString(digest[:])[:12]
+	digest := sha256.New()
+	digest.Write(data)
+	digest.Write([]byte("\x00" + context))
+	keys := make([]string, 0, len(args))
+	for key := range args {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	build := []string{"build", "-t", "", "-f", dockerfile}
+	for _, key := range keys {
+		digest.Write([]byte("\x00" + key + "=" + args[key]))
+		build = append(build, "--build-arg", key+"="+args[key])
+	}
+	for _, path := range dockerfileSources(data, context) {
+		digest.Write([]byte("\x00" + path + "\x00"))
+		if content, err := os.ReadFile(path); err == nil {
+			digest.Write(content)
+		}
+	}
+	image := "localhost/hi-box-project:" + hex.EncodeToString(digest.Sum(nil))[:12]
 	if e.exists("image", image) {
 		return image, nil
 	}
+	build[2] = image
 	fmt.Fprintf(stdout, "Building the project's image from %s...\n", dockerfile)
-	if err := e.interactive(nil, stdout, stderr, "build", "-t", image, "-f", dockerfile, context); err != nil {
+	if err := e.interactive(nil, stdout, stderr, append(build, context)...); err != nil {
 		return "", fmt.Errorf("building %s failed: %w", dockerfile, err)
 	}
 	return image, nil

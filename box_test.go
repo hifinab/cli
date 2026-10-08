@@ -419,3 +419,48 @@ func TestBoxDataOption(t *testing.T) {
 		t.Fatal("the data hosts should cover the CDN and Xet storage only")
 	}
 }
+
+func TestDockerfileSources(t *testing.T) {
+	context := t.TempDir()
+	os.MkdirAll(filepath.Join(context, "conf"), 0o755)
+	for _, name := range []string{"pyproject.toml", "uv.lock", ".python-version", "conf/a.toml", "conf/b.toml"} {
+		os.WriteFile(filepath.Join(context, name), []byte(name), 0o644)
+	}
+	dockerfile := []byte("FROM ubuntu\nCOPY --chown=1000 pyproject.toml uv.lock \\\n  .python-version /opt/project/\nCOPY --from=ghcr.io/astral-sh/uv:0.11 /uv /bin/uv\nadd conf /etc/conf\nRUN echo COPY nothing\n")
+	var got []string
+	for _, path := range dockerfileSources(dockerfile, context) {
+		relative, _ := filepath.Rel(context, path)
+		got = append(got, relative)
+	}
+	if strings.Join(got, ",") != "pyproject.toml,uv.lock,.python-version,conf/a.toml,conf/b.toml" {
+		t.Fatalf("sources %v", got)
+	}
+}
+
+func TestProjectImageFollowsItsInputs(t *testing.T) {
+	context := t.TempDir()
+	dockerfile := filepath.Join(context, "Dockerfile")
+	os.WriteFile(dockerfile, []byte("FROM ubuntu\nARG TORCH=cpu\nCOPY uv.lock /opt/\n"), 0o644)
+	os.WriteFile(filepath.Join(context, "uv.lock"), []byte("one"), 0o644)
+	var builds [][]string
+	previous := boxCommand
+	boxCommand = func(stdin io.Reader, stdout, stderr io.Writer, name string, args ...string) error {
+		if args[0] == "image" {
+			return fmt.Errorf("no such image")
+		}
+		builds = append(builds, args)
+		return nil
+	}
+	t.Cleanup(func() { boxCommand = previous })
+	engine := boxEngine{name: "podman", bin: "podman"}
+	first, _ := engine.ensureProjectImage(dockerfile, context, nil, io.Discard, io.Discard)
+	rocm, _ := engine.ensureProjectImage(dockerfile, context, map[string]string{"TORCH": "rocm"}, io.Discard, io.Discard)
+	os.WriteFile(filepath.Join(context, "uv.lock"), []byte("two"), 0o644)
+	relocked, _ := engine.ensureProjectImage(dockerfile, context, nil, io.Discard, io.Discard)
+	if first == rocm || first == relocked || rocm == relocked {
+		t.Fatalf("images %s %s %s", first, rocm, relocked)
+	}
+	if line := strings.Join(builds[1], " "); !strings.Contains(line, "--build-arg TORCH=rocm") || !strings.HasSuffix(line, context) {
+		t.Fatalf("build %s", line)
+	}
+}

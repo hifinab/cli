@@ -236,8 +236,7 @@ options below. A brief's front matter can set `agent`, `model`, `bundles`,
 `--yes` to start without asking; it exits with 1 when no box passed. With
 rounds: `--for <duration>`, `--budget <dollars>`, `--patience <n>`,
 `--min-gain <number>`, and `--edit a,b` for the files an agent may change.
-See [Several attempts at once](/guide/agent/#several-attempts-at-once) and
-[Rounds that keep only gains](/guide/agent/#rounds-that-keep-only-gains).
+See [Autoresearch](/guide/autoresearch/).
 
 ## hi box
 

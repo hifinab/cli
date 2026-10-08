@@ -1,0 +1,8 @@
+{
+  "name": "autoresearch-base",
+  "summary": "Shared by the research templates: a fixed evaluation, frozen data, a holdout, and hi agent best-of rounds",
+  "extends": "base",
+  "hidden": true,
+  "schema": 1,
+  "requires_hi": ">=0.34.0"
+}

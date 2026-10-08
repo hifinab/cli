@@ -1,0 +1,11 @@
+{
+  "name": "autoresearch-ml",
+  "summary": "Autoresearch on model training: train.py trains for a fixed time, a fixed evaluation scores it, and rounds keep only gains",
+  "extends": "autoresearch-base",
+  "schema": 1,
+  "requires_hi": ">=0.34.0",
+  "commands": {
+    "setup": [["make", "sync"]],
+    "check": [["make", "check"]]
+  }
+}

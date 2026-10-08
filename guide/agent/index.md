@@ -231,90 +231,17 @@ hi agent wait myproject-2
 `--detach` starts the agent and returns at once. `hi agent wait` waits for
 it, if it's still working, and prints the report.
 
-## Several attempts at once
+## Several attempts, and rounds
 
-Agents vary a lot from one attempt to the next. `hi agent best-of` runs the
-same task in several boxes at once, checks each result the same way, and
-ranks them, so you keep the best one.
-
-```sh
-hi agent best-of 3 --agents claude,codex "make the backtest loader 2x faster without changing results"
-```
-
-```text
-Best-of b-4 · "make the backtest loader 2x faster without chang…" · 3 boxes · 23m
-Check: make check
-
-  #  BOX              AGENT   CHECK  DIFF          FLAGS     TIME  SPEND   NOTE
-  1  myproject-b4-2   codex   ✓ 41s  +38 −12 2f    –         12m   880k tok
-  2  myproject-b4-1   claude  ✓ 44s  +112 −40 5f   Makefile  18m   $2.10
-  3  myproject-b4-3   claude  ✗ 12s  +65 −30 3f    –         15m   $1.80   check: FAILED test_loader.py::test_hash
-
-Ranked by the check, then fewer flagged files and a smaller diff: read the diff before you keep one.
-  hi agent best-of keep b-4 myproject-b4-2     (or: hi box diff myproject-b4-2)
-```
-
-- hi asks before it starts, since the run costs about n times the tokens;
-  `--yes` skips the question.
-- Each box works on its own branch, `best-of/<run>/<i>`, from your last
-  commit. `--agents claude,codex` takes the agents in turn: different
-  agents fail in different ways.
-- When an agent ends, hi itself runs the check in its box: `make check`, or
-  `--check "go test ./..."`. An agent that says its tests pass is checked,
-  not believed. Before the check, hi stops anything the agent left running.
-- `--max 45m` limits each agent. The box options (`--network`, `--gpu`,
-  `--bundle`, …) apply to every box.
-- The order is no judgement of quality: passing boxes first, then fewer
-  files that [run on the host later](/guide/box/), then the smaller diff.
-  When every box passes and none touched a test, hi says the check may not
-  test the task.
-- `hi agent best-of keep b-4 myproject-b4-2` (or `keep b-4 1`) keeps that
-  box and its branch and removes the others; nothing is merged or pushed.
-  `hi agent best-of rm b-4` removes them all.
-- Ctrl+C stops waiting, not the boxes; `hi agent best-of show b-4` shows
-  the table later, and `hi agent best-of ls` lists runs. `--detach` starts
-  and returns.
-
-## Rounds that keep only gains
-
-With a score, best-of runs rounds, in the style of Karpathy's
-[autoresearch](https://github.com/karpathy/autoresearch): each round starts
-n boxes from the best result so far, and a result is kept only when its
-score beats that.
+`hi agent best-of` runs one task in several boxes at once, checks each
+result itself, and ranks them; with a score, it runs rounds that keep only
+gains, in the style of autoresearch. See
+[Autoresearch](/guide/autoresearch/).
 
 ```sh
-hi agent best-of 4 --rounds 100 --gpu --edit train.py \
-  --score "uv run train.py | grep ^val_bpb:" --lower program.md
+hi agent best-of 3 --agents claude,codex "make the backtest loader 2x faster"
+hi agent best-of 4 --rounds 50 --score "make score" --lower --edit train.py program.md
 ```
-
-- hi first runs the score on your last commit, the baseline. A score that
-  fails or prints no number stops there, before any agent starts.
-- When an agent ends, hi runs `--check` (if given) and `--score` in its box
-  and takes the last number the score prints. `--lower` or `--higher` says
-  which way is better.
-- **Only hi commits.** If the round's best result beats the best so far,
-  hi adds one commit to `best-of/<run>/best`, with the agent's one-line
-  idea and the scores. Otherwise the round is thrown away. Agents may
-  commit in their own boxes; that is scratch.
-- Each round's task tells the agents the best score so far and lists the
-  earlier attempts, with their scores and ideas, so they build on them.
-- `--edit train.py` limits what an agent may change: a result that touches
-  any other file, such as the evaluation, doesn't count.
-- With `--gpu`, boxes are scored one at a time after every agent of the
-  round is done, so a time-budgeted score isn't skewed by boxes sharing the
-  GPU.
-- The run ends after `--rounds n` (default 1; `forever` has no end), and
-  sooner with `--for 8h`, `--budget 50` (dollars, as agents report them),
-  or `--patience 10` (rounds without a gain). `--min-gain` treats smaller
-  gains as noise.
-
-The rounds run in their own process, so they go on when you close the
-terminal. `hi agent best-of watch b-7` shows a row per round: q, Esc, or
-Ctrl+C leave the view and the run goes on; s stops it after the current
-round. `hi agent best-of stop b-7` does the same from anywhere, and
-`--now` stops at once. `hi agent best-of resume b-7 --rounds 20` goes on
-from the best so far. When it's done, `git merge best-of/b-7/best` takes
-the gains.
 
 ## The report as JSON
 

@@ -1,0 +1,8 @@
+{
+  "name": "hifin-template-name",
+  // hi box and hi agent build this once; it holds the locked dependencies.
+  "build": { "dockerfile": "Dockerfile", "context": ".." },
+  // The prices are in eval/ and the packages in the image, so boxes need no
+  // network. Agents still reach their own model through hi's proxy.
+  "customizations": { "hi": { "network": "locked" } }
+}

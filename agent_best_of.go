@@ -354,6 +354,11 @@ func startBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout,
 	if options.json {
 		info = stderr
 	}
+	// The project's devcontainer.json can give every box the GPU; then
+	// scores take turns too.
+	if devcontainer, err := readBoxDevcontainer(root); err == nil && devcontainer != nil && devcontainer.Customizations.Hi.GPU {
+		options.gpu = true
+	}
 	kind, err := applyFrontMatter("", &options, stdin, info)
 	if err != nil {
 		return err

@@ -31,8 +31,9 @@ Hugging Face.
 | Know what I am paying and who pays                 | [Costs, limits, and billing]({{ '/guide/compute/billing/' | relative_url }}) |
 | Set up Colab or Hugging Face for the first time    | [Google Colab]({{ '/guide/compute/colab/' | relative_url }}), [Hugging Face Jobs]({{ '/guide/compute/hugging-face/' | relative_url }}) |
 | Hand a task to Claude Code, Codex, or Hermes in a sandbox   | [Hand tasks to agents]({{ '/guide/agent/' | relative_url }})   |
-| Try a task several times and keep the best result  | [Several attempts at once]({{ '/guide/agent/#several-attempts-at-once' | relative_url }}) |
-| Let agents improve a benchmark overnight, keeping only gains | [Rounds that keep only gains]({{ '/guide/agent/#rounds-that-keep-only-gains' | relative_url }}) |
+| Try a task several times and keep the best result  | [Several attempts at once]({{ '/guide/autoresearch/best-of/' | relative_url }}) |
+| Let agents improve a number overnight, keeping only gains | [Rounds that keep only gains]({{ '/guide/autoresearch/rounds/' | relative_url }}) |
+| Start an autoresearch project for a model or a strategy | [Start from a template]({{ '/guide/autoresearch/templates/' | relative_url }}) |
 | Let Claude Code or Codex use a GPU safely          | [Let your coding agent use a GPU]({{ '/guide/examples/agent/' | relative_url }}) |
 | Turn "move the md files to notes" into a command   | [Ask for a command]({{ '/guide/q/' | relative_url }})              |
 | Start a new repository that agents work well in   | [Start a project]({{ '/guide/projects/' | relative_url }})          |

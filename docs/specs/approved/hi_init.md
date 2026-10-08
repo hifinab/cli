@@ -44,9 +44,13 @@ The value is not the folders. It is three things no folder template gives:
 - **One default per type.** A template never asks which framework to use. The
   stack is decided once, in the template, and changed for everyone at once.
 - **Public patterns are public; private knowledge is not.** Well-known project
-  shapes ship inside `hi`. Anything quant-related or specific to the team
-  lives only in a private repo and reaches devices through
-  `hi server`.
+  shapes ship inside `hi`. Anything specific to the team lives only in a
+  private repo and reaches devices through `hi server`. A quant-related
+  template may ship inside `hi` when everything in it is public: the
+  `autoresearch-quant` template (2026-10-08) holds a generic backtest and a
+  published paper's strategy (Keller and Keuning, 2023), with no team logic.
+  Built-in layer names must not collide with the private repo's, since
+  built-in names win: hence `autoresearch-*`, not `research`.
 
 ## Where templates and skills live
 
@@ -249,6 +253,8 @@ pinned in the template's own manifests and lockfiles, not here.
 | `web` | Internal web apps and dashboards | React and TypeScript on Vite, npm, Biome, Vitest | type check, production build | v0.16.0 |
 | `service` | Backend services and APIs | `python` + FastAPI, pydantic-settings, SQLAlchemy and Alembic, `/healthz` and `/readyz`, Dockerfile, compose | migrations match models; health endpoints answer | v0.18.0 |
 | `ml` | Model training, fine-tuning, benchmarks | `python` + PyTorch from one dependency group per machine (`cpu`, `cuda`, or `rocm` with AMD's gfx1151 build for Strix Halo), which the `Makefile` picks from the hardware; typed config | a two-step CPU training smoke test | v0.18.0 |
+| `autoresearch-ml` | Agents improving model training with `hi agent best-of` rounds | a hidden `autoresearch-base` layer + PyTorch groups as in `ml`; fixed `prepare.py` and `evaluate.py`, `train.py` the only file agents change, a five-minute training budget, Tiny Shakespeare in `eval/`, a holdout outside the repo, a box image from `uv.lock` | the evaluation scores a uniform model at exactly log2 of the vocabulary; training past the budget fails; the source guard; the example trains | v0.34.0 |
+| `autoresearch-quant` | Agents improving a trading strategy with `hi agent best-of` rounds | `autoresearch-base` + pandas; fixed `prepare.py` (yfinance, `make data` only) and `evaluate.py`, `strategy.py` the only file agents change, HAA as the example | the backtest matches an independent implementation, has no lookahead, and charges fees; the source guard | v0.34.0 |
 | `pipeline` | Data sources, scrapers, ingestion | `python` + one idempotent `run --date` entry point, raw landing before parsing | offline parser tests against recorded responses; a rerun loads nothing new | v0.18.0 |
 | `cli` | Command-line tools | `python` + Typer, installed with `uv tool install` | exit codes and `--json` output | with the first project |
 | `mobile` | Mobile apps | Expo (expo-router, EAS), Biome, Jest | `expo-doctor` | with the first project |

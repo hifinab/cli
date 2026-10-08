@@ -354,7 +354,9 @@ hi init python pricing-tools --yes           # after the user agreed to the plan
 ```
 
 Other templates: `web`, `service`, `pipeline`, `ml`, and the team's private
-ones on a connected device. `hi init --update --dry-run` shows how a project
+ones on a connected device. `autoresearch-ml` and `autoresearch-quant` are
+for `hi agent best-of` rounds: after `hi init`, `make data`, `make score`,
+and a commit, `make loop` starts them (ask about the cost first). `hi init --update --dry-run` shows how a project
 differs from the current templates, and `hi init --update` applies it; if it
 writes `docs/upgrades/<version>.md`, apply what fits from it, run
 `make check`, and delete the file. `hi init --adopt <template>` brings an

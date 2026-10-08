@@ -263,6 +263,27 @@ Now: round 9: scoring ml-b7-r9-2 (2 of 4)
   run went on, and `stop --now` removed the round's box. Turns one at a time
   (`--gpu`) are covered by the code path but were not run on the GPU.
 
+### Templates and the guide (2026-10-08)
+
+- `hi init autoresearch-ml` and `hi init autoresearch-quant` start projects
+  shaped for rounds: a fixed `prepare.py` and `evaluate.py`, one file agents
+  change (`train.py` or `strategy.py`), frozen data in `eval/` (committed,
+  since `data/` is ignored and boxes see only commits), a holdout in
+  `../<folder>-holdout/`, and a box image that installs `uv.lock` into
+  `/opt/venv` so boxes run offline on the locked network. Their evaluation
+  refuses an editable file that opens files, imports outside a short list,
+  or runs code dynamically; `autoresearch-ml` also fails a `train()` that
+  runs past its budget, timed with a clock bound before `train.py` loads.
+- hi builds a project's Dockerfile image again when the Dockerfile, its
+  `build.args`, or a file it `COPY`s changes, and passes `build.args`.
+- best-of takes `"gpu": true` from `devcontainer.json` as `--gpu`, so those
+  boxes take turns to be scored.
+- A round whose boxes all scored but changed nothing is `unchanged`, not
+  `crash`. Seen in a real round: Haiku tried eleven ideas on HAA, found none
+  better, and put the file back.
+- The guide has an Autoresearch section: how it works, best of n, rounds,
+  the templates, and simple and advanced examples.
+
 ## Releases
 
 1. `best-of`, `ls`, `show`, `keep` with local boxes, the check run by hi, the

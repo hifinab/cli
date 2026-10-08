@@ -578,6 +578,19 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.34.0 — Autoresearch templates
+
+- [x] `hi init autoresearch-ml` and `hi init autoresearch-quant`: projects
+  shaped for `hi agent best-of` rounds, with a fixed and tested evaluation,
+  one file agents change, frozen data, a holdout outside the repository,
+  and a box image built from `uv.lock` so boxes run offline. Tested from
+  `hi init` to a score in a locked box, and the quant one through a real
+  round. Spec: [hi_init.md](specs/approved/hi_init.md#built-in-template-types),
+  [hi_agent_best_of.md](specs/ideas/hi_agent_best_of.md#templates-and-the-guide-2026-10-08).
+- [x] Project images rebuild when a file the Dockerfile copies, or a
+  `build.args` value, changes.
+- [x] The guide's Autoresearch section, with simple and advanced examples.
+
 ### v0.33.0 — `hi agent best-of`
 
 - [x] `hi agent best-of <n> "<task>"` runs the same task in 2 to 8 boxes

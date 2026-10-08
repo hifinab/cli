@@ -1,0 +1,19 @@
+
+## Research loop
+
+- This project improves one number with `hi agent best-of` rounds
+  (`make loop`). The number comes from a fixed evaluation: `evaluate.py`,
+  `prepare.py`, and the data in `eval/`. During a run, agents change only the
+  file `program.md` names; hi throws away results that change anything else.
+- `eval/` is the frozen data the score is measured on. It is committed on
+  purpose, unlike `data/`, so every box scores the same thing. Don't change
+  it, the evaluation, or the metric in the middle of a run: scores before and
+  after wouldn't compare.
+- The holdout lives outside the repository, in `../<folder>-holdout/`. Never
+  copy it in or read it from code; it is checked once, at the end, with
+  `make holdout`.
+- Boxes run offline from an image built from `uv.lock`. Don't add
+  dependencies during a run; after a change to `uv.lock`, hi rebuilds the
+  image on the next box.
+- Run Python through `make` (`make score`, `make check`): it picks the box's
+  environment in a box and uv's on this machine.

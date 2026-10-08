@@ -80,7 +80,7 @@ func TestServerTemplatesReachAConnectedDevice(t *testing.T) {
 
 	// Before connecting, a device sees built-in templates only.
 	code, stdout, stderr := runInitConnected(t, t.TempDir(), "", "--list")
-	if code != 0 || strings.Contains(stdout, "quant") {
+	if code != 0 || listsTemplate(stdout, "quant") {
 		t.Fatalf("unconnected list: %d\n%s%s", code, stdout, stderr)
 	}
 
@@ -154,7 +154,7 @@ func TestDeviceRefusesBundlesNotSignedByItsServer(t *testing.T) {
 	saveServerConnection(*connection)
 
 	code, stdout, stderr := runInitConnected(t, t.TempDir(), "", "--list")
-	if code != 0 || strings.Contains(stdout, "quant") || !strings.Contains(stderr, "not signed by this server's key") {
+	if code != 0 || listsTemplate(stdout, "quant") || !strings.Contains(stderr, "not signed by this server's key") {
 		t.Fatalf("exit %d\n%s%s", code, stdout, stderr)
 	}
 	if entries, _ := os.ReadDir(filepath.Join(templateCacheDirectory(), "firm")); len(entries) != 0 {
@@ -214,7 +214,7 @@ func TestPolicyLimitsTemplateSourcesPerGroup(t *testing.T) {
 	ts.connectAs(t, "chen", "students")
 
 	code, stdout, _ := runInitConnected(t, t.TempDir(), "", "--list")
-	if code != 0 || strings.Contains(stdout, "quant") {
+	if code != 0 || listsTemplate(stdout, "quant") {
 		t.Fatalf("students see firm templates:\n%s", stdout)
 	}
 	key, _ := loadDeviceKey(false)
@@ -327,4 +327,15 @@ func TestUpdateFollowsARenamedSource(t *testing.T) {
 	if code, stdout, _ := runInitConnected(t, project, "", "--update", "--check"); code != 0 || strings.Contains(stdout, "Not checked") {
 		t.Fatalf("check after rename: %d\n%s", code, stdout)
 	}
+}
+
+// listsTemplate reports whether hi init --list shows a template by this
+// name, so a built-in such as autoresearch-quant doesn't count as quant.
+func listsTemplate(list, name string) bool {
+	for _, line := range strings.Split(list, "\n") {
+		if fields := strings.Fields(line); len(fields) > 0 && fields[0] == name {
+			return true
+		}
+	}
+	return false
 }

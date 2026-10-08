@@ -27,8 +27,9 @@ type boxDevcontainer struct {
 }
 
 type boxDevBuild struct {
-	Dockerfile string `json:"dockerfile"`
-	Context    string `json:"context"`
+	Dockerfile string            `json:"dockerfile"`
+	Context    string            `json:"context"`
+	Args       map[string]string `json:"args"`
 }
 
 // boxCustomizations is customizations.hi.

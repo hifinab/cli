@@ -61,7 +61,7 @@ type bestOfRound struct {
 	Round   int         `json:"round"`
 	Started time.Time   `json:"started"`
 	Ended   time.Time   `json:"ended"`
-	Result  string      `json:"result"` // kept, discarded, crash, or stopped
+	Result  string      `json:"result"` // kept, discarded, unchanged, crash, or stopped
 	Winner  string      `json:"winner,omitempty"`
 	Agent   string      `json:"agent,omitempty"`
 	Score   *float64    `json:"score,omitempty"`
@@ -610,8 +610,10 @@ func settleBestOfRound(run *bestOfRun, log io.Writer) error {
 	loop := run.Loop
 	rankBestOf(run)
 	var winner *bestOfBox
+	scored := false
 	for i := range run.Boxes {
 		box := &run.Boxes[i]
+		scored = scored || run.good(*box)
 		if !run.good(*box) || box.Files == 0 || box.Snapshot == "" {
 			continue
 		}
@@ -620,6 +622,10 @@ func settleBestOfRound(run *bestOfRun, log io.Writer) error {
 		}
 	}
 	round := bestOfRound{Round: loop.Round, Started: loop.RoundStarted, Ended: time.Now().UTC(), Result: "crash", Before: loop.Best}
+	if scored {
+		// Every box that worked left the files as they were.
+		round.Result = "unchanged"
+	}
 	for _, box := range run.Boxes {
 		round.Spend += box.CostUSD
 	}
@@ -870,6 +876,8 @@ func bestOfRoundNote(round bestOfRound) string {
 	switch round.Result {
 	case "crash":
 		return "no box had a usable result"
+	case "unchanged":
+		return "no box changed anything"
 	case "stopped":
 		return "stopped before it ended"
 	}

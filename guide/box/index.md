@@ -71,7 +71,8 @@ allowed to reach.
 ## devcontainer.json
 
 If the project has `.devcontainer/devcontainer.json`, `hi box` uses its
-`image` or `build.dockerfile`, `containerEnv`, and `postCreateCommand`. It
+`image` or `build.dockerfile` (with `build.context` and `build.args`),
+`containerEnv`, and `postCreateCommand`. It
 ignores the fields that would run on your machine or widen the box, such as
 `initializeCommand`, `runArgs`, `mounts`, and `privileged`, and says so.
 
@@ -88,6 +89,12 @@ Settings for hi go under `customizations.hi`:
 
 The repository writes `domains`, so `hi box` asks once before allowing them,
 and again when the list changes.
+
+A Dockerfile image is built once, and again when the Dockerfile, its
+`build.args`, or a file it copies in (`COPY uv.lock …`) changes. So an image
+that installs the project's locked dependencies stays in step with
+`uv.lock`, and boxes start at once, offline. The
+[autoresearch templates](/guide/autoresearch/templates/) work this way.
 
 `"bundles": ["data"]` gives every box in the project the skills and tools
 of those bundles, as `--bundle` does (see

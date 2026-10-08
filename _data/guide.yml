@@ -53,6 +53,20 @@
       url: /guide/box/
     - title: Download the team's data
       url: /guide/data/
+- section: Autoresearch
+  pages:
+    - title: How it works
+      url: /guide/autoresearch/
+    - title: Several attempts at once
+      url: /guide/autoresearch/best-of/
+    - title: Rounds that keep only gains
+      url: /guide/autoresearch/rounds/
+    - title: Start from a template
+      url: /guide/autoresearch/templates/
+    - title: Simple examples
+      url: /guide/autoresearch/examples/
+    - title: Advanced examples
+      url: /guide/autoresearch/advanced/
 - section: Projects
   pages:
     - title: Start a project

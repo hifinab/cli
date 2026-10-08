@@ -490,7 +490,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	case devcontainer != nil && devcontainer.Build.Dockerfile != "":
 		dir := filepath.Dir(devcontainer.path)
 		context := filepath.Join(dir, firstNonEmpty(devcontainer.Build.Context, "."))
-		if meta.Image, err = engine.ensureProjectImage(filepath.Join(dir, devcontainer.Build.Dockerfile), context, stdout, stderr); err != nil {
+		if meta.Image, err = engine.ensureProjectImage(filepath.Join(dir, devcontainer.Build.Dockerfile), context, devcontainer.Build.Args, stdout, stderr); err != nil {
 			removeBoxWorktree(meta, true)
 			cleanup()
 			return meta, err

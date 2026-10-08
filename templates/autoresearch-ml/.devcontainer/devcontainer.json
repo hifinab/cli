@@ -1,0 +1,10 @@
+{
+  "name": "hifin-template-name",
+  // hi box and hi agent build this once; it holds the locked dependencies.
+  // make sync sets TORCH the first time: rocm on a Strix Halo, cpu elsewhere.
+  "build": { "dockerfile": "Dockerfile", "context": "..", "args": { "TORCH": "auto" } },
+  // The text is in eval/ and the packages in the image, so boxes need no
+  // network; agents still reach their own model through hi's proxy. With
+  // the GPU, hi scores boxes one at a time, so a time-budgeted score is fair.
+  "customizations": { "hi": { "network": "locked", "gpu": false } }
+}

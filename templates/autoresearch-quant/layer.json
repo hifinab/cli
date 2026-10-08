@@ -1,0 +1,11 @@
+{
+  "name": "autoresearch-quant",
+  "summary": "Autoresearch on a trading strategy: a fixed backtest scores strategy.py, and rounds keep only gains",
+  "extends": "autoresearch-base",
+  "schema": 1,
+  "requires_hi": ">=0.34.0",
+  "commands": {
+    "setup": [["uv", "sync"]],
+    "check": [["make", "check"]]
+  }
+}

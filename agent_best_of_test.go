@@ -347,3 +347,17 @@ func TestBestOfRounds(t *testing.T) {
 		t.Fatalf("resumed rounds %d", run.Loop.Rounds)
 	}
 }
+
+func TestBestOfRoundThatChangesNothing(t *testing.T) {
+	run := bestOfRun{ID: "b-9", Root: t.TempDir(), Score: "x", Loop: &bestOfLoop{Lower: true, Round: 1}, Boxes: []bestOfBox{
+		{Name: "same", State: "finished", Score: new(float64), Snapshot: "abc", ChangedFiles: []string{}},
+	}}
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	os.MkdirAll(bestOfStateFile("b-9"), 0o700)
+	if err := settleBestOfRound(&run, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if result := run.Loop.History[0].Result; result != "unchanged" {
+		t.Fatalf("result %q", result)
+	}
+}
