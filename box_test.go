@@ -261,7 +261,7 @@ func TestBoxStartArguments(t *testing.T) {
 		"--network hi-box-t1", "--dns 127.0.0.1", "-d", "--userns=keep-id", "--cap-drop=ALL", "no-new-privileges",
 		"CLAUDE_CODE_OAUTH_TOKEN=" + boxClaudePlacehold, "ANTHROPIC_BASE_URL=http://10.234.", ":3129",
 		"/.git/hooks:", "/.git/hooks:ro", "/.git/config:ro",
-		"claude -p --output-format json --dangerously-skip-permissions < /box/home/.hi-agent/task.md > /box/home/.hi-agent/result.json",
+		"claude -p --output-format json --dangerously-skip-permissions --model opus < /box/home/.hi-agent/task.md > /box/home/.hi-agent/result.json",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("box run lacks %q:\n%s", want, joined)
