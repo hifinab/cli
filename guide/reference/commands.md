@@ -235,7 +235,9 @@ the box options below. A brief's front matter can set `agent`, `bundles`,
 
 Options when starting: `--name`, `--network locked|dev|open`,
 `--allow <domain>`, `--gpu`, `--data` (the team's data through the hi server),
-`--worktree`, `--here`, `--image`, `--memory`, and `--bundle a,b`. See
+`--worktree`, `--here`, `--image`, `--memory`, and `--bundle a,b`. A
+project's `devcontainer.json` can set `network`, `domains`, `gpu`, `data`,
+and `bundles` under `customizations.hi`. See
 [Run code in a box](/guide/box/).
 
 ## hi bundle

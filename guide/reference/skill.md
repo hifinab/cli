@@ -183,7 +183,9 @@ A team keeps its own bundles in `bundles/` of a template source on its
 [hi server](/guide/compute/managed/), next to `skills/`; there, a skill
 whose `source` is `"."` is the source's own `skills/<name>`. Your own go in
 `~/.local/share/hi/bundles/bundles/` (or `HI_BUNDLES_DIR`), with the same
-layout.
+layout. A project that always needs a bundle names it in its
+`devcontainer.json`, under `customizations.hi.bundles`; see
+[Run code in a box](/guide/box/#devcontainerjson).
 
 Whoever looks after the bundles moves the commits in the folder that has
 `bundles/`:

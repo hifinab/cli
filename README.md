@@ -314,7 +314,9 @@ package registries, plus the agent's own hosts (`--network locked|dev|open`,
 `hi box allow`). Claude Code's token never enters the box: the proxy swaps a
 placeholder for it. Git hooks and config are read-only, `--gpu` passes the
 Strix Halo in, and `devcontainer.json`'s image, environment, and
-`postCreateCommand` are used, with hi's settings under `customizations.hi`.
+`postCreateCommand` are used, with hi's settings under `customizations.hi`,
+where `"bundles": ["data"]` gives every box and agent in the project those
+bundles.
 
 ## Team data
 
