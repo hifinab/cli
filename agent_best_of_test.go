@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -160,7 +161,7 @@ func TestBestOfRun(t *testing.T) {
 
 func TestRankBestOf(t *testing.T) {
 	passed := &bestOfCheck{Exit: 0}
-	run := bestOfRun{Boxes: []bestOfBox{
+	run := bestOfRun{Check: "make check", Boxes: []bestOfBox{
 		{Name: "failing", State: "finished", AgentStatus: "done", Check: &bestOfCheck{Exit: 2}, Files: 1},
 		{Name: "unchanged", State: "finished", AgentStatus: "done", Check: passed},
 		{Name: "running", State: "running"},
@@ -179,11 +180,170 @@ func TestRankBestOf(t *testing.T) {
 }
 
 func TestBestOfBoxCommand(t *testing.T) {
-	command := bestOfBoxCommand([]string{"sh", "-c", "claude -p"}, 0)
-	if command[0] != "sh" || command[3] != "sh" || strings.Join(command[4:], " ") != "sh -c claude -p" || strings.Contains(command[2], "timeout") {
+	command := bestOfBoxCommand([]string{"sh", "-c", "claude -p"}, 0, false)
+	if command[0] != "sh" || command[3] != "sh" || strings.Join(command[4:], " ") != "sh -c claude -p" || strings.Contains(command[2], "timeout -k 30") {
 		t.Fatalf("command %q", command)
 	}
-	if limited := bestOfBoxCommand([]string{"codex"}, 45*time.Minute); !strings.Contains(limited[2], "timeout -k 30 2700") {
+	if limited := bestOfBoxCommand([]string{"codex"}, 45*time.Minute, false); !strings.Contains(limited[2], "timeout -k 30 2700") || strings.Contains(limited[2], "/box/turn") {
 		t.Fatalf("limited %q", limited[2])
+	}
+	// With turns, the check and score wait for hi; the snapshot is taken first.
+	turned := bestOfBoxCommand([]string{"codex"}, 0, true)[2]
+	if strings.Index(turned, "write-tree") > strings.Index(turned, "/box/turn/go") || strings.Index(turned, "/box/turn/go") > strings.Index(turned, "HI_CHECK") {
+		t.Fatalf("turned %q", turned)
+	}
+}
+
+func TestBestOfLoopFlags(t *testing.T) {
+	for _, flags := range []bestOfFlags{
+		{rounds: "3", roundsGiven: true},        // --rounds without --score
+		{score: "x"},                            // no direction
+		{score: "x", lower: true, higher: true}, // both
+		{score: "x", lower: true, rounds: "0x", roundsGiven: true},
+		{score: "x", lower: true, within: "10s"},
+		{score: "x", lower: true, budget: "-3"},
+	} {
+		if _, err := parseBestOfLoop(flags); err == nil {
+			t.Errorf("%+v was accepted", flags)
+		}
+	}
+	loop, err := parseBestOfLoop(bestOfFlags{score: "x", higher: true, rounds: "forever", roundsGiven: true, budget: "$20", patience: "5", minGain: "0.01"})
+	if err != nil || loop.Lower || loop.Rounds != 0 || loop.Budget != 20 || loop.Patience != 5 || loop.MinGain != 0.01 {
+		t.Fatalf("%+v %v", loop, err)
+	}
+	// On resume, limits count from where the run is.
+	loop.applyLimits(bestOfFlags{rounds: "10", roundsGiven: true, budget: "5"}, 7, 12.5)
+	if loop.Rounds != 17 || loop.Budget != 17.5 {
+		t.Fatalf("resumed %+v", loop)
+	}
+	if outside := bestOfOutside([]string{"train.py", "src/", "*.md"}, []string{"train.py", "src/a/b.py", "README.md", "prepare.py"}); strings.Join(outside, ",") != "prepare.py" {
+		t.Fatalf("outside %v", outside)
+	}
+	if value, ok := lastNumber("step 953\nval_bpb:          0.997900\n"); !ok || value != 0.9979 {
+		t.Fatalf("last number %v %v", value, ok)
+	}
+}
+
+func TestBestOfRounds(t *testing.T) {
+	project, calls, exited := agentTestSetup(t)
+	os.WriteFile(filepath.Join(project, "train.py"), []byte("lr = 0.01\n"), 0o644)
+	os.WriteFile(filepath.Join(project, "prepare.py"), []byte("data\n"), 0o644)
+	for _, args := range [][]string{{"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "train"}} {
+		boxGit(project, args...)
+	}
+	*exited = "0"
+	bestOfPoll = time.Millisecond
+	spawned := ""
+	previousSpawn := bestOfSpawn
+	bestOfSpawn = func(id string) error { spawned = id; return nil }
+	t.Cleanup(func() { bestOfPoll, bestOfSpawn = 3*time.Second, previousSpawn })
+
+	// The fake engine plays each box: the baseline scores 1.0; in round 1
+	// box 1 reaches 0.9 and box 2 edits prepare.py for 0.5; in round 2
+	// nothing beats 0.9.
+	scores := map[string]string{"r1-1": "0.9", "r1-2": "0.5", "r2-1": "0.95", "r2-2": "0.92"}
+	files := map[string][2]string{"r1-1": {"train.py", "lr = 0.04\n"}, "r1-2": {"prepare.py", "cheat\n"},
+		"r2-1": {"train.py", "lr = 0.05\n"}, "r2-2": {"train.py", "lr = 0.03\n"}}
+	previousCommand := boxCommand
+	boxCommand = func(stdin io.Reader, stdout, stderr io.Writer, name string, args ...string) error {
+		err := previousCommand(stdin, stdout, stderr, name, args...)
+		if name == "git" || args[0] != "run" {
+			return err
+		}
+		var box string
+		for i, arg := range args {
+			if arg == "--name" {
+				box = strings.TrimPrefix(args[i+1], "hi-box-")
+			}
+		}
+		home := boxStateFile(box, "home")
+		if strings.HasSuffix(box, "-base") {
+			os.WriteFile(filepath.Join(home, "score.log"), []byte("val_bpb: 1.0\n"), 0o600)
+			os.WriteFile(filepath.Join(home, "baseline.txt"), []byte("0 0 30\n"), 0o600)
+			return err
+		}
+		meta, _ := loadBoxMeta(box)
+		key := box[strings.Index(box, "-r")+1:]
+		if key == "r2-1" {
+			// Round 2 starts from round 1's gain.
+			if data, _ := os.ReadFile(filepath.Join(meta.Workdir, "train.py")); string(data) != "lr = 0.04\n" {
+				t.Errorf("round 2 started from %q", data)
+			}
+			task, _ := os.ReadFile(filepath.Join(home, agentResultDir, "task.md"))
+			for _, want := range []string{"tune it", "round 2", "best score so far is 0.9", "Change only train.py", "raise lr", "outside the files allowed"} {
+				if !strings.Contains(string(task), want) {
+					t.Errorf("round 2's task lacks %q:\n%s", want, task)
+				}
+			}
+		}
+		os.WriteFile(filepath.Join(meta.Workdir, files[key][0]), []byte(files[key][1]), 0o644)
+		boxGit(meta.Workdir, "add", "-A")
+		tree := boxGit(meta.Workdir, "write-tree")
+		boxGit(meta.Workdir, "reset", "-q")
+		// The score writes a file after the snapshot; it isn't the agent's.
+		os.WriteFile(filepath.Join(meta.Workdir, "run.log"), []byte("written by the score\n"), 0o644)
+		results := filepath.Join(home, agentResultDir)
+		os.WriteFile(filepath.Join(results, "tree.txt"), []byte(tree+"\n"), 0o600)
+		os.WriteFile(filepath.Join(results, "agent.json"), []byte(`{"agent_exit":0,"agent_seconds":60}`), 0o600)
+		os.WriteFile(filepath.Join(results, "check.json"), []byte(`{"agent_exit":0,"agent_seconds":60,"check_exit":0,"check_seconds":1,"score_exit":0,"score_seconds":30}`), 0o600)
+		os.WriteFile(filepath.Join(results, "score.log"), []byte("val_bpb: "+scores[key]+"\n"), 0o600)
+		idea := map[string]string{"r1-1": "raise lr to 0.04", "r1-2": "change the data"}[key]
+		os.WriteFile(filepath.Join(results, "result.json"), []byte(`{"result":"ok\n<<<REPORT\n{\"status\":\"complete\",\"summary\":\"`+idea+`\"}\nREPORT>>>","total_cost_usd":0.5}`), 0o600)
+		return err
+	}
+	t.Cleanup(func() { boxCommand = previousCommand })
+
+	var stdout, stderr bytes.Buffer
+	args := []string{"best-of", "2", "--rounds", "2", "--score", "grep val_bpb run.log", "--lower", "--edit", "train.py", "--yes", "tune it"}
+	if status := runAgent(args, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("status %d: %s %s", status, stdout.String(), stderr.String())
+	}
+	if spawned != "b-1" || !strings.Contains(stdout.String(), "Baseline: 1") {
+		t.Fatalf("spawned %q: %s", spawned, stdout.String())
+	}
+	if err := driveBestOf("b-1", io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	run, _ := loadBestOf("b-1")
+	loop := run.Loop
+	if loop.State != "done" || loop.Round != 2 || len(loop.History) != 2 || *loop.Best != 0.9 || loop.BestRound != 1 || loop.Spend != 2 {
+		t.Fatalf("loop %+v", loop)
+	}
+	if loop.History[0].Result != "kept" || loop.History[0].Idea != "raise lr to 0.04" || loop.History[1].Result != "discarded" || *loop.History[1].Score != 0.92 {
+		t.Fatalf("history %+v", loop.History)
+	}
+	// hi made one commit, with the agent's file and not the score's.
+	if log := boxGit(project, "log", "--format=%s", run.Base+".."+loop.Branch); log != "best-of b-1 round 1: raise lr to 0.04" {
+		t.Fatalf("log %q", log)
+	}
+	if changed := boxGit(project, "diff", "--name-only", run.Base, loop.Branch); changed != "train.py" {
+		t.Fatalf("committed %q", changed)
+	}
+	// Every box and its branch is gone; the gains' branch stays.
+	if branches := boxGit(project, "branch", "--list", "best-of/*"); strings.TrimSpace(branches) != "best-of/b-1/best" {
+		t.Fatalf("branches %q", branches)
+	}
+	for _, call := range *calls {
+		if call[0] == "run" && !strings.Contains(strings.Join(call, " "), "-base") && !strings.Contains(strings.Join(call, " "), ":/box/turn:ro") {
+			t.Fatalf("box without its turn folder: %v", call)
+		}
+	}
+	stdout.Reset()
+	runAgent([]string{"best-of", "show", "b-1"}, strings.NewReader(""), &stdout, &stderr)
+	for _, want := range []string{"Best: 0.9 from round 1, baseline 1", "kept", "discarded", "Done: finished 2 rounds", "git merge best-of/b-1/best"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Errorf("show lacks %q:\n%s", want, stdout.String())
+		}
+	}
+	// Resuming without more rounds would end at once; with more, it goes on.
+	if status := runAgent([]string{"best-of", "resume", "b-1"}, strings.NewReader(""), &stdout, &stderr); status != 1 {
+		t.Fatalf("resume without more: %d", status)
+	}
+	spawned = ""
+	if status := runAgent([]string{"best-of", "resume", "b-1", "--rounds", "1"}, strings.NewReader(""), &stdout, &stderr); status != 0 || spawned != "b-1" {
+		t.Fatalf("resume: %d %q %s", status, spawned, stderr.String())
+	}
+	if run, _ := loadBestOf("b-1"); run.Loop.Rounds != 3 {
+		t.Fatalf("resumed rounds %d", run.Loop.Rounds)
 	}
 }

@@ -294,6 +294,14 @@ hi agent best-of 3 --agents claude,codex --check "pytest -q" --yes --json "<task
 hi agent best-of show <run> --json     # the table again; --detach returns at once
 ```
 
+For a number to improve over many tries (a benchmark, a loss), rounds keep
+only gains: `--score "<command>" --lower` (or `--higher`) with
+`--rounds 10` and `--edit <files>`. hi commits each gain to
+`best-of/<run>/best`; the run goes on in the background, so use
+`hi agent best-of show <run> --json` to follow it and
+`hi agent best-of stop <run>` to end it. Rounds multiply the cost: agree on
+`--rounds` or `--budget` with the user first.
+
 hi runs the check in each box after its agent ends; `best` is the first
 box that passed, changed something, and whose agent finished. Read its
 diff (`hi box diff <box>`) and let the user choose before

@@ -1,7 +1,7 @@
 # `hi agent best-of` specification
 
-Status: Draft. Release 1 built on 2026-10-08 (see
-[As built](#as-built-release-1)).
+Status: Draft. Releases 1 and 2 built on 2026-10-08 (see
+[As built](#as-built-release-1) and [rounds, as built](#as-built-release-2)).
 
 Dependencies: `hi agent` (agent runs and their reports), `hi box` (boxes,
 worktrees, `diff`, the proxy; forks from its release 3 are useful but not
@@ -21,6 +21,11 @@ hi agent best-of 4 "make the backtest loader 2x faster without changing results"
 
 The output is a ranked table and one kept branch, not four branches to read
 by hand.
+
+With a score, best-of becomes a loop in the style of Karpathy's
+[autoresearch](https://github.com/karpathy/autoresearch): rounds of n
+attempts, each round starting from the best result so far, and a result
+kept only when its score beats that ([Rounds](#rounds)).
 
 Many different tasks at once, all kept, are a fan-out instead
 ([hi_agent_fanout.md](hi_agent_fanout.md)); the two share the queue, the
@@ -142,12 +147,133 @@ review, as with any box.
   in about 6 seconds, `make check` ran in each, and `keep` removed the
   other box and its branch.
 
+## Rounds
+
+autoresearch runs one agent in one long session: it edits `train.py`,
+commits, trains for five minutes, reads `val_bpb`, and keeps the commit if
+the number improved or resets it if not, logging every attempt to
+`results.tsv`. The rules (edit only `train.py`, never touch the evaluation)
+are in the prompt, and the agent judges itself. best-of keeps the loop and
+moves the judging to hi, as with the check: an agent that says it improved
+the score is scored, not believed.
+
+```sh
+hi agent best-of 4 --rounds 100 --score "uv run train.py | grep ^val_bpb:" --lower --edit train.py program.md
+hi agent best-of 4 --for 8h --score "…" --lower program.md           # overnight
+hi agent best-of 1 --rounds forever --budget 50 --score "…" --lower program.md   # autoresearch's shape
+```
+
+| Flag | Meaning |
+|---|---|
+| `--score "<cmd>"` | hi runs it in each box after the agent ends and takes the last number it prints |
+| `--lower` / `--higher` | which way is better; one is required |
+| `--check` | still a gate: a result that fails it doesn't count. Without `--score` it defaults to `make check`; with it, there is no check unless given |
+| `--rounds n` / `forever` | how many rounds (default 1) |
+| `--for 8h` | no round starts after this |
+| `--budget 50` | no round starts once agents have spent this many dollars |
+| `--patience 10` | stop after 10 rounds without a gain |
+| `--edit train.py` | the files and folders an agent may change; a result that changes anything else is disqualified, which enforces what autoresearch only asks |
+| `--min-gain 0.001` | a smaller gain is noise, not progress |
+
+**hi alone commits.** The run has one branch for its gains,
+`best-of/<run>/best`, that only hi writes. Each round starts n boxes from
+its tip. In its box an agent may commit, experiment, and run the score as
+often as it likes; that is scratch. When the agents are done, hi scores
+each box, and if the best beats the best so far, hi adds one commit to the
+gains' branch (`best-of b-7 round 6: raise LR to 0.04`, with the scores in
+the message). Otherwise the round is discarded. Every round's boxes and
+branches are removed when the round ends. Nothing is merged into your
+branch or pushed: `git merge best-of/<run>/best` takes the gains.
+
+**Agents learn through the next task.** Each round's task is your task plus
+what hi tells the agents: the round, the score command and its direction,
+the best score so far, the check, the files they may change, and a table of
+earlier attempts (round, agent, score, kept or discarded or crash, and the
+agent's one-line summary from its report), like `results.tsv`.
+
+**A baseline first.** Before any agent starts, hi runs the check and the
+score on your last commit in a box with the run's options. A score that
+fails or prints no number stops the run there, before it costs tokens. The
+baseline is also where the box's questions (bundles' network) are asked,
+in the terminal; the rounds reuse the answers.
+
+**Leaving the view is not stopping.** The rounds run in a process of their
+own, so they outlive the terminal and SSH. The view (`watch`) shows a row
+per round; q, Esc, or Ctrl+C leave it and the run goes on, as Ctrl+C stops
+waiting but not the boxes. `stop` ends the run after the current round, so
+no work is lost; `stop --now` also removes the round's boxes. `resume` goes
+on from the best so far, and its `--rounds`, `--for`, and `--budget` count
+from where the run is.
+
+**One GPU, one score at a time.** autoresearch's metric is the best result
+in a fixed five minutes of training. Boxes training at once on the Strix
+Halo would each get part of the GPU, and the scores would measure the
+contention. With `--gpu`, agents work in parallel, but hi gives the boxes
+the turn to be scored one at a time, after every agent of the round is
+done. Without `--gpu`, they are scored at once.
+
+```text
+Best-of b-7 · "program.md" · 4 boxes a round · round 9 of 100 · 2h41m · $31.20 spent
+Score: uv run train.py | grep ^val_bpb: (lower is better)
+Best: 0.9871 from round 6, baseline 0.9979 · on best-of/b-7/best
+
+  ROUND  RESULT     SCORE   BOX           IDEA
+  6      kept       0.9871  ml-b7-r6-2    raise the learning rate to 0.04
+  7      discarded  0.9951  ml-b7-r7-4    switch to GeLU
+  8      crash      –       –             no box had a usable result
+
+Now: round 9: scoring ml-b7-r9-2 (2 of 4)
+```
+
+### As built (release 2)
+
+- `--score` turns any run into rounds; without `--rounds` it is one round,
+  kept only if it beats your last commit. `n` can be 1 with a score.
+- The box wrapper (release 1) now also snapshots the files the agent left
+  with `git add -A` and `git write-tree`, after killing what it left
+  running and before the check and score run, into `.hi-agent/tree.txt`.
+  What changed, `--edit`, and the commit all use that tree, so files the
+  score writes (a `run.log`) are neither committed nor count against
+  `--edit`. A box without a snapshot can't be kept. `keep` (release 1)
+  commits the work an agent left uncommitted from the same snapshot, so
+  `git merge` takes all of it.
+- With a score, the check and score wait in the box until hi creates
+  `go` in a folder mounted read-only at `/box/turn`, so an agent can't
+  start its own scoring early. The score runs under `timeout`, at twice the
+  baseline's time plus a minute (at least two minutes).
+- The winner is the good box (check passed, a score, inside `--edit`,
+  something changed) with the best score, whatever its agent's own status:
+  the score is what counts. It is kept if it beats the best so far by more
+  than `--min-gain`. The commit is `git commit-tree` of its snapshot on the
+  gains' tip, with your git identity, or `hi agent best-of` when there is
+  none.
+- The rounds' process is `hi agent best-of __loop <run>`, started with
+  `setsid` and logging to `loop.log` in the run's state folder. A stop
+  request is a `stop` file there; the process checks it every few seconds
+  while waiting and before each round. `resume` after a reboot picks up a
+  round whose boxes still exist.
+- `--budget` counts what agents report in dollars: Claude Code's cost at
+  API prices, and Hermes' when it has one. Codex reports only tokens, so
+  its runs count as nothing; the confirmation says so.
+- Round history keeps the last five lines of each box's check and score
+  output, to keep `run.json` small over hundreds of rounds.
+- Tested on 2026-10-08 with Podman and Claude Code on Haiku: a run of two
+  boxes and two rounds took a number from 100 to 95 to 85, with one commit
+  per gain and only the allowed file in it; `watch` left with q while the
+  run went on, and `stop --now` removed the round's box. Turns one at a time
+  (`--gpu`) are covered by the code path but were not run on the GPU.
+
 ## Releases
 
 1. `best-of`, `ls`, `show`, `keep` with local boxes, the check run by hi, the
    measurements, and the table. No judge.
-2. The judge through the team's model, and the Slack message with buttons.
-3. Mixed agents tuned by results: hi records which agent won which run,
+2. Rounds: `--score`, the baseline, commits by hi only on the gains'
+   branch, the history in each round's task, `--edit`, the limits, the
+   rounds' own process, `watch`, `stop`, `resume`, and scoring one box at a
+   time on the GPU.
+3. The judge through the team's model, and the Slack message with buttons;
+   a message when a long run keeps a gain or ends.
+4. Mixed agents tuned by results: hi records which agent won which run,
    and `hi agent best-of stats` shows it per project, so the team can see whether
    mixing pays.
 
@@ -173,6 +299,15 @@ review, as with any box.
    check than to judging, and may belong in `--check`.
 3. Whether a run should stop early when the first box passes, to save
    tokens, as an option (`--first`).
+4. Ties in rounds: autoresearch keeps an equal score when the code got
+   simpler. hi could keep a result within `--min-gain` that removes lines.
+5. Memory across rounds: fresh agents with the history table don't fill
+   their context over 100 rounds; resuming each box's session across rounds
+   would give real memory, once `hi agent resume` exists.
+6. Re-measuring the best every k rounds, so a lucky score on a noisy metric
+   doesn't stick, at the cost of GPU time.
+7. Scoring on rented GPUs through `hi compute`, so rounds aren't limited to
+   one Strix Halo.
 
 ## Findings
 

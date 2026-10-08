@@ -589,6 +589,15 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   `rm`. No judge yet. Spec:
   [hi_agent_best_of.md](specs/ideas/hi_agent_best_of.md) (release 1).
   Tested on 2026-10-08 with two Claude Code boxes.
+- [x] Rounds, in the style of autoresearch: `--score "<cmd>" --lower|--higher`
+  measures your last commit, then runs `--rounds n|forever` rounds, each
+  from the best so far. hi scores each box itself and alone commits a result
+  that beats the best, one commit per gain on `best-of/<run>/best`; agents
+  see earlier attempts in the next round's task. `--edit` disqualifies
+  results that touch other files; `--for`, `--budget`, `--patience`,
+  `--min-gain`. The rounds run in their own process: `watch` (q leaves,
+  the run goes on), `stop [--now]`, `resume`. With `--gpu`, boxes are scored
+  one at a time. Spec: [hi_agent_best_of.md, Rounds](specs/ideas/hi_agent_best_of.md#rounds) (release 2).
 
 ### v0.32.0 — Hermes Agent
 

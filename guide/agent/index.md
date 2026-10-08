@@ -275,6 +275,47 @@ Ranked by the check, then fewer flagged files and a smaller diff: read the diff 
   the table later, and `hi agent best-of ls` lists runs. `--detach` starts
   and returns.
 
+## Rounds that keep only gains
+
+With a score, best-of runs rounds, in the style of Karpathy's
+[autoresearch](https://github.com/karpathy/autoresearch): each round starts
+n boxes from the best result so far, and a result is kept only when its
+score beats that.
+
+```sh
+hi agent best-of 4 --rounds 100 --gpu --edit train.py \
+  --score "uv run train.py | grep ^val_bpb:" --lower program.md
+```
+
+- hi first runs the score on your last commit, the baseline. A score that
+  fails or prints no number stops there, before any agent starts.
+- When an agent ends, hi runs `--check` (if given) and `--score` in its box
+  and takes the last number the score prints. `--lower` or `--higher` says
+  which way is better.
+- **Only hi commits.** If the round's best result beats the best so far,
+  hi adds one commit to `best-of/<run>/best`, with the agent's one-line
+  idea and the scores. Otherwise the round is thrown away. Agents may
+  commit in their own boxes; that is scratch.
+- Each round's task tells the agents the best score so far and lists the
+  earlier attempts, with their scores and ideas, so they build on them.
+- `--edit train.py` limits what an agent may change: a result that touches
+  any other file, such as the evaluation, doesn't count.
+- With `--gpu`, boxes are scored one at a time after every agent of the
+  round is done, so a time-budgeted score isn't skewed by boxes sharing the
+  GPU.
+- The run ends after `--rounds n` (default 1; `forever` has no end), and
+  sooner with `--for 8h`, `--budget 50` (dollars, as agents report them),
+  or `--patience 10` (rounds without a gain). `--min-gain` treats smaller
+  gains as noise.
+
+The rounds run in their own process, so they go on when you close the
+terminal. `hi agent best-of watch b-7` shows a row per round: q, Esc, or
+Ctrl+C leave the view and the run goes on; s stops it after the current
+round. `hi agent best-of stop b-7` does the same from anywhere, and
+`--now` stops at once. `hi agent best-of resume b-7 --rounds 20` goes on
+from the best so far. When it's done, `git merge best-of/b-7/best` takes
+the gains.
+
 ## The report as JSON
 
 `--json` prints the report on stdout and everything else on stderr, for

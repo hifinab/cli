@@ -94,8 +94,12 @@ type boxOptions struct {
 	taskFile string        // hi agent
 	model    string        // hi agent
 	branch   string        // hi agent best-of: the worktree's branch
+	from     string        // hi agent best-of: the commit the worktree starts from
+	mounts   []string      // hi agent best-of: more mounts, host:box:ro
 	check    string        // hi agent best-of: run after the agent, by hi
+	score    string        // hi agent best-of: run after the check, in the box's turn
 	maxTime  time.Duration // hi agent best-of: the agent's time limit
+	scoreMax time.Duration // hi agent best-of: the score's time limit
 	bundles  []string
 	words    []string
 	// fromBrief holds what a task file's front matter asked for, to ask
@@ -412,16 +416,17 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		}
 		meta.Worktree = true
 		meta.Branch = firstNonEmpty(options.branch, "hi-box/"+name)
-		meta.Base = boxGit(root, "rev-parse", "HEAD")
+		from := firstNonEmpty(options.from, "HEAD")
+		meta.Base = boxGit(root, "rev-parse", from)
 		work := filepath.Join(stateDir, "work")
 		var out bytes.Buffer
-		if err := boxCommand(nil, &out, &out, "git", "-C", root, "worktree", "add", "-q", "-b", meta.Branch, work, "HEAD"); err != nil {
+		if err := boxCommand(nil, &out, &out, "git", "-C", root, "worktree", "add", "-q", "-b", meta.Branch, work, from); err != nil {
 			cleanup()
 			return meta, fmt.Errorf("git worktree add: %s", qFirstLine(out.String(), err.Error()))
 		}
 		meta.Workdir = work
 		mounts = append(mounts, work+":"+work)
-		if dirty := boxGit(root, "status", "--porcelain"); dirty != "" {
+		if dirty := boxGit(root, "status", "--porcelain"); dirty != "" && options.from == "" {
 			fmt.Fprintln(stdout, "Note: the box starts from your last commit; uncommitted changes in the project are not in it.")
 		}
 	} else {
@@ -434,6 +439,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 			}
 		}
 	}
+	mounts = append(mounts, options.mounts...)
 	if gitCommon != "" {
 		mounts = append(mounts, gitCommon+":"+gitCommon)
 		// The agent may commit, but not plant hooks or change git's settings.
@@ -563,9 +569,12 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		command = options.words
 	default:
 		command, err = agentBoxSetup(kind, prompt, meta, homeDir, &run, env)
-		if err == nil && options.check != "" && prompt != "" {
-			command = bestOfBoxCommand(command, options.maxTime)
-			env["HI_CHECK"] = options.check
+		if err == nil && (options.check != "" || options.score != "") && prompt != "" {
+			command = bestOfBoxCommand(command, options.maxTime, options.score != "")
+			env["HI_CHECK"], env["HI_SCORE"] = options.check, options.score
+			if options.scoreMax > 0 {
+				env["HI_SCORE_MAX"] = strconv.Itoa(int(options.scoreMax / time.Second))
+			}
 		}
 	}
 	if err != nil {

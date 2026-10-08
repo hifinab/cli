@@ -216,6 +216,10 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 | `hi agent best-of show <run> [--full]`   | The table again; `--full` adds each box's diff           |
 | `hi agent best-of keep <run> <box>`      | Keep one box and its branch, remove the others           |
 | `hi agent best-of rm <run>`              | Remove every box of a run and its branches               |
+| `hi agent best-of <n> --score "<cmd>" --lower\|--higher --rounds <n>\|forever "<task>"` | Rounds: each starts from the best so far, and hi commits a result only when its score beats it |
+| `hi agent best-of watch <run>`           | Follow a run with rounds; q leaves the view, the run goes on |
+| `hi agent best-of stop <run> [--now]`    | Stop after the current round; `--now` removes its boxes too |
+| `hi agent best-of resume <run>`          | Go on from the best so far; `--rounds`, `--for`, `--budget` give more |
 | `hi agent token claude`                  | Store a long-lived token from `claude setup-token`       |
 
 Options: `--detach` to start and return, `--json` for the report as JSON on
@@ -229,8 +233,11 @@ options below. A brief's front matter can set `agent`, `model`, `bundles`,
 
 `best-of` also takes `--agents claude,codex` (taken in turn), `--check
 "<command>"` (default: `make check`), `--max <duration>` per agent, and
-`--yes` to start without asking; it exits with 1 when no box passed. See
-[Several attempts at once](/guide/agent/#several-attempts-at-once).
+`--yes` to start without asking; it exits with 1 when no box passed. With
+rounds: `--for <duration>`, `--budget <dollars>`, `--patience <n>`,
+`--min-gain <number>`, and `--edit a,b` for the files an agent may change.
+See [Several attempts at once](/guide/agent/#several-attempts-at-once) and
+[Rounds that keep only gains](/guide/agent/#rounds-that-keep-only-gains).
 
 ## hi box
 
