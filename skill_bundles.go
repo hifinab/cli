@@ -60,26 +60,34 @@ var (
 	bundleEnvPattern    = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 )
 
-// readSkillBundle reads and checks one bundle file. An unknown key or a
-// package that isn't a plain pinned name refuses the whole bundle.
+// readSkillBundle reads and checks one bundle file in this repository's
+// bundles/, where every skill comes from a repository at a commit.
 func readSkillBundle(path string) (skillBundle, error) {
-	var bundle skillBundle
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return bundle, err
+		return skillBundle{}, err
 	}
+	return parseSkillBundle(data, path, false)
+}
+
+// parseSkillBundle checks one bundle file. An unknown key or a package that
+// isn't a plain pinned name refuses the whole bundle. With ownSkills, a
+// skill's source may be ".", the bundle source's own skills/<name>, as in a
+// team or local source.
+func parseSkillBundle(data []byte, label string, ownSkills bool) (skillBundle, error) {
+	var bundle skillBundle
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&bundle); err != nil {
-		return bundle, fmt.Errorf("%s: %v", path, err)
+		return bundle, fmt.Errorf("%s: %v", label, err)
 	}
-	if err := bundle.check(); err != nil {
-		return bundle, fmt.Errorf("%s: %v", path, err)
+	if err := bundle.check(ownSkills); err != nil {
+		return bundle, fmt.Errorf("%s: %v", label, err)
 	}
 	return bundle, nil
 }
 
-func (b skillBundle) check() error {
+func (b skillBundle) check(ownSkills bool) error {
 	if !skillNamePattern.MatchString(b.Name) {
 		return fmt.Errorf("the name %q isn't a plain name", b.Name)
 	}
@@ -88,10 +96,6 @@ func (b skillBundle) check() error {
 	}
 	seen := map[string]bool{}
 	for _, skill := range b.Skills {
-		source, err := parseSkillSource(skill.Source)
-		if err != nil || (source.Kind != "github" && source.Kind != "git") || source.Skill != "" {
-			return fmt.Errorf("%s: the source %q isn't owner/repo or a git URL", skill.Skill, skill.Source)
-		}
 		if !skillNamePattern.MatchString(skill.Skill) || seen[skill.Skill] {
 			return fmt.Errorf("the skill %q is missing, not a plain name, or listed twice", skill.Skill)
 		}
@@ -99,8 +103,21 @@ func (b skillBundle) check() error {
 		if skill.Skill == "hi" {
 			return fmt.Errorf("the hi skill is in every bundle already; leave it out")
 		}
-		if skill.Commit != "" && !bundleCommitPattern.MatchString(skill.Commit) {
-			return fmt.Errorf("%s: the commit %q isn't a full commit hash", skill.Skill, skill.Commit)
+		switch {
+		case skill.Source == "." && ownSkills:
+			if skill.Commit != "" {
+				return fmt.Errorf("%s: a skill from this source (\".\") has no commit of its own", skill.Skill)
+			}
+		case skill.Source == ".":
+			return fmt.Errorf("%s: only a team or local source has skills of its own (\".\")", skill.Skill)
+		default:
+			source, err := parseSkillSource(skill.Source)
+			if err != nil || (source.Kind != "github" && source.Kind != "git") || source.Skill != "" {
+				return fmt.Errorf("%s: the source %q isn't owner/repo or a git URL", skill.Skill, skill.Source)
+			}
+			if skill.Commit != "" && !bundleCommitPattern.MatchString(skill.Commit) {
+				return fmt.Errorf("%s: the commit %q isn't a full commit hash", skill.Skill, skill.Commit)
+			}
 		}
 		if skill.Needs != nil {
 			if err := skill.Needs.check(); err != nil {
@@ -201,7 +218,12 @@ func skillUpdateBundles(options skillOptions, stdin io.Reader, stdout io.Writer)
 	newest := map[string]string{}
 	changes, skipped, found := 0, 0, 0
 	for _, file := range files {
-		bundle, err := readSkillBundle(file)
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		// A team source's bundles may name its own skills.
+		bundle, err := parseSkillBundle(data, file, true)
 		if err != nil {
 			return err
 		}
@@ -211,6 +233,10 @@ func skillUpdateBundles(options skillOptions, stdin io.Reader, stdout io.Writer)
 				continue
 			}
 			found++
+			if skill.Source == "." {
+				fmt.Fprintf(stdout, "%s: %s is this source's own skill; nothing to move\n", bundle.Name, skill.Skill)
+				continue
+			}
 			result, err := updateBundleSkill(bundle.Name, skill, newest, options, stdin, stdout)
 			if err != nil {
 				return err

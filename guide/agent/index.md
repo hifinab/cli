@@ -83,6 +83,69 @@ that doesn't exist stops hi with an error, instead of being sent to the
 agent as the task. A task file can be at most 1 MB, and the report's
 `task_file` says which file it was.
 
+### Options in the brief
+
+A brief can start with the options it needs, between two `---` lines:
+
+```markdown
+---
+agent: claude
+bundles: [web, office]
+network: open
+---
+# Nordic GPU providers
+
+Find the five largest GPU cloud providers in the Nordics…
+```
+
+It can set `agent`, `bundles`, `network`, `allow`, `data`, and `gpu`.
+Flags on the command line win. A brief can come from anyone, another agent
+too, so what would widen the box (`network`, `allow`, `data`, `gpu`) is
+asked about first; without a terminal it's left out, and hi says which
+flag allows it.
+
+## Bundles: skills and the tools they need
+
+For work that isn't code, such as browsing or writing documents, attach a
+bundle: a set of [skills](/guide/reference/skill/) and the tools they
+need.
+
+```sh
+mkdir gpu-prices && cd gpu-prices
+hi agent --bundle web,office "find the five largest Nordic GPU cloud providers and write a comparison as a Word document"
+```
+
+```text
+Bundles: web, office
+Skills: agent-browser, docx, hi, pdf, pptx, xlsx
+Image: localhost/hi-agent:7f3a91c2b0d4 (cached)
+Network: open (agent-browser (open): visits whatever sites the task needs)
+```
+
+| Bundle   | Skills                                                    | Tools in the image                                  |
+|----------|-----------------------------------------------------------|-----------------------------------------------------|
+| `web`    | `agent-browser`                                           | agent-browser and its Chrome                        |
+| `office` | Anthropic's `docx`, `xlsx`, `pptx`, `pdf` (proprietary)   | LibreOffice, pandoc, Poppler, qpdf, Tesseract, and their Python and npm packages |
+| `data`   | DuckDB's `query`, `read-file`, `convert-file`; `data-visualization` | the DuckDB CLI, matplotlib, seaborn, plotly, pandas |
+
+- **The image** is built once for each set of skills, on the box's own
+  image, and reused; the first build of `office` takes several minutes.
+  `hi bundle prune` removes images not used for 30 days.
+- **The skills** go in the box's home folder, with the `hi` skill, never
+  into your folder, so they leave nothing behind in the results. Each is
+  pinned to a commit.
+- **The network.** `web` needs an open network. hi shows why and asks
+  before it widens the box; without a terminal, add `--network open`. An
+  open network and `--data` don't go together, since an agent reading
+  untrusted pages could be told to pass the team's data on.
+- **More bundles** come from your team's template sources on a
+  [hi server](/guide/compute/managed/), and your own, in
+  `~/.local/share/hi/bundles/bundles/<name>.json` (or `HI_BUNDLES_DIR`).
+  `hi bundle ls` lists them all, and `hi bundle show <name>` what one
+  installs. A bundle file is described in [Skills](/guide/reference/skill/#bundles).
+
+`hi box shell --bundle data` gives you the same box to try things in.
+
 ## While it works
 
 `hi agent` waits until the agent is done. While it works,
@@ -95,7 +158,8 @@ hi agent wait myproject-1      # wait again and print the report
 ```
 
 The box options from `hi box` work here too: `--name`, `--network`,
-`--allow`, `--gpu`, `--data`, `--here`, `--image`, and `--memory`. See
+`--allow`, `--gpu`, `--data`, `--here`, `--image`, `--memory`, and
+`--bundle`. See
 [Run code in a box](/guide/box/).
 
 ## In the background
@@ -143,6 +207,7 @@ hi agent codex --json "review the change on this branch; don't edit files"
 | `folder`        | The folder the agent worked in, when it worked in place                                    |
 | `session_id`    | The agent's session, when it reports one                                                   |
 | `task_file`     | The file the task came from, when it came from one                                         |
+| `bundles`, `skills`, `image` | With `--bundle`: the bundles, the skills in the box, and the image it ran on   |
 | `tokens`        | Input and output tokens, when the agent reports them (Claude Code)                         |
 | `warnings`      | Anything hi noticed, such as a missing summary                                             |
 

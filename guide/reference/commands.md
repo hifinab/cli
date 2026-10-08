@@ -18,6 +18,7 @@ description: Every hi command and option in one place.
 | `hi shell-init bash\|zsh`        | Shell integration for `hi q`                           |
 | `hi agent …`                     | Hand a task to Claude Code or Codex in a box; see below |
 | `hi box …`                       | Run a shell or a command in a rootless box; see below  |
+| `hi bundle …`                    | Bundles of skills for `hi agent --bundle`; see below   |
 | `hi skill …`                     | Find, install, and update agent skills; see below      |
 | `hi install`                     | Choose workstation software from a menu                |
 | `hi uninstall <tool>…`           | Remove workstation software                            |
@@ -214,7 +215,9 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 
 Options: `--detach` to start and return, `--json` for the report as JSON on
 stdout, `--task-file <path>` for a task file whose name doesn't end in
-`.md`, and the box options below. Exits with 0 when the agent is done and
+`.md`, `--bundle a,b` for bundles of skills and the tools they need, and
+the box options below. A brief's front matter can set `agent`, `bundles`,
+`network`, `allow`, `data`, and `gpu`. Exits with 0 when the agent is done and
 1 when it failed. See [Hand tasks to agents](/guide/agent/).
 
 ## hi box
@@ -232,8 +235,20 @@ stdout, `--task-file <path>` for a task file whose name doesn't end in
 
 Options when starting: `--name`, `--network locked|dev|open`,
 `--allow <domain>`, `--gpu`, `--data` (the team's data through the hi server),
-`--worktree`, `--here`, `--image`, and `--memory`. See
+`--worktree`, `--here`, `--image`, `--memory`, and `--bundle a,b`. See
 [Run code in a box](/guide/box/).
+
+## hi bundle
+
+| Command                              | Does                                                     |
+|--------------------------------------|----------------------------------------------------------|
+| `hi bundle ls [--json]`              | Bundles for `--bundle`, and where each comes from        |
+| `hi bundle show <name>`              | Its skills, at which commit, what each needs, and its network |
+| `hi bundle prune [--all]`            | Remove bundle images unused for 30 days (`--all`: every unused one) |
+
+Bundles come from hi itself, the team's template sources on a hi server,
+and `~/.local/share/hi/bundles` (or `HI_BUNDLES_DIR`); a later one wins on
+a name. See [Bundles](/guide/agent/#bundles-skills-and-the-tools-they-need).
 
 ## hi skill
 

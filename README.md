@@ -49,6 +49,7 @@ hi data            Download the team's Hugging Face datasets, models, and bucket
 hi server          Run the server that brokers compute and serves templates for a team (hi server help)
 hi agent [task]    Hand a task to Claude Code or Codex in a box and get its report (hi agent help)
 hi box shell       Run a shell or a command in a rootless box (hi box help)
+hi bundle ls       Bundles of skills and tools for hi agent --bundle
 hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
 hi skills          Find, install, and update agent skills from skills.sh; hi skill add hi teaches agents hi
 hi verify strix    Check an installed Strix Halo workstation
@@ -302,6 +303,7 @@ the home folder.
 hi agent "make the flaky test reliable"        # the first agent signed in; waits for the report
 hi agent codex --json "review this branch"     # the report as JSON, for scripts and agents
 hi agent claude brief.md                       # the task from a markdown file
+hi agent --bundle web,office "compare GPU clouds in a Word document"   # skills and tools for work that isn't code
 hi agent claude                                # interactive, in a box
 hi box shell                                   # or hi box run -- make test
 hi box diff myproject-1                        # what it changed, flagging files that run on the host

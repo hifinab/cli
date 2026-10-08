@@ -138,8 +138,10 @@ scripts it runs, so `hi` never changes one by itself:
 ## Bundles
 
 A bundle is a named set of skills for one kind of work, with the packages
-each skill needs, so that `hi agent` can prepare a box for it (still to
-come). `hi` has three, in [`bundles/`](https://github.com/hifinab/cli/tree/main/bundles):
+each skill needs. `hi agent --bundle web,office` puts the skills in the
+box's home folder and runs the box on an image with those packages; see
+[Bundles](/guide/agent/#bundles-skills-and-the-tools-they-need).
+`hi` has three, in [`bundles/`](https://github.com/hifinab/cli/tree/main/bundles):
 
 | Bundle   | Skills                                                                 |
 |----------|------------------------------------------------------------------------|
@@ -147,7 +149,42 @@ come). `hi` has three, in [`bundles/`](https://github.com/hifinab/cli/tree/main/
 | `office` | `docx`, `xlsx`, `pptx`, `pdf` from anthropics/skills (proprietary)      |
 | `data`   | `query`, `read-file`, `convert-file` from duckdb/duckdb-skills; `data-visualization` from anthropics/knowledge-work-plugins |
 
-Each skill is pinned to a commit, and the `hi` skill goes in every bundle.
+A bundle file lists each skill's source, its commit, and what it needs:
+
+```json
+{
+  "name": "web",
+  "description": "Browse and automate websites with agent-browser.",
+  "skills": [
+    {
+      "source": "vercel-labs/agent-browser",
+      "skill": "agent-browser",
+      "commit": "0207911f1bd4d0393eddaa90f2e50f96e0fb8974",
+      "needs": {
+        "layer": "heavy",
+        "npm": ["agent-browser@0.38.2"],
+        "browsers": ["chrome"],
+        "network": {"mode": "open", "reason": "visits whatever sites the task needs"}
+      }
+    }
+  ]
+}
+```
+
+`needs` can have `layer` (`base`, `heavy`, or `light`: the order the
+packages go in), `apt`, `pip` (`name==version`), `npm` (`name@version`),
+`browsers` (`chromium` from Playwright, `chrome` from
+`agent-browser install`), `env`, `network` (`mode`, `hosts`, `reason`), and
+`gpu`. Each is one fixed install step, so a bundle can't run commands of
+its own; an unknown key or an unpinned package refuses the bundle. The
+`hi` skill goes in every bundle.
+
+A team keeps its own bundles in `bundles/` of a template source on its
+[hi server](/guide/compute/managed/), next to `skills/`; there, a skill
+whose `source` is `"."` is the source's own `skills/<name>`. Your own go in
+`~/.local/share/hi/bundles/bundles/` (or `HI_BUNDLES_DIR`), with the same
+layout.
+
 Whoever looks after the bundles moves the commits in the folder that has
 `bundles/`:
 

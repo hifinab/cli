@@ -229,8 +229,12 @@ func checkTemplateSource(name string, files fs.FS) ([]apiTemplateLayer, []string
 			skills = append(skills, entry.Name())
 		}
 	}
-	if len(layers) == 0 && len(skills) == 0 {
-		return nil, nil, errors.New("no layers (<layer>/layer.json) and no skills (skills/<name>/SKILL.md) found")
+	bundles, err := loadBundleSource(bundleSource{name: name, files: files})
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(layers) == 0 && len(skills) == 0 && len(bundles) == 0 {
+		return nil, nil, errors.New("no layers (<layer>/layer.json), skills (skills/<name>/SKILL.md), or bundles (bundles/<name>.json) found")
 	}
 	combined := map[string]*templateLayer{}
 	for layerName, layer := range builtin {

@@ -1,6 +1,7 @@
 # `hi agent` bundles and task files
 
-Status: Draft (proposal by Iman Habib, 2026-10-07)
+Status: Draft (proposal by Iman Habib, 2026-10-07). Release 1 built on
+2026-10-07; release 2 built on 2026-10-08 (see [As built](#as-built-release-2)).
 
 Dependencies: `hi agent` (release 1, v0.28.0), `hi box` (the proxy, the
 base image, Dockerfile builds), `hi init` and `hi server` template sources
@@ -259,8 +260,9 @@ Folder: ~/work/gpu-prices (not a git repository: it works in place)
 The selected skills are copied into the box's own home folder, in
 `~/.claude/skills/<name>` and `~/.agents/skills/<name>`, never into the
 project or the folder. So a run leaves no skill files in the results, and the
-project's own `.claude/skills` still work alongside them. Codex's skill
-folder to be checked against the installed version.
+project's own `.claude/skills` still work alongside them. Checked on
+2026-10-08: Codex lists the skills in `~/.agents/skills` next to its own
+built-in ones, and Claude Code uses those in `~/.claude/skills`.
 
 ### Network
 
@@ -273,6 +275,39 @@ never widen the network by choosing a bundle.
 `--data` with an `open` network is refused in this release: the data token
 stays at the proxy, but an agent reading untrusted pages could be told to
 read the team's data through the proxy and post it anywhere.
+
+### As built (release 2)
+
+- `--bundle a,b` (repeatable) works on `hi agent` and on `hi box shell`
+  and `run`, which is useful for trying a bundle by hand. It doesn't go
+  with `--image` or an image from `devcontainer.json` yet: the generated
+  Dockerfile starts from hi's base image.
+- The image is `localhost/hi-agent:<first 12 hex of the Dockerfile's
+  sha256>`. The Dockerfile names the base image by its content tag, so a
+  new base image gives new bundle images. Packages go in
+  `/opt/hi/venv` (pip), `/opt/hi/npm` with `NODE_PATH` (npm), and
+  `/opt/hi/bin`; the box puts them first in `PATH`.
+- `chrome` runs `agent-browser install --with-deps` with
+  `HOME=/opt/hi/agent-browser`, and a stand-in `sudo` for that step only,
+  because it calls `sudo apt-get` and the box image has no sudo. The box
+  sets `AGENT_BROWSER_EXECUTABLE_PATH`, and `AGENT_BROWSER_PROXY` to hi's
+  proxy, since Chrome ignores `HTTPS_PROXY`. Chrome ran without
+  `--no-sandbox` in rootless Podman.
+- Skill files are fetched at their commit into `~/.cache/hi/skills/` and
+  reused; a team source's own skills are cached by the source's commit,
+  and a local source's are read in place.
+- The `hi` skill is always installed, which answers the open question
+  below.
+- The base image's Node.js is 18 (Ubuntu 24.04). `sharp` 0.35 needs 20,
+  so `office` pins 0.33.5; `agent-browser` asks for 24 but its native
+  binary runs. A `node` key in `needs`, or a newer Node in the base image,
+  is for when a skill really needs one.
+- Sizes on 2026-10-08: `web` 2.8 GB, `office` 3.0 GB, `data` 1.9 GB,
+  including the 0.8 GB base image they share.
+- Image use is recorded in `~/.local/state/hi/bundle-images.json` for
+  `hi bundle prune`, which never removes an image a box still uses.
+- A team source may hold only bundles (and skills) without layers; the
+  server checks its bundle files when it takes a commit.
 
 ## The planner (release 3)
 
@@ -344,12 +379,13 @@ The same report as today, with:
 - [ ] Is "bundle" the right word? `hi init` already calls a server source's
   signed download a bundle. That use is internal, so the user-facing word
   can stay, but the specs should say "source archive" there.
-- [ ] Should the `hi` skill become a built-in bundle that `hi agent` always
-  attaches, so agents in boxes know how to call `hi`?
+- [x] Should the `hi` skill become a built-in bundle that `hi agent` always
+  attaches, so agents in boxes know how to call `hi`? It's installed with
+  every bundle (2026-10-08); without `--bundle` the box still gets none.
 - [ ] Do workspaces pin bundle versions, like `.hifin/template.json` pins
   templates, or does a run always take the source's current commit?
-- [ ] How do bundles relate to skills.sh (v0.30.0)? A skill from skills.sh,
-  pinned to a commit, could be one more local skill in a bundle.
+- [x] How do bundles relate to skills.sh (v0.30.0)? Bundles list skills.sh
+  skills by source and commit (v0.30.1).
 - [ ] Are skills that need an API key in scope? If so, through `--secret` or
   through the hi server, never inside a bundle.
 

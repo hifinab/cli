@@ -270,7 +270,15 @@ hi agent codex --json "review the diff between main and this branch; don't chang
 hi agent claude --json --detach "<task>"    # returns at once
 hi agent wait <name> --json                 # the report when it's done
 hi agent codex --json brief.md              # a long task: write it to a .md file
+hi agent claude --json --bundle web --network open "<task>"   # skills and tools for browsing
 ```
+
+`--bundle` (see `hi bundle ls`) gives the agent skills and the tools they
+need, for work that isn't code: `web` (a browser, needs `--network open`),
+`office` (Word, Excel, PowerPoint, PDF), and `data` (DuckDB and charts;
+add `--allow extensions.duckdb.org`). Without a terminal, hi refuses a
+bundle whose network the flags don't allow, and names the flag; ask the
+user before adding `--network open`.
 
 The report's `status` is `done` or `failed` (exit 1), `text` is the agent's
 final message, `report` its own summary (`complete`, `partial`, or

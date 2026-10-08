@@ -71,6 +71,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return runBox(args[1:], stdin, stdout, stderr)
 	case "agent":
 		return runAgent(args[1:], stdin, stdout, stderr)
+	case "bundle", "bundles":
+		return runBundle(args[1:], stdin, stdout, stderr)
 	case "shell-init":
 		return runShellInit(args[1:], stdout, stderr)
 	case "init":
@@ -133,6 +135,7 @@ Usage:
   hi q                          Chat with it; hi q --setup chooses the model and sets up the shell
   hi agent [claude|codex] [task]
                                 Hand a task to a coding agent in a box and get its report (hi agent help)
+  hi bundle ls|show             Bundles for hi agent --bundle: skills and the tools they need
   hi box shell|run              Run a shell or a command in a rootless box with no credentials
   hi skills                     Find, install, and update agent skills from skills.sh (hi skill help);
                                 hi skill add hi teaches agents to use hi

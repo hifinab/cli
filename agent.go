@@ -55,6 +55,9 @@ type agentReport struct {
 	ExitCode     int             `json:"exit_code"`
 	SessionID    string          `json:"session_id,omitempty"`
 	TaskFile     string          `json:"task_file,omitempty"`
+	Bundles      []string        `json:"bundles,omitempty"`
+	Skills       []string        `json:"skills,omitempty"`
+	Image        string          `json:"image,omitempty"`
 	Text         string          `json:"text"`
 	Report       json.RawMessage `json:"report"`
 	Branch       string          `json:"branch,omitempty"`
@@ -113,6 +116,7 @@ options:
   --detach               start the run and return; hi agent wait <name> gets the report
   --json                 the report as JSON on stdout
   --task-file <path>     the task from a file whose name doesn't end in .md
+  --bundle a,b           attach bundles: their skills, and an image with what they need (hi bundle ls)
   --name, --network, --allow, --gpu, --data, --here, --image, --memory
                          the box's options, as for hi box
 
@@ -129,6 +133,14 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 	if task == "" && (options.detach || options.json) {
 		return usageError{"--detach and --json need a task: hi agent [claude|codex] \"<task>\""}
 	}
+	// With --json, stdout holds only the report.
+	info := stdout
+	if options.json {
+		info = stderr
+	}
+	if kind, err = applyFrontMatter(kind, &options, stdin, info); err != nil {
+		return err
+	}
 	if kind == "" {
 		if task == "" {
 			return usageError{"name the agent for an interactive session: hi agent claude, or hi agent codex"}
@@ -142,11 +154,6 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 	options.words = nil
 	if task != "" {
 		options.words = []string{task}
-	}
-	// With --json, stdout holds only the report.
-	info := stdout
-	if options.json {
-		info = stderr
 	}
 	if options.taskFile != "" {
 		fmt.Fprintf(info, "Task from %s.\n", options.taskFile)
@@ -184,7 +191,11 @@ func agentTask(options *boxOptions, stdin io.Reader) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("reading the task from stdin: %w", err)
 		}
-		return checkAgentTask("the task on stdin", data)
+		task, err := checkAgentTask("the task on stdin", data)
+		if err != nil {
+			return "", err
+		}
+		return briefTask(options, task, "the task on stdin")
 	case len(words) == 1 && strings.HasSuffix(strings.ToLower(words[0]), ".md"):
 		options.taskFile = words[0]
 	default:
@@ -212,7 +223,24 @@ func agentTask(options *boxOptions, stdin io.Reader) (string, error) {
 		return "", err
 	}
 	options.taskFile = path
-	return checkAgentTask(options.taskFile, data)
+	task, err := checkAgentTask(options.taskFile, data)
+	if err != nil {
+		return "", err
+	}
+	return briefTask(options, task, options.taskFile)
+}
+
+// briefTask takes a brief's front matter off for applyFrontMatter.
+func briefTask(options *boxOptions, task, source string) (string, error) {
+	front, body, err := splitFrontMatter(task, source)
+	if err != nil {
+		return "", err
+	}
+	if front != nil && body == "" {
+		return "", fmt.Errorf("%s has front matter but no task", source)
+	}
+	options.fromBrief = front
+	return body, nil
 }
 
 func checkAgentTask(source string, data []byte) (string, error) {
@@ -470,7 +498,11 @@ func agentDisplayName(kind string) string {
 // collectAgentReport builds the report from the box: the agent's result
 // files and log, the container's exit status, and git.
 func collectAgentReport(engine boxEngine, meta boxMeta) agentReport {
-	report := agentReport{Name: meta.Name, Agent: meta.Agent, Branch: meta.Branch, TaskFile: meta.TaskFile, Status: "done", Warnings: []string{}}
+	report := agentReport{Name: meta.Name, Agent: meta.Agent, Branch: meta.Branch, TaskFile: meta.TaskFile, Status: "done", Warnings: []string{},
+		Bundles: meta.Bundles, Skills: meta.Skills}
+	if len(meta.Bundles) > 0 {
+		report.Image = meta.Image
+	}
 	container := "hi-box-" + meta.Name
 	switch state := engine.state(container); state {
 	case "running":
@@ -628,4 +660,144 @@ func printAgentReport(report agentReport, w io.Writer) {
 		fmt.Fprintf(w, "  %s\n", path)
 	}
 	fmt.Fprintf(w, "Review with hi box diff %s, keep with git merge %s, then hi box rm %s.\n", report.Name, report.Branch, report.Name)
+}
+
+// agentFrontMatter is what a task file's front matter may set: options the
+// command line also takes. Flags win.
+type agentFrontMatter struct {
+	Agent   string
+	Bundles []string
+	Network string
+	Allow   []string
+	Data    bool
+	GPU     bool
+}
+
+// splitFrontMatter takes the front matter off a brief: lines of key: value
+// between two --- lines at the top. Lists are [a, b] or a, b.
+func splitFrontMatter(task, source string) (*agentFrontMatter, string, error) {
+	rest, ok := strings.CutPrefix(task, "---\n")
+	if !ok {
+		return nil, task, nil
+	}
+	head, body, found := strings.Cut(rest, "\n---\n")
+	if !found {
+		if head, found = strings.CutSuffix(rest, "\n---"); !found {
+			return nil, task, nil
+		}
+		body = ""
+	}
+	front := &agentFrontMatter{}
+	for _, line := range strings.Split(head, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, ":")
+		if !ok {
+			return nil, "", fmt.Errorf("%s: front matter line %q isn't key: value", source, line)
+		}
+		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
+		list := func() []string {
+			var items []string
+			for _, item := range strings.Split(strings.Trim(value, "[]"), ",") {
+				if item = strings.Trim(strings.TrimSpace(item), `"'`); item != "" {
+					items = append(items, item)
+				}
+			}
+			return items
+		}
+		flag := func() (bool, error) {
+			switch strings.ToLower(value) {
+			case "true", "yes":
+				return true, nil
+			case "false", "no":
+				return false, nil
+			}
+			return false, fmt.Errorf("%s: %s is true or false, not %q", source, key, value)
+		}
+		var err error
+		switch key {
+		case "agent":
+			front.Agent = strings.Trim(value, `"'`)
+			if !agentKinds[front.Agent] {
+				return nil, "", fmt.Errorf("%s: agent is claude or codex, not %q", source, front.Agent)
+			}
+		case "bundles", "bundle":
+			front.Bundles = list()
+		case "network":
+			front.Network = strings.Trim(value, `"'`)
+			if _, ok := boxPresets[front.Network]; !ok {
+				return nil, "", fmt.Errorf("%s: network is locked, dev, or open, not %q", source, front.Network)
+			}
+		case "allow":
+			front.Allow = list()
+		case "data":
+			front.Data, err = flag()
+		case "gpu":
+			front.GPU, err = flag()
+		default:
+			return nil, "", fmt.Errorf("%s: front matter can set agent, bundles, network, allow, data, and gpu, not %s", source, key)
+		}
+		if err != nil {
+			return nil, "", err
+		}
+	}
+	return front, strings.TrimSpace(body), nil
+}
+
+// applyFrontMatter uses a brief's front matter where no flag was given.
+// A brief can come from anyone, including another agent, so what widens
+// the box (network, allow, data, gpu) is asked about, and left out without
+// a terminal.
+func applyFrontMatter(kind string, options *boxOptions, stdin io.Reader, stdout io.Writer) (string, error) {
+	front := options.fromBrief
+	if front == nil {
+		return kind, nil
+	}
+	if kind == "" {
+		kind = front.Agent
+	}
+	if len(options.bundles) == 0 {
+		options.bundles = front.Bundles
+	}
+	var asks, flags []string
+	var apply []func()
+	if front.Network != "" && options.network == "" && front.Network != "dev" {
+		asks, flags = append(asks, "network "+front.Network), append(flags, "--network "+front.Network)
+		apply = append(apply, func() { options.network = front.Network })
+	} else if front.Network == "dev" && options.network == "" {
+		options.network = "dev"
+	}
+	for _, host := range front.Allow {
+		if !containsString(options.allow, host) {
+			asks, flags = append(asks, host), append(flags, "--allow "+host)
+			apply = append(apply, func() { options.allow = append(options.allow, host) })
+		}
+	}
+	if front.Data && !options.data {
+		asks, flags = append(asks, "the team's data"), append(flags, "--data")
+		apply = append(apply, func() { options.data = true })
+	}
+	if front.GPU && !options.gpu {
+		asks, flags = append(asks, "the GPU"), append(flags, "--gpu")
+		apply = append(apply, func() { options.gpu = true })
+	}
+	if len(asks) == 0 {
+		return kind, nil
+	}
+	source := firstNonEmpty(options.taskFile, "the task")
+	if !isTerminal(stdin) {
+		fmt.Fprintf(stdout, "Ignoring %s from %s's front matter; add %s to allow it.\n", strings.Join(asks, ", "), source, strings.Join(flags, " "))
+		return kind, nil
+	}
+	fmt.Fprintf(stdout, "%s asks for %s. Allow it for this box? [y/N] ", source, strings.Join(asks, ", "))
+	if answer := readSkillAnswer(stdin); answer == "y" || answer == "yes" {
+		for _, set := range apply {
+			set()
+		}
+	} else {
+		fmt.Fprintln(stdout, "Starting without them.")
+	}
+	return kind, nil
 }

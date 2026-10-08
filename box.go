@@ -69,6 +69,8 @@ type boxMeta struct {
 	Prompt     string    `json:"prompt,omitempty"`
 	NotGit     bool      `json:"not_git,omitempty"`
 	TaskFile   string    `json:"task_file,omitempty"`
+	Bundles    []string  `json:"bundles,omitempty"`
+	Skills     []string  `json:"skills,omitempty"`
 	Created    time.Time `json:"created"`
 }
 
@@ -89,7 +91,11 @@ type boxOptions struct {
 	detach   bool   // hi agent
 	json     bool   // hi agent
 	taskFile string // hi agent
+	bundles  []string
 	words    []string
+	// fromBrief holds what a task file's front matter asked for, to ask
+	// about before it widens the box (agent.go).
+	fromBrief *agentFrontMatter
 }
 
 func boxStateFile(parts ...string) string {
@@ -176,6 +182,7 @@ options when starting:
   --worktree             a new git worktree (agents always get one)
   --here                 work in the project folder itself, not a worktree
   --image <image>        another image; devcontainer.json's image or Dockerfile is used too
+  --bundle a,b           skills and their tools from bundles (hi bundle ls), on an image built once
   --memory <size>        memory limit (default 16g)`)
 }
 
@@ -221,6 +228,13 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 			options.json = true
 		case command == "agent" && (arg == "--task-file" || strings.HasPrefix(arg, "--task-file=")):
 			options.taskFile, err = value()
+		case arg == "--bundle" || strings.HasPrefix(arg, "--bundle="):
+			text, err = value()
+			for _, name := range strings.Split(text, ",") {
+				if name = strings.TrimSpace(name); name != "" && !containsString(options.bundles, name) {
+					options.bundles = append(options.bundles, name)
+				}
+			}
 		case arg == "--name" || strings.HasPrefix(arg, "--name="):
 			options.name, err = value()
 		case arg == "--network" || strings.HasPrefix(arg, "--network="):
@@ -302,6 +316,34 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		}
 	}
 
+	data := options.data || custom.Data
+
+	// Bundles: their skills' files, and the network they need, before
+	// anything is made.
+	var bundles *bundlePlan
+	var bundleHosts []string
+	if len(options.bundles) > 0 {
+		if options.image != "" || (devcontainer != nil && (devcontainer.Image != "" || devcontainer.Build.Dockerfile != "")) {
+			return meta, errors.New("--bundle builds its image on hi's own base image, so it doesn't go with --image or an image from devcontainer.json yet")
+		}
+		all, err := loadAllBundles(stderr)
+		if err != nil {
+			return meta, err
+		}
+		if bundles, err = planBundles(options.bundles, all); err != nil {
+			return meta, err
+		}
+		if network, bundleHosts, err = bundles.widen(network, options.allow, stdin, stdout); err != nil {
+			return meta, err
+		}
+		if data && network == "open" {
+			return meta, errors.New("--data doesn't go with an open network: an agent reading untrusted pages could be told to pass the team's data on; run the data work in a separate box")
+		}
+		if err := bundles.fetchSkills(stdout); err != nil {
+			return meta, err
+		}
+	}
+
 	agent := agentKinds[kind]
 	prompt := ""
 	if agent {
@@ -326,7 +368,6 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	cleanup := func() { os.RemoveAll(stateDir) }
 
-	data := options.data || custom.Data
 	var dataSetup *boxData
 	if data {
 		if dataSetup, err = prepareBoxData(stateDir); err != nil {
@@ -392,6 +433,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 	}
 	hosts = append(hosts, agentHosts[kind]...)
 	hosts = append(hosts, options.allow...)
+	hosts = append(hosts, bundleHosts...)
 	if data {
 		hosts = append(hosts, boxDataHosts...)
 	}
@@ -407,7 +449,15 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		return meta, err
 	}
 	meta.Image = baseImage
+	imageCached := false
 	switch {
+	case bundles != nil:
+		if meta.Image, imageCached, err = bundles.ensureImage(engine, baseImage, stdout, stderr); err != nil {
+			removeBoxWorktree(meta, true)
+			cleanup()
+			return meta, err
+		}
+		meta.Bundles, meta.Skills = bundles.bundleNames(), bundles.skillNames()
 	case options.image != "":
 		meta.Image = options.image
 	case devcontainer != nil && devcontainer.Image != "":
@@ -457,6 +507,18 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		"NO_PROXY": "localhost,127.0.0.1," + meta.ProxyIP, "no_proxy": "localhost,127.0.0.1," + meta.ProxyIP,
 		"HI_BOX": name, "PATH": "/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
+	if bundles != nil {
+		// The bundle image's tools come first. Chrome ignores HTTPS_PROXY,
+		// so agent-browser passes the proxy to it.
+		env["PATH"] = "/opt/hi/venv/bin:/opt/hi/npm/bin:/opt/hi/bin:" + env["PATH"]
+		if bundles.chrome {
+			env["AGENT_BROWSER_PROXY"] = proxy
+			env["AGENT_BROWSER_PROXY_BYPASS"] = "localhost,127.0.0.1"
+		}
+		if err := bundles.installSkills(homeDir); err != nil {
+			return meta, fail(err)
+		}
+	}
 	if data {
 		// hf and huggingface_hub reach the server through the proxy's data
 		// listener, which puts the hi data token in place of this one.
@@ -502,6 +564,9 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 
 	if err := saveBoxMeta(meta); err != nil {
 		return meta, fail(err)
+	}
+	if bundles != nil {
+		bundles.printPlan(meta.Image, imageCached, network, stdout)
 	}
 	describeBox(meta, gpu, stdout)
 	if meta.Background {

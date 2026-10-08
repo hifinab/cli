@@ -578,6 +578,29 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.31.0 — Bundles in `hi agent`
+
+- [x] `hi agent --bundle web,office` (and `hi box --bundle`): the bundles'
+  skills, pinned to their commits, go in the box's home with the `hi`
+  skill, and the box runs on `hi-agent:<hash>`, built once from the
+  skills' needs on the box's base image and reused.
+- [x] The network the skills need is shown with each reason and asked
+  about; without a terminal it needs `--network` or `--allow`. `--data`
+  with an open network is refused.
+- [x] Bundles from hi, the team's template sources (which may name their
+  own `skills/`), and `~/.local/share/hi/bundles`; `hi bundle ls`, `show`,
+  and `prune`.
+- [x] Front matter in briefs: `agent`, `bundles`, `network`, `allow`,
+  `data`, `gpu`; what widens the box is asked about, or left out without a
+  terminal.
+- [x] The report's `bundles`, `skills`, and `image`.
+  Tested on 2026-10-08 with rootless Podman: the `web` image (2.8 GB)
+  built once, then started from the cache in a second; Claude Code browsed
+  with `agent-browser` in an empty folder from a brief with front matter;
+  Codex found the `data` bundle's skills in `~/.agents/skills` and used
+  DuckDB; every tool in the `office` image checked.
+  Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md), release 2.
+
 ### v0.30.2 — Finish the team's data on every cloud machine
 
 - [x] `hi server expose revoke <run>` ends one run's token now; the server
@@ -781,7 +804,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
 ## Planned
 
-### v0.31.0 — Learn from agent-machine services
+### v0.32.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit
@@ -812,10 +835,6 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   the live view. Spec: [hi_agent.md](specs/approved/hi_agent.md#sign-ins-on-the-server-release-3) (3).
 - [ ] `--on <machine>` and `--remote`, Antigravity CLI, and `hi agent race`.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
-- [ ] Bundles in `hi agent`: `--bundle`, a cached `hi-agent:<hash>`
-  image built from the skills' `needs`, the skills in the box's home, and
-  `hi bundle ls`, `show`, and `prune`, from the built-in and team sources.
-  The bundle files themselves are done (v0.30.1).
   Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md) (draft).
 
 ### Later — `hi data` and `hi server expose`
