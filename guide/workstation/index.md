@@ -87,6 +87,7 @@ Removing Strix Halo support keeps you in the `render` and `video` groups.
 | Codex CLI          | `codex`    | `codex`                                                   |
 | omp                | `omp`      | `omp`                                                     |
 | herdr              | `herdr`    | `herdr`                                                   |
+| Hermes Agent       | `hermes`   | `hermes`, from Nous Research's installer (setup later with `hermes setup`) |
 | NetBird            | `netbird`  | NetBird client and service                                |
 | Colab CLI          | `colab`    | `colab` (needs uv)                                        |
 | Hugging Face CLI   | `hf`       | `hf`                                                      |

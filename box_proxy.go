@@ -102,7 +102,7 @@ func (l *boxNetworkLog) record(decision, host string) {
 // runBoxProxy is `hi box __proxy`, run inside the proxy container.
 func runBoxProxy(args []string, stderr io.Writer) int {
 	if len(args) != 3 && len(args) != 5 {
-		fmt.Fprintln(stderr, "usage: hi box __proxy <allowlist> <log> <claude credentials or -> [<data token> <server's /hf URL>]")
+		fmt.Fprintln(stderr, "usage: hi box __proxy <allowlist> <log> <claude credentials, openrouter:<.env>, or -> [<data token> <server's /hf URL>]")
 		return 2
 	}
 	allow := &boxAllowlist{path: args[0]}
@@ -116,7 +116,11 @@ func runBoxProxy(args []string, stderr io.Writer) int {
 	go func() {
 		errs <- http.ListenAndServe(fmt.Sprintf(":%d", boxProxyPort), &boxEgressProxy{allow: allow, log: log})
 	}()
-	if args[2] != "-" {
+	if env, ok := strings.CutPrefix(args[2], "openrouter:"); ok {
+		go func() {
+			errs <- http.ListenAndServe(fmt.Sprintf(":%d", boxInjectPort), newBoxOpenRouterInjector(env, "https://openrouter.ai", log))
+		}()
+	} else if args[2] != "-" {
 		go func() {
 			errs <- http.ListenAndServe(fmt.Sprintf(":%d", boxInjectPort), newBoxClaudeInjector(args[2], "https://api.anthropic.com", log))
 		}()
@@ -239,6 +243,53 @@ func newBoxClaudeInjector(secret, upstream string, log *boxNetworkLog) http.Hand
 		log.record("claude", r.URL.Path)
 	}
 	return proxy
+}
+
+// newBoxOpenRouterInjector passes Hermes' requests on to OpenRouter with
+// the real API key in place of the placeholder. env is Hermes' .env file,
+// mounted read-only into the proxy and read again for each request; only
+// OPENROUTER_API_KEY is taken from it.
+func newBoxOpenRouterInjector(env, upstream string, log *boxNetworkLog) http.Handler {
+	target, _ := url.Parse(upstream)
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.FlushInterval = -1
+	director := proxy.Director
+	proxy.Director = func(r *http.Request) {
+		director(r)
+		r.Host = target.Host
+		key, err := readDotEnvValue(env, "OPENROUTER_API_KEY")
+		if err != nil {
+			log.record("openrouter-key-problem", err.Error())
+		}
+		if strings.Contains(r.Header.Get("Authorization"), boxClaudePlacehold) && key != "" {
+			r.Header.Set("Authorization", "Bearer "+key)
+		}
+		log.record("openrouter", r.URL.Path)
+	}
+	return proxy
+}
+
+// readDotEnvValue reads one KEY=value from a .env file.
+func readDotEnvValue(path, key string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("%s can't be read: %w", path, err)
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "export "))
+		name, value, ok := strings.Cut(line, "=")
+		if !ok || strings.TrimSpace(name) != key {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if len(value) >= 2 && (value[0] == '"' || value[0] == '\'') && value[len(value)-1] == value[0] {
+			value = value[1 : len(value)-1]
+		}
+		if value != "" {
+			return value, nil
+		}
+	}
+	return "", fmt.Errorf("no %s in %s", key, path)
 }
 
 func readBoxClaudeToken(path string) (string, error) {

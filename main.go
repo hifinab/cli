@@ -133,7 +133,7 @@ Usage:
   hi init [<template> <dir>]    Start a project from a template (python, web, service, pipeline, ml)
   hi q <what you want to do>    Ask an AI model for a shell command, then run, copy, or explain it
   hi q                          Chat with it; hi q --setup chooses the model and sets up the shell
-  hi agent [claude|codex] [task]
+  hi agent [claude|codex|hermes] [task]
                                 Hand a task to a coding agent in a box and get its report (hi agent help)
   hi bundle ls|show             Bundles for hi agent --bundle: skills and the tools they need
   hi box shell|run              Run a shell or a command in a rootless box with no credentials

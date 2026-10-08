@@ -186,6 +186,30 @@ the report. What each has to handle:
 - An adapter checks the agent's version against the range it was tested
   with and warns outside it (release 2); `hi doctor` reports the same.
 
+### Hermes Agent (v0.32.0)
+
+Added on 2026-10-08, outside the numbered releases. Hermes Agent (Nous
+Research) is a Python program in `~/.hermes/hermes-agent` with its own
+venv, signed in to a provider with a key in `~/.hermes/.env`.
+
+| | Hermes Agent |
+|---|---|
+| Run | `hermes chat --query-file <task> -Q` |
+| Without prompts | `--yolo` |
+| Final text | stdout, after notices that start with `⚠` |
+| Session ID | `session_id:` on stderr |
+| Tokens, steps, model | the newest session in `~/.hermes/state.db` |
+| Its hosts | `openrouter.ai` for its public model list; model calls go through the proxy's token listener |
+
+- Its install and the Python its venv links to are mounted read-only at
+  the same paths.
+- Only OpenRouter: Hermes sends `OPENROUTER_API_KEY` only to
+  `openrouter.ai`, so the box's config names the proxy as a `custom`
+  endpoint with the placeholder as its `api_key`. The proxy mounts the
+  host's `.env` read-only and takes only that key from it.
+- With a custom endpoint Hermes doesn't price the calls, so the report has
+  no cost.
+
 ## Tiers and limits (release 2)
 
 `--tier` replaces each agent's permission flags:

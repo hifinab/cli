@@ -52,6 +52,12 @@ func (r *agentProgressReader) pattern() string {
 
 // poll reads what the log gained since the last call.
 func (r *agentProgressReader) poll() agentProgress {
+	if r.kind == "hermes" {
+		if session, ok := readHermesSession(r.home); ok {
+			r.agentProgress = hermesProgress(session)
+		}
+		return r.agentProgress
+	}
 	newest, newestTime := "", time.Time{}
 	matches, _ := filepath.Glob(r.pattern())
 	for _, match := range matches {
@@ -147,9 +153,9 @@ func (r *agentProgressReader) claudeLine(line []byte) {
 
 // claudeStep names a tool call with the part of its input that says most.
 func claudeStep(name string, input map[string]any) string {
-	for _, key := range []string{"command", "query", "url", "file_path", "pattern", "description", "prompt"} {
+	for _, key := range []string{"command", "query", "url", "file_path", "pattern", "description", "prompt", "path"} {
 		if value, ok := input[key].(string); ok && value != "" {
-			if key == "file_path" {
+			if key == "file_path" || key == "path" {
 				value = filepath.Base(value)
 			}
 			return name + ": " + value

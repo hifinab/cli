@@ -53,7 +53,7 @@ var boxNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,39}$`)
 // boxMeta is box.json in the box's state folder.
 type boxMeta struct {
 	Name       string    `json:"name"`
-	Agent      string    `json:"agent"` // claude, codex, shell, or run
+	Agent      string    `json:"agent"` // claude, codex, hermes, shell, or run
 	Root       string    `json:"root"`
 	Workdir    string    `json:"workdir"`
 	Worktree   bool      `json:"worktree"`
@@ -494,7 +494,7 @@ func startBox(kind string, options boxOptions, stdin io.Reader, stdout, stderr i
 		cleanup()
 		return err
 	}
-	if err := startBoxNetwork(engine, &meta, stateDir, kind == "claude", dataSetup); err != nil {
+	if err := startBoxNetwork(engine, &meta, stateDir, kind, dataSetup); err != nil {
 		return meta, fail(err)
 	}
 
@@ -629,7 +629,7 @@ func boxHostBinary(name string) (string, error) {
 
 // startBoxNetwork creates the box's internal network and starts its proxy,
 // which is also on a normal network.
-func startBoxNetwork(engine boxEngine, meta *boxMeta, stateDir string, claude bool, data *boxData) error {
+func startBoxNetwork(engine boxEngine, meta *boxMeta, stateDir string, kind string, data *boxData) error {
 	network := "hi-box-" + meta.Name
 	hash := fnv.New32a()
 	hash.Write([]byte(meta.Name))
@@ -662,13 +662,19 @@ func startBoxNetwork(engine boxEngine, meta *boxMeta, stateDir string, claude bo
 	args = append(args, "--cap-drop=ALL", "--security-opt", "no-new-privileges", "--memory", "256m",
 		"-v", executable+":/usr/local/bin/hi:ro", "-v", stateDir+":/state")
 	secret := "-"
-	if claude {
+	switch kind {
+	case "claude":
 		source, err := boxClaudeSecret()
 		if err != nil {
 			return err
 		}
 		args = append(args, "-v", source+":/secrets/claude:ro")
 		secret = "/secrets/claude"
+	case "hermes":
+		// Only the proxy sees Hermes' .env, and takes only the OpenRouter
+		// key from it.
+		args = append(args, "-v", hermesEnvPath()+":/secrets/hermes.env:ro")
+		secret = "openrouter:/secrets/hermes.env"
 	}
 	if data != nil && data.address != "" {
 		// The server's name may resolve only on the host, through NetBird.

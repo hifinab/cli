@@ -47,7 +47,7 @@ hi connect <server>         Join a team's hi server, which approves and pays for
 hi disconnect               Leave it; hi compute uses your own keys again
 hi data            Download the team's Hugging Face datasets, models, and buckets through it (hi data help)
 hi server          Run the server that brokers compute and serves templates for a team (hi server help)
-hi agent [task]    Hand a task to Claude Code or Codex in a box and get its report (hi agent help)
+hi agent [task]    Hand a task to Claude Code, Codex, or Hermes in a box and get its report (hi agent help)
 hi box shell       Run a shell or a command in a rootless box (hi box help)
 hi bundle ls       Bundles of skills and tools for hi agent --bundle
 hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
@@ -292,7 +292,7 @@ their output.
 
 ## Agents and boxes
 
-`hi agent` hands a task to Claude Code or Codex, which works without
+`hi agent` hands a task to Claude Code, Codex, or Hermes, which works without
 permission prompts in a box, and waits for one report, the same for every
 agent: its final message, whether it worked, and the files changed.
 `hi box` is the box itself, for any code: a rootless Podman container that
@@ -381,6 +381,7 @@ under the name in brackets for `hi install <tool>` and `hi uninstall <tool>`:
   - [Codex CLI](https://developers.openai.com/codex/cli) [`codex`]
   - [omp](https://omp.sh) [`omp`]
   - [herdr](https://herdr.dev) [`herdr`]
+  - [Hermes Agent](https://github.com/NousResearch/hermes-agent) [`hermes`]
   - [Colab CLI](https://github.com/googlecolab/google-colab-cli) [`colab`] and
     [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/guides/cli)
     [`hf`], used by `hi compute` and `hi login`. The Colab CLI needs uv.

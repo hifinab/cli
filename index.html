@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hi — Hifin workstations</title>
-<meta name="description" content="hi turns a fresh Ubuntu machine into a Hifin AI workstation: Claude Code, Codex, omp, herdr, ROCm, Docker and NetBird in one command. It also starts agent-ready projects, rents GPUs, downloads the team's data, and shares local services on a temporary public address.">
+<meta name="description" content="hi turns a fresh Ubuntu machine into a Hifin AI workstation: Claude Code, Codex, omp, herdr, Hermes, ROCm, Docker and NetBird in one command. It also starts agent-ready projects, rents GPUs, downloads the team's data, and shares local services on a temporary public address.">
 <meta name="theme-color" content="#0a0c11">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%239aa0ff'/><stop offset='1' stop-color='%236fd9b8'/></linearGradient></defs><rect width='64' height='64' rx='16' fill='%230a0c11'/><text x='32' y='44' font-family='monospace' font-size='34' font-weight='700' text-anchor='middle' fill='url(%23g)'>hi</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -234,7 +234,7 @@
     <a class="pill" href="https://github.com/hifinab/cli/releases/latest"><i></i><span id="ver">latest release</span></a>
     <h1>Fresh Ubuntu to <em>AI workstation</em> in one command.</h1>
     <p class="lede">
-      <code>hi</code> installs Claude Code, Codex, omp and herdr,
+      <code>hi</code> installs Claude Code, Codex, omp, herdr and Hermes,
       wires up ROCm, Docker and NetBird, then checks everything is working. It's a single static
       binary with no runtime to install.
     </p>
@@ -306,6 +306,12 @@
         <p>The runtime coding agents run on, for keeping several agents working side by side.</p>
         <span class="bin">$ herdr</span>
       </a>
+      <a class="card" href="https://github.com/NousResearch/hermes-agent">
+        <div class="card-top"><span class="badge">☿</span><span class="arrow">↗</span></div>
+        <h3>Hermes Agent</h3>
+        <p>Nous Research's agent with tools, memory and messaging gateways, on any model through OpenRouter.</p>
+        <span class="bin">$ hermes</span>
+      </a>
       <a class="card" href="https://rocm.docs.amd.com">
         <div class="card-top"><span class="badge">▲</span><span class="arrow">↗</span></div>
         <h3>AMD ROCm 10</h3>
@@ -354,7 +360,7 @@
       <div class="cmd"><code>hi net expose <span>&lt;port&gt;</span></code><p>Put a web app or webhook receiver on your machine, even on localhost, on a temporary public HTTPS address. Password-protected by default, ends on its own, logs every request.</p></div>
       <div class="cmd"><code>hi init <span>&lt;template&gt; &lt;dir&gt;</span></code><p>Start a project agents work well in: <code>make check</code>, short agent rules, safe settings and CI. Python, web, service, pipeline and ML built in, plus your team's own, and <code>--update</code> keeps projects current.</p></div>
       <div class="cmd"><code>hi q <span>&lt;what you want&gt;</span></code><p>Ask for a shell command in plain words, or chat. The model looks at your files first; you see the command, and what its globs match, before Enter runs it. Uses Claude Code, OpenRouter or any OpenAI-compatible endpoint.</p></div>
-      <div class="cmd"><code>hi agent <span>&lt;task&gt;</span></code><p>Hand a task to Claude Code or Codex. It works without permission prompts in a box, on its own branch, and you get one report back, the same for every agent: what it said, whether it worked, and what changed. <code>--bundle web,office,data</code> adds skills and tools for browsing, documents and data.</p></div>
+      <div class="cmd"><code>hi agent <span>&lt;task&gt;</span></code><p>Hand a task to Claude Code, Codex, or Hermes. It works without permission prompts in a box, on its own branch, and you get one report back, the same for every agent: what it said, whether it worked, and what changed. <code>--bundle web,office,data</code> adds skills and tools for browsing, documents and data.</p></div>
       <div class="cmd"><code>hi box <span>shell · run</span></code><p>Run a shell or a command in a rootless container: the project and nothing else, no credentials, a network that reaches only what you allow, and the Strix Halo GPU if you want it. <code>devcontainer.json</code> sets it up for the whole project.</p></div>
       <div class="cmd"><code>hi compute</code><p>Guided menu to start, reach and stop remote GPU machines on Colab, Hugging Face, RunPod or Shadeform, with lifetime limits.</p></div>
       <div class="cmd"><code>hi compute stop</code><p>Pick a running machine from a list, or all of them, and stop it after confirming.</p></div>

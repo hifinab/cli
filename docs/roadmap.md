@@ -578,6 +578,19 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.32.0 — Hermes Agent
+
+- [x] `hi install hermes` runs Nous Research's installer without its setup
+  wizard; `hi uninstall hermes` removes the program and keeps `~/.hermes`.
+- [x] `hi agent hermes`: Hermes in a box, from your install mounted
+  read-only, on OpenRouter with your model. The key stays outside the box:
+  Hermes gets a placeholder and the proxy as a custom endpoint, and the
+  proxy reads only `OPENROUTER_API_KEY` from `~/.hermes/.env`. The live
+  line, the report, and its stats come from Hermes' `state.db`.
+  Tested on 2026-10-08 with Hermes Agent v0.21.2 and
+  `google/gemini-3.8-flash`: tasks of one and four steps finished, and the
+  key was in no file or variable of the box.
+
 ### v0.31.6 — The agent's model
 
 - [x] `hi agent --model <model>` and `model:` in a brief's front matter.
@@ -850,7 +863,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
 ## Planned
 
-### v0.32.0 — Learn from agent-machine services
+### v0.33.0 — Learn from agent-machine services
 
 - [ ] Study [boxd](https://docs.boxd.sh/) and similar services (Fly's
   Sprites, E2B, Daytona, Modal Sandboxes) and write down which ideas fit

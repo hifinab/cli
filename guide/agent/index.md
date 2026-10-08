@@ -1,6 +1,6 @@
 ---
 title: Hand tasks to agents
-description: Hand a task to Claude Code or Codex with hi agent. The agent works without permission prompts in a box, on its own branch, and you get back one report, the same for every agent.
+description: Hand a task to Claude Code, Codex, or Hermes with hi agent. The agent works without permission prompts in a box, on its own branch, and you get back one report, the same for every agent.
 ---
 
 `hi agent` hands a task to a coding agent and waits for it. The agent works
@@ -32,19 +32,38 @@ Review with hi box diff myproject-1, keep with git merge hi-box/myproject-1, the
 hi agent "<task>"              # the first agent installed and signed in
 hi agent claude "<task>"       # Claude Code
 hi agent codex "<task>"        # Codex
+hi agent hermes "<task>"       # Hermes Agent
 ```
 
 Without an agent's name, `hi agent` takes Claude Code if it is installed and
-signed in on this machine, and Codex otherwise. The agent starts from your
+signed in on this machine, then Codex, then Hermes. The agent starts from your
 last commit, on a new worktree and the branch `hi-box/<name>`; uncommitted
 changes in the project aren't in it, and hi says so when there are some.
+
+### Hermes
+
+[Hermes Agent](https://github.com/NousResearch/hermes-agent) from Nous
+Research (`hi install hermes`) runs on OpenRouter with your key in
+`~/.hermes/.env`. The key stays outside the box, like Claude Code's
+sign-in: the box's Hermes gets a placeholder and hi's proxy as its
+endpoint, and only the proxy reads the key, and only that key, from
+`~/.hermes/.env`. Hermes itself and its Python are mounted read-only from
+your install, so the box runs the version you have.
+
+- Only OpenRouter for now; with another provider `hi agent hermes` says so.
+- The box gets a small Hermes config of its own: your model, the
+  terminal in the box, and none of your gateways, MCP servers, or other
+  keys.
+- Hermes doesn't know OpenRouter's prices through hi's proxy, so its
+  report has no cost.
 
 ### The model
 
 `--model` picks the agent's model, for example `--model sonnet` or
 `--model gpt-6.1-sol`. Without it, the box uses the model in your own
-settings (`model` in `~/.claude/settings.json`, or in
-`~/.codex/config.toml`), so it behaves like the agent on this machine. If
+settings (`model` in `~/.claude/settings.json`, in `~/.codex/config.toml`,
+or Hermes' `model.default` in `~/.hermes/config.yaml`), so it behaves like
+the agent on this machine. If
 your settings don't name one, Claude Code gets `opus`: in the box it only
 holds a placeholder token, so it can't see your plan and would otherwise
 choose its plan-less default, Sonnet. Codex keeps its own default. The box's

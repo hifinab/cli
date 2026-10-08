@@ -35,7 +35,7 @@
 - [Let your coding agent use a GPU](https://hifin.sh/guide/examples/agent/): what to ask an agent, and what it does
 - [Skills](https://hifin.sh/guide/reference/skill/): `hi skill` finds, installs, and updates agent skills from skills.sh, and writes the hi skill
 - [All commands](https://hifin.sh/guide/reference/commands/): every command and option
-- [Hand tasks to agents](https://hifin.sh/guide/agent/): `hi agent`, Claude Code or Codex on a task in a box, without permission prompts, with one report for every agent, and `--bundle web,office,data` for skills and the tools they need
+- [Hand tasks to agents](https://hifin.sh/guide/agent/): `hi agent`, Claude Code, Codex, or Hermes on a task in a box, without permission prompts, with one report for every agent, and `--bundle web,office,data` for skills and the tools they need
 - [Run code in a box](https://hifin.sh/guide/box/): `hi box`, a shell or a command in a rootless container with no credentials and a limited network, set up per project in `devcontainer.json` (`customizations.hi`, including `bundles`)
 - [Share a local service](https://hifin.sh/guide/workstation/expose/): `hi net expose <port>`, a temporary public address for a service on this machine; ask the user first
 - [Download the team's data](https://hifin.sh/guide/data/): `hi data`, the team's private Hugging Face datasets, models, and buckets through the hi server, on laptops, in boxes, in cloud jobs (`hi compute run --data`), and on machines you SSH into (`hi compute up --data`)

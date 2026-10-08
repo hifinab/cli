@@ -22,8 +22,8 @@ import (
 
 // agentKinds are the agents hi agent runs, in the order it picks them.
 var (
-	agentKinds = map[string]bool{"claude": true, "codex": true}
-	agentOrder = []string{"claude", "codex"}
+	agentKinds = map[string]bool{"claude": true, "codex": true, "hermes": true}
+	agentOrder = []string{"claude", "codex", "hermes"}
 )
 
 // agentHosts are the hosts an agent needs beyond its box's network preset.
@@ -32,6 +32,9 @@ var (
 var agentHosts = map[string][]string{
 	// Codex with a ChatGPT sign-in, or an API key.
 	"codex": {"chatgpt.com", "ab.chatgpt.com", "auth.openai.com", "api.openai.com"},
+	// Hermes' model calls go through the token listener; it also reads
+	// OpenRouter's public model list directly.
+	"hermes": {"openrouter.ai"},
 }
 
 // agentResultDir is where the agent leaves its result, in the box's home
@@ -110,11 +113,11 @@ func printAgentUsage(w io.Writer) {
 waits for its report: what it said, whether it worked, and what changed.
 
 usage:
-  hi agent [claude|codex] "<task>"  run a task on a new git worktree (outside git, in the folder) and wait for the report;
+  hi agent [claude|codex|hermes] "<task>"  run a task on a new git worktree (outside git, in the folder) and wait for the report;
                                     without an agent, the first one installed and signed in
-  hi agent [claude|codex] <brief.md>
+  hi agent [claude|codex|hermes] <brief.md>
                                     the task is the file's contents; - reads it from stdin
-  hi agent claude|codex             an interactive session in a box
+  hi agent claude|codex|hermes      an interactive session in a box
   hi agent wait <name> [--json]     wait for a run and print its report
   hi agent token claude             store a long-lived Claude token from claude setup-token
 
@@ -139,7 +142,7 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 		return err
 	}
 	if task == "" && (options.detach || options.json) {
-		return usageError{"--detach and --json need a task: hi agent [claude|codex] \"<task>\""}
+		return usageError{"--detach and --json need a task: hi agent [claude|codex|hermes] \"<task>\""}
 	}
 	// With --json, stdout holds only the report.
 	info := stdout
@@ -151,7 +154,7 @@ func startAgent(kind string, options boxOptions, stdin io.Reader, stdout, stderr
 	}
 	if kind == "" {
 		if task == "" {
-			return usageError{"name the agent for an interactive session: hi agent claude, or hi agent codex"}
+			return usageError{"name the agent for an interactive session: hi agent claude, hi agent codex, or hi agent hermes"}
 		}
 		if kind, err = chooseAgent(); err != nil {
 			return err
@@ -291,6 +294,8 @@ func agentReady(kind string) error {
 		}
 		_, err := boxClaudeSecret()
 		return err
+	case "hermes":
+		return hermesReady()
 	case "codex":
 		if _, err := boxHostBinary("codex"); err != nil {
 			return errors.New("Codex is not installed on this machine; install it with hi install codex")
@@ -424,6 +429,8 @@ func agentBoxSetup(kind, prompt string, meta boxMeta, homeDir string, run *[]str
 		}
 		return []string{"sh", "-c", "exec codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check" + model + " -o " +
 			results + "/last.txt - < " + results + "/task.md"}, nil
+	case "hermes":
+		return hermesBoxSetup(prompt, meta, homeDir, results, run)
 	}
 	return nil, fmt.Errorf("unknown agent %q", kind)
 }
@@ -538,8 +545,11 @@ func finishAgent(meta boxMeta, asJSON bool, info, stdout io.Writer) error {
 }
 
 func agentDisplayName(kind string) string {
-	if kind == "claude" {
+	switch kind {
+	case "claude":
 		return "Claude Code"
+	case "hermes":
+		return "Hermes"
 	}
 	return "Codex"
 }
@@ -583,6 +593,27 @@ func collectAgentReport(engine boxEngine, meta boxMeta) agentReport {
 			if usage := result.Usage; usage.Input+usage.Output > 0 {
 				report.Tokens = &agentTokens{Input: usage.Input + usage.CacheRead + usage.CacheCreate, Cached: usage.CacheRead, Output: usage.Output}
 			}
+		}
+	case "hermes":
+		// Hermes prints notices such as "⚠ tirith security scanner …"
+		// before its answer; they aren't part of it.
+		if data, err := os.ReadFile(filepath.Join(results, "last.txt")); err == nil {
+			var lines []string
+			for _, line := range strings.Split(string(data), "\n") {
+				if len(lines) == 0 && strings.HasPrefix(strings.TrimSpace(line), "⚠") {
+					continue
+				}
+				lines = append(lines, line)
+			}
+			report.Text = strings.Join(lines, "\n")
+		}
+		var logs bytes.Buffer
+		boxCommand(nil, &logs, &logs, engine.bin, "logs", container)
+		if match := regexp.MustCompile(`(?m)^session_id: (\S+)`).FindStringSubmatch(logs.String()); match != nil {
+			report.SessionID = match[1]
+		}
+		if session, ok := readHermesSession(boxStateFile(meta.Name, "home")); ok && session.Cost != nil {
+			report.CostUSD = *session.Cost
 		}
 	case "codex":
 		if data, err := os.ReadFile(filepath.Join(results, "last.txt")); err == nil {
@@ -782,7 +813,7 @@ func splitFrontMatter(task, source string) (*agentFrontMatter, string, error) {
 		case "agent":
 			front.Agent = strings.Trim(value, `"'`)
 			if !agentKinds[front.Agent] {
-				return nil, "", fmt.Errorf("%s: agent is claude or codex, not %q", source, front.Agent)
+				return nil, "", fmt.Errorf("%s: agent is claude, codex, or hermes, not %q", source, front.Agent)
 			}
 		case "model":
 			front.Model = strings.Trim(value, `"'`)
@@ -949,6 +980,8 @@ func defaultAgentModel(kind string) string {
 			return model
 		}
 		return "opus"
+	case "hermes":
+		return readHermesModelConfig(filepath.Join(hermesHome(), "config.yaml")).Default
 	case "codex":
 		data, err := os.ReadFile(filepath.Join(firstNonEmpty(os.Getenv("CODEX_HOME"), filepath.Join(home, ".codex")), "config.toml"))
 		if err != nil {

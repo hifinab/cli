@@ -58,6 +58,8 @@ var installItems = []installItem{
 		commands: []string{"codex"}, keeps: "Codex keeps its settings and sign-in in ~/.codex."},
 	{id: "omp", title: "omp", description: "oh-my-pi, a terminal coding agent",
 		commands: []string{"omp"}, keeps: "omp keeps its settings in ~/.omp."},
+	{id: "hermes", title: "Hermes Agent", description: "Nous Research's agent, with tools, memory, and gateways (hermes)",
+		commands: []string{"hermes"}, keeps: "Hermes keeps its settings, keys, and sessions in ~/.hermes."},
 	{id: "herdr", title: "herdr", description: "runs and watches several coding agents at once",
 		commands: []string{"herdr"}, keeps: "herdr keeps its settings in ~/.config/herdr."},
 	{id: "netbird", title: "NetBird", description: "private network between team machines (hi net)",

@@ -197,6 +197,10 @@ remove_tool() {
       ;;
     omp) rm -f "$HOME/.local/bin/omp" ;;
     herdr) rm -f "$HOME/.local/bin/herdr" ;;
+    hermes)
+      rm -f "$HOME/.local/bin/hermes"
+      rm -rf "${HERMES_HOME:-$HOME/.hermes}/hermes-agent"
+      ;;
     netbird)
       if command -v netbird >/dev/null; then
         sudo netbird service stop || true
@@ -350,6 +354,11 @@ fi
 if installing herdr; then
   log "Installing herdr"
   curl -fsSL https://herdr.dev/install.sh | sh
+fi
+if installing hermes; then
+  # Its setup wizard asks questions; hermes setup runs it later.
+  log "Installing Hermes Agent"
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup
 fi
 if installing hf; then
   log "Installing the Hugging Face CLI"

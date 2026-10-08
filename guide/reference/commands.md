@@ -16,7 +16,7 @@ description: Every hi command and option in one place.
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
 | `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
 | `hi shell-init bash\|zsh`        | Shell integration for `hi q`                           |
-| `hi agent …`                     | Hand a task to Claude Code or Codex in a box; see below |
+| `hi agent …`                     | Hand a task to Claude Code, Codex, or Hermes in a box; see below |
 | `hi box …`                       | Run a shell or a command in a rootless box; see below  |
 | `hi bundle …`                    | Bundles of skills for `hi agent --bundle`; see below   |
 | `hi skill …`                     | Find, install, and update agent skills; see below      |
@@ -216,7 +216,7 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 Options: `--detach` to start and return, `--json` for the report as JSON on
 stdout, `--task-file <path>` for a task file whose name doesn't end in
 `.md`, `--model <model>` for the agent's model (without it, the one in your
-own Claude Code or Codex settings, else `opus` for Claude Code),
+own Claude Code, Codex, or Hermes settings, else `opus` for Claude Code),
 `--bundle a,b` for bundles of skills and the tools they need, and the box
 options below. A brief's front matter can set `agent`, `model`, `bundles`,
 `network`, `allow`, `data`, and `gpu`. Exits with 0 when the agent is done and
