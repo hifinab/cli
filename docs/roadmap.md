@@ -578,6 +578,19 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.35.0 — Results of a run
+
+- [x] `hi agent best-of --then "<command>"` runs a command on this machine,
+  in the project, when the rounds end for any reason, with `HI_BEST_OF_RUN`
+  set. hi keeps every attempt's files under `refs/best-of/<run>/`, and
+  `ls --json` lists the runs.
+- [x] `autoresearch-quant`: `make results` re-runs every attempt of a run,
+  in-sample and on the holdout, into `results/<run>/`: Parquet tables, each
+  attempt's `strategy.py`, and a `report.html` that embeds the tables and a
+  Parquet reader, so it opens from disk without a server. `make loop` runs
+  it through `--then`. Tested with a real two-round run on 2026-10-09.
+  Spec: [hi_agent_best_of.md, Results](specs/ideas/hi_agent_best_of.md#results-2026-10-09).
+
 ### v0.34.0 — Autoresearch templates
 
 - [x] `hi init autoresearch-ml` and `hi init autoresearch-quant`: projects
@@ -950,9 +963,9 @@ a fuller, tested suite it can start from. No spec yet: write one in
   drawdowns, a table per year, turnover, and the benchmark; for
   `autoresearch-ml`, the loss curves. A chart of the score round by round,
   with the kept ideas, from `hi agent best-of show --json`. The holdout
-  next to the in-sample score. Done for `autoresearch-quant` (not
-  released yet): `make results` writes every attempt to Parquet and an
-  offline `report.html`, and `make loop` runs it through `--then`.
+  next to the in-sample score. Done for `autoresearch-quant` in v0.35.0:
+  `make results` writes every attempt to Parquet and an offline
+  `report.html`, and `make loop` runs it through `--then`.
   Spec: [hi_agent_best_of.md, Results](specs/ideas/hi_agent_best_of.md#results-2026-10-09).
 - [ ] More: cross-validation and several seeds for `autoresearch-ml`, data
   sources beyond Yahoo Finance and one text file, and a record of every

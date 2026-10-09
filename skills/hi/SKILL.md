@@ -300,7 +300,8 @@ only gains: `--score "<command>" --lower` (or `--higher`) with
 `best-of/<run>/best`; the run goes on in the background, so use
 `hi agent best-of show <run> --json` to follow it and
 `hi agent best-of stop <run>` to end it. Rounds multiply the cost: agree on
-`--rounds` or `--budget` with the user first.
+`--rounds` or `--budget` with the user first. `--then "<command>"` runs a
+command on this machine when the rounds end, for any reason.
 
 hi runs the check in each box after its agent ends; `best` is the first
 box that passed, changed something, and whose agent finished. Read its
@@ -356,7 +357,11 @@ hi init python pricing-tools --yes           # after the user agreed to the plan
 Other templates: `web`, `service`, `pipeline`, `ml`, and the team's private
 ones on a connected device. `autoresearch-ml` and `autoresearch-quant` are
 for `hi agent best-of` rounds: after `hi init`, `make data`, `make score`,
-and a commit, `make loop` starts them (ask about the cost first). `hi init --update --dry-run` shows how a project
+and a commit, `make loop` starts them (ask about the cost first).
+In `autoresearch-quant`, `make loop` ends with `make results`, and
+`make results` after an early stop writes `results/<run>/`: every attempt
+re-run, as Parquet, and `report.html`. Don't commit `results/`: it holds
+holdout scores. `hi init --update --dry-run` shows how a project
 differs from the current templates, and `hi init --update` applies it; if it
 writes `docs/upgrades/<version>.md`, apply what fits from it, run
 `make check`, and delete the file. `hi init --adopt <template>` brings an

@@ -254,7 +254,9 @@ without touching its code.
 The built-in templates are public and generic; they live in `templates/` and
 are embedded in the binary. `autoresearch-ml` and `autoresearch-quant` are
 projects shaped for `hi agent best-of` rounds: a fixed, tested evaluation,
-one file agents change, frozen data, and a holdout outside the repository. Private templates, such as quant `research`,
+one file agents change, frozen data, and a holdout outside the repository;
+`autoresearch-quant`'s `make results` re-runs every attempt of a run into
+Parquet files and a report that opens from disk. Private templates, such as quant `research`,
 live in a private repository that a `hi server` mirrors
 (`hi server templates add`) and serves, signed, to connected devices. Template
 authors can try a folder of layers with `HI_TEMPLATES_DIR=<path> hi init …`.
@@ -307,6 +309,7 @@ hi agent codex --json "review this branch"     # the report as JSON, for scripts
 hi agent claude brief.md                       # the task from a markdown file
 hi agent best-of 3 --agents claude,codex "<task>"   # the same task in 3 boxes, checked and ranked
 hi agent best-of 4 --rounds 100 --score "make bench" --lower "<task>"   # rounds that keep only gains
+hi agent best-of 3 --rounds 40 --score "make score" --higher --then "make results" program.md   # a command when the rounds end
 hi agent --bundle web,office "compare GPU clouds in a Word document"   # skills and tools for work that isn't code
 hi agent claude                                # interactive, in a box
 hi box shell                                   # or hi box run -- make test

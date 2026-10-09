@@ -94,11 +94,21 @@ refuses code that reads files or imports anything but numpy, pandas, and a
 few standard modules, and charges 0.1% of every trade. So a gain is a better
 rule, not a peek at the future or a cheaper trade.
 
+**Read the results.** `make loop` ends with `make results`, which re-runs
+every attempt and writes `results/b-1/report.html`: the score round by
+round, the growth and drawdown of each kept version against the baseline
+and SPY, and returns by year. If the run stopped early, run `make results`
+yourself.
+
 **Check it once:**
 
 ```sh
 git checkout best-of/b-1/best && make holdout && git checkout -
 ```
+
+`make results` scores the holdout for every attempt, so once you've read
+its report the holdout has been looked at many times. Decide on the
+strategy from the in-sample work and the ideas, not from those columns.
 
 Compare it with the holdout score of your starting rules, measured once
 before the run. Every look at the holdout spends some of its value; if you
