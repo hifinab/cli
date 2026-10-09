@@ -235,6 +235,15 @@ func planUpdate(catalog *templateCatalog, target string, check, strict, force bo
 		if action.action == actionNote {
 			notes = append(notes, upgradeNote(target, entry, wasRecorded))
 		}
+		if note := managedRestNote(target, entry, recorded, wasRecorded, action); note != "" {
+			notes = append(notes, note)
+			switch action.action {
+			case actionSame:
+				action = fileAction{entry: entry, action: actionNote, reason: "outside the hi block"}
+			case actionBlock:
+				action.reason = "and a note for the rest"
+			}
+		}
 		change.actions = append(change.actions, action)
 	}
 	if len(change.unchecked) == 0 {
@@ -394,6 +403,38 @@ func upgradeNote(target string, entry initEntry, wasRecorded bool) string {
 		"apply only the template's improvements and keep the project's own changes:\n\n")
 	fmt.Fprintf(&note, "````diff\n%s````\n", ensureNewline(unifiedDiff(full, entry.path, entry.data)))
 	return note.String()
+}
+
+// managedRestNote describes what the template changed outside a managed
+// file's hi block, such as a project target in the Makefile. hi updates the
+// block itself; the rest is the project's, so it goes in the upgrade notes.
+func managedRestNote(target string, entry initEntry, recorded templateMetadataHash, wasRecorded bool, action fileAction) string {
+	if entry.class != "managed" || action.action == actionConflict || action.action == actionWrite {
+		return ""
+	}
+	disk, err := os.ReadFile(filepath.Join(target, filepath.FromSlash(entry.path)))
+	if err != nil {
+		return ""
+	}
+	rest := outsideBlock(entry.data)
+	if bytes.Equal(outsideBlock(disk), rest) || wasRecorded && recorded.Rest == sha256Hex(rest) {
+		return ""
+	}
+	// Diff from the file as it will be, with the new block, so only the rest shows.
+	updated := disk
+	if action.action == actionBlock {
+		updated = action.data
+	}
+	temporary, err := os.CreateTemp("", "hi-project-*")
+	if err != nil {
+		return ""
+	}
+	defer os.Remove(temporary.Name())
+	temporary.Write(updated)
+	temporary.Close()
+	return fmt.Sprintf("### `%s`, outside the hi block\n\nhi updated the block. The template also changed the rest of the file; "+
+		"this diff turns the project's into the template's. Apply only the template's improvements and keep the project's own changes:\n\n"+
+		"````diff\n%s````\n", entry.path, ensureNewline(unifiedDiff(temporary.Name(), entry.path, entry.data)))
 }
 
 func ensureNewline(text string) string {

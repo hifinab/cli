@@ -347,6 +347,9 @@ type templateMetadataHash struct {
 	// Source is where the file came from, so a check without the server
 	// can skip what came from it.
 	Source string `json:"source,omitempty"`
+	// Rest is the hash of a managed file's text outside its hi block, as the
+	// template had it, so an update can tell when the template changed it.
+	Rest string `json:"rest,omitempty"`
 }
 
 // templateMetadata records what generated the repository. It holds names,
@@ -387,7 +390,11 @@ func templateMetadata(composed *composedTemplate, entries []initEntry, skillSour
 			metadata.Files[entry.path] = kept
 			continue
 		}
-		metadata.Files[entry.path] = templateMetadataHash{Class: entry.class, SHA256: entryHash(entry), Source: entry.source}
+		hash := templateMetadataHash{Class: entry.class, SHA256: entryHash(entry), Source: entry.source}
+		if entry.class == "managed" {
+			hash.Rest = sha256Hex(outsideBlock(entry.data))
+		}
+		metadata.Files[entry.path] = hash
 	}
 	data, err := json.MarshalIndent(metadata, "", "  ")
 	return append(data, '\n'), err
@@ -401,6 +408,11 @@ func entryHash(entry initEntry) string {
 		data = managedBlock(data)
 	}
 	return sha256Hex(data)
+}
+
+// outsideBlock is a managed file without its hi block: the project's part.
+func outsideBlock(data []byte) []byte {
+	return bytes.Replace(data, managedBlock(data), nil, 1)
 }
 
 func sha256Hex(data []byte) string {

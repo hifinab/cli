@@ -122,6 +122,37 @@ func TestUpdateBringsARepositoryUpToTheTemplates(t *testing.T) {
 	}
 }
 
+func TestUpdateNotesChangesOutsideTheHiBlock(t *testing.T) {
+	source := newLocalTemplate(t)
+	python := readTestFile(t, filepath.Join("templates", "python", "Makefile"))
+	source.write(map[string]string{"quant/Makefile": python + "\nscore: ## v1\n\t@echo score\n"})
+	project := source.generate(t)
+	appendFile(t, filepath.Join(project, "Makefile"), "\nours: ## the project's own\n\t@echo ours\n")
+
+	// The template adds a project target below its block; the block is the same.
+	source.write(map[string]string{"quant/Makefile": python + "\nscore: ## v1\n\t@echo score\n\nrobust: ## v2\n\t@echo robust\n"})
+	code, stdout, stderr := runInitInProject(t, project, "--update", "--yes")
+	if code != 0 || !strings.Contains(stdout, "note     Makefile (outside the hi block)") {
+		t.Fatalf("update: %d\n%s%s", code, stdout, stderr)
+	}
+	if got := readTestFile(t, filepath.Join(project, "Makefile")); strings.Contains(got, "robust:") || !strings.Contains(got, "ours:") {
+		t.Errorf("the project's part of the Makefile was rewritten:\n%s", got)
+	}
+	upgrades, _ := filepath.Glob(filepath.Join(project, "docs/upgrades/*.md"))
+	if len(upgrades) != 1 {
+		t.Fatalf("upgrade notes: %v", upgrades)
+	}
+	note := readTestFile(t, upgrades[0])
+	if !strings.Contains(note, "### `Makefile`, outside the hi block") || !strings.Contains(note, "+robust: ## v2") || strings.Contains(note, "hi:begin") {
+		t.Errorf("the note lacks the diff of the rest, or shows the block:\n%s", note)
+	}
+	os.Remove(upgrades[0])
+	// Recorded now: the next update doesn't note it again.
+	if code, stdout, _ := runInitInProject(t, project, "--update", "--check"); code != 0 {
+		t.Fatalf("noted twice: %d\n%s", code, stdout)
+	}
+}
+
 func TestUpdateLeavesHandEditsAlone(t *testing.T) {
 	source := newLocalTemplate(t)
 	project := source.generate(t)
