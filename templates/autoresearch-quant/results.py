@@ -43,9 +43,10 @@ import math
 import os
 import subprocess
 import sys
+import time
 import types
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -328,12 +329,31 @@ def build(
     # Attempts that left strategy.py as another left it share one backtest.
     hashes = list(by_hash)
     tasks = [(by_hash[h], checks.get(h, "none")) for h in hashes]
+    checked = sum(task[1] != "none" for task in tasks)
+    print(
+        f"Re-running {len(tasks)} strategies, {checked} of them with make robust's checks…",
+        file=sys.stderr,
+    )
+    outcomes: dict[str, Run] = {}
+    started = time.monotonic()
+
+    def done(sha: str, outcome: Run) -> None:
+        outcomes[sha] = outcome
+        if len(outcomes) % 10 == 0 or len(outcomes) == len(tasks):
+            minutes = (time.monotonic() - started) / 60
+            print(f"  {len(outcomes)} of {len(tasks)} done, {minutes:.1f} min", file=sys.stderr)
+
     if workers == 1:
         _init(in_sample, full)
-        outcomes = dict(zip(hashes, map(run_source, tasks), strict=True))
+        for sha, task in zip(hashes, tasks, strict=True):
+            done(sha, run_source(task))
     else:
         with ProcessPoolExecutor(workers, initializer=_init, initargs=(in_sample, full)) as pool:
-            outcomes = dict(zip(hashes, pool.map(run_source, tasks), strict=True))
+            futures = {
+                pool.submit(run_source, task): sha for sha, task in zip(hashes, tasks, strict=True)
+            }
+            for future in as_completed(futures):
+                done(futures[future], future.result())
 
     version = 0
     rows, returns, weights, checked, capacities = [], [], [], [], []
