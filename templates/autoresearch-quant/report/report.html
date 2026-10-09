@@ -363,7 +363,7 @@ const short = (s, n = 48) => { s = String(s || "").split(/(?<=[.;])\s/)[0].repla
 function el(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
 function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
 
-let R, KEY, NAME, M, HO, HOOK, A, V, base, last, BENCH, roundVer, roundResult, ROUNDS;
+let BKEY, R, KEY, NAME, M, HO, HOOK, A, V, base, last, BENCH, roundVer, roundResult, ROUNDS;
 let TICKER_ORDER = [], K = 1, FROM = 0, TO = 0, REG = [], ROB = new Map(), CAP = [], WT = new Map();
 const SCORE_NAMES = { sharpe: "Sharpe", worst_period: "worst-period Sharpe", median_start: "median-start Sharpe", tranches: "tranche Sharpe" };
 
@@ -389,6 +389,8 @@ function prepare(T) {
   HO = HOOK ? M.indexOf(R.first_holdout_month) : -1; if (HO < 0) HOOK = false;
   BENCH = { name: R.benchmark, ret: ret.get(-1), in: {}, hoM: {} };
   for (const k of ["cagr_pct", "ann_vol_pct", "max_drawdown_pct", "sharpe"]) { BENCH.in[k] = R["bench_is_" + k]; BENCH.hoM[k] = R["bench_ho_" + k]; }
+  // A benchmark bought and held has one Sharpe whatever the score; compare the score with it.
+  BKEY = num(BENCH.hoM[BKEY]) ? KEY : "sharpe";
   const lastMonth = M[M.length - 1];
   const held = new Map();
   for (const w of T.weights) if (w.month === lastMonth) { const o = held.get(w.attempt) || {}; o[w.ticker] = w.weight; held.set(w.attempt, o); }
@@ -438,14 +440,14 @@ function header(T) {
   $("#progressTitle").textContent = `In-sample ${NAME}, attempt by attempt`;
   $("#logTitle").textContent = `All ${A.length} attempts`;
   let lede = `${boxes} ${boxes === 1 ? "box" : "boxes"} a round, ${ROUNDS} rounds, ${mins} minutes, $${R.spend_usd.toFixed(2)} at API prices${R.billed_usd > 0 ? ` ($${R.billed_usd.toFixed(2)} of it billed)` : ""}. In-sample ${NAME} went from ${f3(base.score)} to ${f3(last.score)}.`;
-  if (HOOK) lede += ` On the holdout, which the loop never saw, it went from ${f3(base.scoreHo)} to ${f3(last.scoreHo)}.` + (num(BENCH.hoM[KEY]) ? ` Over those months ${BENCH.name} alone had ${f3(BENCH.hoM[KEY])}.` : "");
+  if (HOOK) lede += ` On the holdout, which the loop never saw, it went from ${f3(base.scoreHo)} to ${f3(last.scoreHo)}.` + (num(BENCH.hoM[BKEY]) ? ` Over those months ${BENCH.name} alone had a Sharpe of ${f3(BENCH.hoM[BKEY])}.` : "");
   $("#lede").textContent = lede;
   $("#meta").innerHTML = [`base ${R.base.slice(0, 7)}`, `best ${R.best_commit ? R.best_commit.slice(0, 7) : "–"} (round ${R.best_round})`, `started ${R.started.slice(0, 16).replace("T", " ")} UTC`, `agents: ${R.agents}${R.models ? ` (${R.models})` : ""}`, R.billing ? `paid by ${R.billing}` : "", `score: ${R.score_command}, ${R.higher ? "higher" : "lower"} is better`, R.edit ? `--edit ${R.edit}` : "", `${R.state}: ${R.reason}`].filter(Boolean).map((s) => `<span>${esc(s)}</span>`).join("");
   const keptBy = A.filter((a) => a.result === "kept").reduce((o, a) => (o[a.agent] = (o[a.agent] || 0) + 1, o), {});
   const change = (a, b) => num(a) && num(b) && a !== 0 ? `<span class="${(b - a) * (R.higher ? 1 : -1) >= 0 ? "up" : "down"}">${pct((b / a - 1) * 100, 0)}</span>` : "";
   const figs = [[`In-sample ${NAME}`, f3(last.score), `from ${f3(base.score)} · ${change(base.score, last.score)}`]];
   if (HOOK) figs.push([`Holdout ${NAME}`, f3(last.scoreHo), `from ${f3(base.scoreHo)} · ${change(base.scoreHo, last.scoreHo)}`]);
-  if (HOOK && num(BENCH.hoM[KEY])) figs.push([`${BENCH.name} on the holdout`, f3(BENCH.hoM[KEY]), `CAGR ${f2(BENCH.hoM.cagr_pct)}% vs ${f2(last.hoM.cagr_pct)}%`]);
+  if (HOOK && num(BENCH.hoM[BKEY])) figs.push([`${BENCH.name} on the holdout`, f3(BENCH.hoM[BKEY]), `CAGR ${f2(BENCH.hoM.cagr_pct)}% vs ${f2(last.hoM.cagr_pct)}%`]);
   figs.push(["Rounds kept", `${kept} / ${ROUNDS}`, Object.entries(keptBy).map(([k, v]) => `${esc(k)} ${v}`).join(" · ") || "no gains"]);
   figs.push(["At API prices", `$${R.spend_usd.toFixed(2)}`, `${mins} min · ${A.length - 1} attempts · ` + (R.billed_usd > 0 ? `$${R.billed_usd.toFixed(2)} billed, the rest subscription usage` : "on a subscription, usage, not a bill")]);
   $("#figures").innerHTML = figs.map(([k, v, s]) => `<div class="fig"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
@@ -460,7 +462,7 @@ function header(T) {
     const hos = V.map((v) => v.scoreHo).filter(num);
     facts.push(["The holdout", `The best strategy's holdout ${NAME} went from ${f3(base.scoreHo)} to ${f3(last.scoreHo)}, and ranged from ${f3(Math.min(...hos))} to ${f3(Math.max(...hos))} across the ${V.length} versions. Of the ${steps.length} kept steps, ${R.higher ? up : down} improved it, ${steps.length - up - down} left it the same, and ${R.higher ? down : up} made it worse.`]);
     facts.push(["Risk", `In-sample, volatility went from ${f2(base.in.ann_vol_pct)}% to ${f2(last.in.ann_vol_pct)}% and the worst drawdown from ${f2(base.in.max_drawdown_pct)}% to ${f2(last.in.max_drawdown_pct)}%. On the holdout, volatility went from ${f2(base.hoM.ann_vol_pct)}% to ${f2(last.hoM.ann_vol_pct)}% and the worst drawdown from ${f2(base.hoM.max_drawdown_pct)}% to ${f2(last.hoM.max_drawdown_pct)}%.`]);
-    if (num(BENCH.hoM[KEY])) facts.push([`${BENCH.name}`, `Bought and held, ${BENCH.name} had an in-sample ${NAME} of ${f3(BENCH.in[KEY])} and a holdout ${NAME} of ${f3(BENCH.hoM[KEY])}, with a CAGR of ${f2(BENCH.hoM.cagr_pct)}% on the holdout against ${f2(last.hoM.cagr_pct)}% for round ${last.round}.`]);
+    if (num(BENCH.hoM[BKEY])) facts.push([`${BENCH.name}`, `Bought and held, ${BENCH.name} had an in-sample ${NAME} of ${f3(BENCH.in[BKEY])} and a holdout ${NAME} of ${f3(BENCH.hoM[BKEY])}, with a CAGR of ${f2(BENCH.hoM.cagr_pct)}% on the holdout against ${f2(last.hoM.cagr_pct)}% for round ${last.round}.`]);
   }
   if (KEY === "sharpe" && V.length > 1) {
     const years = (HOOK ? HO : M.length) / 12, se = Math.sqrt((1 + last.score ** 2 / 2) / years);
@@ -644,7 +646,7 @@ function drawYears() {
   const cells = (o) => years.map((y) => isRef(o) ? `<td style="color:var(--muted)">${o[y].toFixed(1)}</td>` : paint(shown(o, y))).join("");
   const tail = (a, b) => `<td class="sh">${f3(a)}</td>` + (HOOK ? `<td class="sh">${f3(b)}</td>` : ""); // as the run scored them
   const head = `<tr><th class="stick">Version</th>${years.map((y) => `<th${y >= hoYear ? ' style="color:var(--accent)"' : ""}>${y}</th>`).join("")}<th class="sh">${esc(NAME)} in</th>${HOOK ? `<th class="sh">${esc(NAME)} out</th>` : ""}</tr>`;
-  const bench = `<tr class="ref"><td class="stick"><span class="key"><i class="sw" style="color:var(--spy)"></i>${esc(BENCH.name)}</span><span class="sub">bought and held${yearView === "idx" ? " · the reference" : ""}</span></td>${cells(benchY)}${tail(BENCH.in[KEY], BENCH.hoM[KEY])}</tr>`;
+  const bench = `<tr class="ref"><td class="stick"><span class="key"><i class="sw" style="color:var(--spy)"></i>${esc(BENCH.name)}</span><span class="sub">bought and held${yearView === "idx" ? " · the reference" : ""}</span></td>${cells(benchY)}${tail(BENCH.in[BKEY], BENCH.hoM[BKEY])}</tr>`;
   const rows = V.map((v, vi) => { const o = vi === 0 && refY && yearView === "base" ? refY : yearly(v.ret); return `<tr data-round="${v.round}" class="${vi === sel ? "cur" : ""}${vi === 0 ? " ref" : ""}" tabindex="0"><td class="stick"><span class="key"><i class="sw${vi === 0 ? " dash" : ""}" style="color:var(${vi === 0 ? "--base" : "--accent"})"></i>${vi === 0 ? "Baseline" : "Round " + v.round}${vi ? ` <span class="ag">${esc(v.agent)}</span>` : ""}</span><span class="sub">${esc(v.label)}${vi === 0 && yearView === "base" ? " · the reference" : ""}</span></td>${cells(o)}${tail(v.score, v.scoreHo)}</tr>`; }).join("");
   const t = $("#yearTable"); t.innerHTML = head + bench + rows;
   for (const [id, view] of [["#yrRet", "ret"], ["#yrBase", "base"], ["#yrIdx", "idx"]]) { const b = $(id); b.setAttribute("aria-pressed", yearView === view); b.onclick = () => { yearView = view; store("results.years", view); drawYears(); }; }

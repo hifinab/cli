@@ -578,6 +578,21 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.36.2 — Live tokens, how agents are paid for, a model per agent
+
+- [x] `hi agent best-of watch` and `show` read the running boxes' session
+  logs: tokens in and out, steps and the latest step for each box, and the
+  round's tokens so far.
+- [x] The dollars are labelled as what they are: Claude Code's own cost at
+  API prices, which on a subscription is usage, not a bill. hi reads each
+  agent's sign-in (a Claude plan and tier, a ChatGPT plan or an OpenAI API
+  key, OpenRouter for Hermes), shows it per box, and splits billed dollars
+  from subscription usage.
+- [x] `--agents` takes a model per agent, such as
+  `hermes:qwen/qwen3.8-max-0902`, and refuses more agents than boxes.
+- [x] `make results` prints its progress; the report compares a score that
+  isn't `sharpe` with the benchmark's Sharpe.
+
 ### v0.36.1 — Report layout, excess returns, and Makefile notes
 
 - [x] The report's fees, dates and period buttons sit at the top of the
