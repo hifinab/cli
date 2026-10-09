@@ -382,6 +382,10 @@ func startBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout,
 	if err != nil {
 		return err
 	}
+	if len(kinds) > n {
+		return usageError{fmt.Sprintf("--agents names %d agents for %d boxes, so %d of them would never run; ask for %d boxes: hi agent best-of %d …",
+			len(kinds), n, len(kinds)-n, len(kinds), len(kinds))}
+	}
 	if options.model != "" {
 		for _, other := range kinds {
 			if other != kinds[0] {

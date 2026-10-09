@@ -30,6 +30,10 @@ func TestBestOfNeedsACheckAndConfirmation(t *testing.T) {
 	if entries, _ := os.ReadDir(bestOfStateFile()); len(entries) != 0 {
 		t.Fatalf("a run was saved without confirmation: %v", entries)
 	}
+	stderr.Reset()
+	if status := runAgent([]string{"best-of", "2", "--agents", "claude,codex,claude", "--yes", "x"}, strings.NewReader(""), &stdout, &stderr); status != 2 || !strings.Contains(stderr.String(), "3 agents for 2 boxes") {
+		t.Errorf("more agents than boxes: status %d, %q", status, stderr.String())
+	}
 	for _, args := range [][]string{{"best-of", "1", "x"}, {"best-of", "9", "x"}, {"best-of", "2", "--name", "n", "x"}, {"best-of", "2", "--max", "10s", "x"}, {"best-of", "frob"}} {
 		stderr.Reset()
 		if status := runAgent(args, strings.NewReader(""), &stdout, &stderr); status != 2 {
