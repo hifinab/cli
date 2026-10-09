@@ -202,6 +202,7 @@ func TestBestOfLoopFlags(t *testing.T) {
 		{score: "x", lower: true, rounds: "0x", roundsGiven: true},
 		{score: "x", lower: true, within: "10s"},
 		{score: "x", lower: true, budget: "-3"},
+		{then: "make results"}, // --then without --score
 	} {
 		if _, err := parseBestOfLoop(flags); err == nil {
 			t.Errorf("%+v was accepted", flags)
@@ -294,18 +295,32 @@ func TestBestOfRounds(t *testing.T) {
 	t.Cleanup(func() { boxCommand = previousCommand })
 
 	var stdout, stderr bytes.Buffer
-	args := []string{"best-of", "2", "--rounds", "2", "--score", "grep val_bpb run.log", "--lower", "--edit", "train.py", "--yes", "tune it"}
+	args := []string{"best-of", "2", "--rounds", "2", "--score", "grep val_bpb run.log", "--lower", "--edit", "train.py",
+		"--then", `echo "$HI_BEST_OF_RUN $(git rev-parse --abbrev-ref HEAD)" > then.txt`, "--yes", "tune it"}
 	if status := runAgent(args, strings.NewReader(""), &stdout, &stderr); status != 0 {
 		t.Fatalf("status %d: %s %s", status, stdout.String(), stderr.String())
 	}
 	if spawned != "b-1" || !strings.Contains(stdout.String(), "Baseline: 1") {
 		t.Fatalf("spawned %q: %s", spawned, stdout.String())
 	}
-	if err := driveBestOf("b-1", io.Discard); err != nil {
+	var log bytes.Buffer
+	if err := driveBestOf("b-1", &log); err != nil {
 		t.Fatal(err)
 	}
 	run, _ := loadBestOf("b-1")
 	loop := run.Loop
+	// --then ran once, in the project, after the last round, with the run's name.
+	if then, _ := os.ReadFile(filepath.Join(project, "then.txt")); !strings.HasPrefix(string(then), "b-1 ") || !strings.Contains(log.String(), "then done") {
+		t.Fatalf("then.txt %q, log:\n%s", then, log.String())
+	}
+	// Every attempt's files stay reachable, kept or not.
+	refs := strings.Fields(boxGit(project, "for-each-ref", "--format=%(refname)", "refs/best-of/b-1/"))
+	if len(refs) != 4 {
+		t.Fatalf("attempt refs %v", refs)
+	}
+	if cheat := boxGit(project, "show", "refs/best-of/b-1/r1-2:prepare.py"); cheat != "cheat" {
+		t.Fatalf("r1-2's prepare.py %q", cheat)
+	}
 	if loop.State != "done" || loop.Round != 2 || len(loop.History) != 2 || *loop.Best != 0.9 || loop.BestRound != 1 || loop.Spend != 2 {
 		t.Fatalf("loop %+v", loop)
 	}
@@ -343,8 +358,16 @@ func TestBestOfRounds(t *testing.T) {
 	if status := runAgent([]string{"best-of", "resume", "b-1", "--rounds", "1"}, strings.NewReader(""), &stdout, &stderr); status != 0 || spawned != "b-1" {
 		t.Fatalf("resume: %d %q %s", status, spawned, stderr.String())
 	}
-	if run, _ := loadBestOf("b-1"); run.Loop.Rounds != 3 {
-		t.Fatalf("resumed rounds %d", run.Loop.Rounds)
+	if run, _ := loadBestOf("b-1"); run.Loop.Rounds != 3 || run.Loop.Then == "" {
+		t.Fatalf("resumed rounds %d, then %q", run.Loop.Rounds, run.Loop.Then)
+	}
+	stdout.Reset()
+	if status := runAgent([]string{"best-of", "ls", "--json"}, strings.NewReader(""), &stdout, &stderr); status != 0 {
+		t.Fatalf("ls --json: %d %s", status, stderr.String())
+	}
+	var runs []bestOfRun
+	if err := json.Unmarshal(stdout.Bytes(), &runs); err != nil || len(runs) != 1 || runs[0].ID != "b-1" || runs[0].Root != project {
+		t.Fatalf("ls --json %v: %s", err, stdout.String())
 	}
 }
 

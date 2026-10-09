@@ -1,0 +1,3 @@
+# make results: every attempt scored on the holdout. Keep it out of git:
+# boxes start from commits, so agents never see it.
+results/

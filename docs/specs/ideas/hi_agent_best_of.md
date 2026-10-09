@@ -284,6 +284,40 @@ Now: round 9: scoring ml-b7-r9-2 (2 of 4)
 - The guide has an Autoresearch section: how it works, best of n, rounds,
   the templates, and simple and advanced examples.
 
+### Results (2026-10-09)
+
+Asked for after the first long real run (42 rounds on HAA): every number of
+a run in files, and a report that reads them, without a web server.
+
+- `--then "<command>"` runs a command on the host, in the project, once the
+  rounds end for any reason (finished, a limit, `stop`, `stop --now`, or a
+  failure), after the run's state is saved. `HI_BEST_OF_RUN` holds the run;
+  the output goes to `loop.log`. `resume --then` replaces it.
+- hi keeps every attempt's files: when a round ends, each box's snapshot
+  gets a commit under `refs/best-of/<run>/r<round>-<i>`, so git never prunes
+  it and results made later can re-run attempts that weren't kept.
+  `hi agent best-of rm` leaves these refs.
+- `hi agent best-of ls --json` lists the runs, so a script can find the
+  newest run of a project.
+- `autoresearch-quant` has `make results` (and `make loop` passes `--then
+  "make results"`): `results.py` re-runs every attempt from its files with
+  the project's `evaluate.py`, in-sample and on the holdout, and writes
+  `results/<run>/`: `run`, `attempts`, `rounds`, `returns`, and `weights` as
+  Parquet, each attempt's `strategy.py`, hi's JSON, and `report.html`.
+  `results/` is ignored by git, since boxes must never see holdout scores.
+- The report needs no server: a page opened from disk can't `fetch()` the
+  files next to it, so `make results` embeds the Parquet files (base64) and
+  a bundled copy of hyparquet (a small Parquet reader in plain JavaScript,
+  MIT) in `report.html`. DuckDB-Wasm would work too, but it is several
+  megabytes of WebAssembly from a CDN for tables of a few hundred kilobytes.
+  Served over HTTP, the same page reads the Parquet files beside it.
+- The report: the score of every attempt with the best so far and its
+  holdout score, the growth of $1 with a synced drawdown chart for each
+  round against the baseline and a benchmark (one round at a time or all at
+  once), one small chart per kept version, returns by year for every
+  version, computed facts, and the attempt log. Each re-run score is
+  compared with what hi recorded.
+
 ## Releases
 
 1. `best-of`, `ls`, `show`, `keep` with local boxes, the check run by hi, the

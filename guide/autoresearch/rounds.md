@@ -165,6 +165,23 @@ else (a model's quality, a strategy's future returns).
 - **Prefer simple changes.** Tell agents so in the task; a small gain from
   a lot of code is usually noise that fits.
 
+## When a run ends
+
+`--then "<command>"` runs a command on your machine, in the project, when
+the rounds end for any reason: the last round, a limit, `stop`, `stop
+--now`, or a failure. `HI_BEST_OF_RUN` holds the run's name, and the output
+goes to the run's log. The templates use it to write their
+[results](/guide/autoresearch/templates/#results):
+
+```sh
+hi agent best-of 3 --rounds 40 --score "make score" --higher --edit strategy.py \
+  --then "make results" program.md
+```
+
+hi keeps every attempt's files, kept or not, under
+`refs/best-of/<run>/`, so a command run later can still read them:
+`git show refs/best-of/b-7/r3-2:train.py`.
+
 ## After a run
 
 ```sh

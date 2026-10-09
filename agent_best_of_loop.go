@@ -36,6 +36,8 @@ type bestOfLoop struct {
 	Edit     []string  `json:"edit,omitempty"`
 	Branch   string    `json:"branch"`
 	ScoreMax int       `json:"score_max_seconds,omitempty"`
+	// Then runs on the host, in the project, when the rounds end.
+	Then string `json:"then,omitempty"`
 
 	Baseline   *float64 `json:"baseline,omitempty"`
 	Best       *float64 `json:"best,omitempty"`
@@ -100,15 +102,15 @@ var (
 func parseBestOfLoop(flags bestOfFlags) (*bestOfLoop, error) {
 	if flags.score == "" {
 		if flags.roundsGiven || flags.within != "" || flags.budget != "" || flags.patience != "" || flags.minGain != "" ||
-			len(flags.edit) > 0 || flags.lower || flags.higher {
-			return nil, usageError{`--rounds, --for, --budget, --patience, --min-gain, --edit, --lower, and --higher go with --score "<command>"`}
+			len(flags.edit) > 0 || flags.lower || flags.higher || flags.then != "" {
+			return nil, usageError{`--rounds, --for, --budget, --patience, --min-gain, --edit, --then, --lower, and --higher go with --score "<command>"`}
 		}
 		return nil, nil
 	}
 	if flags.lower == flags.higher {
 		return nil, usageError{"say which score is better: --lower or --higher"}
 	}
-	loop := &bestOfLoop{Lower: flags.lower, Rounds: 1, Edit: flags.edit, History: []bestOfRound{}}
+	loop := &bestOfLoop{Lower: flags.lower, Rounds: 1, Edit: flags.edit, Then: flags.then, History: []bestOfRound{}}
 	if err := loop.applyLimits(flags, 0, 0); err != nil {
 		return nil, err
 	}
@@ -346,7 +348,9 @@ func driveBestOf(id string, log io.Writer) error {
 	finish := func(state, reason string) error {
 		loop.State, loop.Reason, loop.PID, loop.Phase = state, reason, 0, ""
 		fmt.Fprintf(log, "%s: %s: %s\n", time.Now().Format(time.DateTime), state, reason)
-		return saveBestOf(&run)
+		err := saveBestOf(&run)
+		runBestOfThen(run, log)
+		return err
 	}
 	for {
 		if len(run.Boxes) == 0 {
@@ -367,6 +371,24 @@ func driveBestOf(id string, log io.Writer) error {
 			return finish("stopped", "stopped with --now")
 		}
 	}
+}
+
+// runBestOfThen runs --then once the rounds have ended and the run is saved,
+// so the command sees the final state: on this machine, in the project.
+func runBestOfThen(run bestOfRun, log io.Writer) {
+	if run.Loop == nil || strings.TrimSpace(run.Loop.Then) == "" {
+		return
+	}
+	fmt.Fprintf(log, "%s: then: %s\n", time.Now().Format(time.DateTime), run.Loop.Then)
+	command := exec.Command("sh", "-c", run.Loop.Then)
+	command.Dir = run.Root
+	command.Env = append(os.Environ(), "HI_BEST_OF_RUN="+run.ID)
+	command.Stdin, command.Stdout, command.Stderr = nil, log, log
+	if err := command.Run(); err != nil {
+		fmt.Fprintf(log, "%s: then failed: %v\n", time.Now().Format(time.DateTime), err)
+		return
+	}
+	fmt.Fprintf(log, "%s: then done\n", time.Now().Format(time.DateTime))
 }
 
 // bestOfShouldStop is why no new round starts, if there is a reason.
@@ -621,6 +643,7 @@ func settleBestOfRound(run *bestOfRun, log io.Writer) error {
 			winner = box
 		}
 	}
+	keepBestOfAttempts(*run)
 	round := bestOfRound{Round: loop.Round, Started: loop.RoundStarted, Ended: time.Now().UTC(), Result: "crash", Before: loop.Best}
 	if scored {
 		// Every box that worked left the files as they were.
@@ -702,6 +725,21 @@ func bestOfDiscardRound(run *bestOfRun, result string) {
 	saveBestOf(run)
 }
 
+// keepBestOfAttempts gives every box's snapshot a commit under
+// refs/best-of/<run>/, so git never prunes an attempt's files: results made
+// later (make results) can read every attempt, not only the kept ones.
+func keepBestOfAttempts(run bestOfRun) {
+	for _, box := range run.Boxes {
+		if box.Snapshot == "" || !strings.HasPrefix(box.Branch, "best-of/") {
+			continue
+		}
+		message := fmt.Sprintf("best-of %s attempt %s (%s): %s\n", run.ID, box.Name, box.Agent, firstNonEmpty(box.Idea, "no summary"))
+		if commit, err := bestOfCommitTree(run.Root, box.Snapshot, run.Loop.Tip, message); err == nil {
+			boxGit(run.Root, "update-ref", "refs/"+box.Branch, commit)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // stop and resume
 
@@ -746,7 +784,7 @@ func stopBestOf(options boxOptions, now bool, stdout io.Writer) error {
 
 func resumeBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout io.Writer) error {
 	if len(options.words) != 2 {
-		return usageError{"usage: hi agent best-of resume <run> [--rounds n] [--for duration] [--budget dollars] [--patience n]"}
+		return usageError{"usage: hi agent best-of resume <run> [--rounds n] [--for duration] [--budget dollars] [--patience n] [--then command]"}
 	}
 	run, err := loadBestOf(options.words[1])
 	if err != nil {
@@ -761,6 +799,9 @@ func resumeBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout
 	}
 	if err := loop.applyLimits(flags, loop.Round, loop.Spend); err != nil {
 		return err
+	}
+	if flags.then != "" {
+		loop.Then = flags.then
 	}
 	os.Remove(bestOfStateFile(run.ID, "stop"))
 	if state, reason := bestOfShouldStop(run); reason != "" && len(run.Boxes) == 0 {
@@ -809,6 +850,9 @@ func bestOfLoopView(run bestOfRun, width, rows int) string {
 		direction = "higher is better"
 	}
 	fmt.Fprintf(&b, "Score: %s (%s)\n", run.Score, direction)
+	if loop.Then != "" {
+		fmt.Fprintf(&b, "Then: %s, when the rounds end\n", loop.Then)
+	}
 	if loop.Best != nil {
 		line := "Best: " + formatScore(*loop.Best)
 		if loop.BestRound > 0 {

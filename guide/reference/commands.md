@@ -212,7 +212,7 @@ need `yes` typed. See [Ask for a command](/guide/q/).
 | `hi agent claude\|codex`                 | An interactive session in a box, without permission prompts |
 | `hi agent wait <name> [--json]`          | Wait for a run and print its report                      |
 | `hi agent best-of <n> "<task>"`          | The same task in n boxes (2 to 8) at once; hi checks each and ranks them |
-| `hi agent best-of ls`                    | Best-of runs and their state                             |
+| `hi agent best-of ls [--json]`           | Best-of runs and their state                             |
 | `hi agent best-of show <run> [--full]`   | The table again; `--full` adds each box's diff           |
 | `hi agent best-of keep <run> <box>`      | Keep one box and its branch, remove the others           |
 | `hi agent best-of rm <run>`              | Remove every box of a run and its branches               |
@@ -235,7 +235,8 @@ options below. A brief's front matter can set `agent`, `model`, `bundles`,
 "<command>"` (default: `make check`), `--max <duration>` per agent, and
 `--yes` to start without asking; it exits with 1 when no box passed. With
 rounds: `--for <duration>`, `--budget <dollars>`, `--patience <n>`,
-`--min-gain <number>`, and `--edit a,b` for the files an agent may change.
+`--min-gain <number>`, `--edit a,b` for the files an agent may change, and
+`--then "<command>"`, run on this machine when the rounds end.
 See [Autoresearch](/guide/autoresearch/).
 
 ## hi box

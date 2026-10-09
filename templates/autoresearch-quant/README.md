@@ -11,12 +11,14 @@ beats the best so far, and commits it.
 | `prepare.py` | which prices, from when, and where the holdout starts |
 | `eval/prices.csv` | the frozen in-sample prices (`make data` writes them) |
 | `program.md` | the task the agents get |
+| `results.py`, `report/` | `make results`: every attempt re-run into `results/<run>/`, with `report.html` |
 
 ```sh
 make data       # download the prices, keep the holdout outside the repo
 make score      # the in-sample Sharpe of the example strategy
 git add -A && git commit -m "Prices and baseline"
 make loop       # rounds in the background; hi agent best-of watch b-1
+make results    # every attempt re-run: results/<run>/report.html (make loop runs it at the end)
 make holdout    # once, at the end, on the gains' branch
 ```
 
@@ -34,6 +36,11 @@ make holdout    # once, at the end, on the gains' branch
   round, rounds, budget, `--edit strategy.py`.
 
 ## After a run
+
+`make loop` ends with `make results`; after a run that stopped early, run it
+yourself. `results/<run>/report.html` opens from disk and shows every
+attempt, the growth and drawdown of each round against the baseline and
+SPY, and returns by year. The numbers are in Parquet files next to it.
 
 The gains are commits on `best-of/<run>/best`. Check them on the holdout
 before you merge:

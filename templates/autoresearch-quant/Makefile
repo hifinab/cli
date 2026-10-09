@@ -34,7 +34,7 @@ test: ## Tests only
 # hi:end
 
 # Project targets below.
-.PHONY: score holdout data loop
+.PHONY: score holdout data loop results
 
 HOLDOUT ?= ../$(notdir $(CURDIR))-holdout/prices.csv
 BOXES ?= 3
@@ -51,6 +51,10 @@ holdout: ## The score after prepare.SPLIT, from outside the repository; once, at
 data: ## Download the prices: eval/ in the repository, the holdout outside it
 	uv run --frozen --group data python prepare.py
 
-loop: ## Rounds in the background: BOXES a round, up to ROUNDS, BUDGET dollars
+loop: ## Rounds in the background: BOXES a round, up to ROUNDS, BUDGET dollars; results/ at the end
 	hi agent best-of $(BOXES) --rounds $(ROUNDS) --budget $(BUDGET) --patience 10 --max 20m \
-	  --score "make score" --higher --edit strategy.py program.md
+	  --score "make score" --higher --edit strategy.py --then "make results" program.md
+
+results: ## Every attempt of the newest run (or ID=b-2), re-run, in results/<run>/ with report.html
+	@test -z "$(HI_BOX)" || { echo "results stay outside boxes: they hold holdout scores"; exit 1; }
+	@$(RUN) python results.py $(if $(ID),--run $(ID)) --holdout $(HOLDOUT)

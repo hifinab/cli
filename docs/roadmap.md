@@ -946,11 +946,14 @@ a fuller, tested suite it can start from. No spec yet: write one in
   daily as well as monthly rebalancing, long and short, slippage and fees
   per asset, a benchmark, cash and leverage limits, and tests against an
   independent implementation like today's.
-- [ ] Result presentation: a report per run (`make report`) with the equity
-  curve, drawdowns, a table per year, turnover, and the benchmark; for
+- [ ] Result presentation: a report per run with the equity curve,
+  drawdowns, a table per year, turnover, and the benchmark; for
   `autoresearch-ml`, the loss curves. A chart of the score round by round,
   with the kept ideas, from `hi agent best-of show --json`. The holdout
-  next to the in-sample score, measured once.
+  next to the in-sample score. Done for `autoresearch-quant` (not
+  released yet): `make results` writes every attempt to Parquet and an
+  offline `report.html`, and `make loop` runs it through `--then`.
+  Spec: [hi_agent_best_of.md, Results](specs/ideas/hi_agent_best_of.md#results-2026-10-09).
 - [ ] More: cross-validation and several seeds for `autoresearch-ml`, data
   sources beyond Yahoo Finance and one text file, and a record of every
   holdout look so a holdout spent is visible.

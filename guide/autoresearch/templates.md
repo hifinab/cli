@@ -28,7 +28,7 @@ hi init autoresearch-quant momentum    # find a better trading strategy, net of 
 | `../<folder>-holdout/` | the data after the split, outside the repository | never seen by boxes |
 | `program.md` | the task agents read each round | yours to write before |
 | `.devcontainer/` | the box image: the locked dependencies, built once | rebuilt when `uv.lock` changes |
-| `Makefile` | `data`, `score`, `holdout`, `loop`, `check` | |
+| `Makefile` | `data`, `score`, `holdout`, `loop`, `check`, and `results` (quant) | |
 
 Three things make the evaluation trustworthy:
 
@@ -63,6 +63,47 @@ hi agent best-of watch b-1
 
 `hi init` installs the dependencies (`make sync` or `uv sync`). The loop
 needs a commit: boxes start from it.
+
+## Results
+
+In `autoresearch-quant`, `make loop` ends with `make results`, and you can
+run it yourself after a run that stopped early: it covers every round that
+finished.
+
+```sh
+make results           # the newest run of this project
+make results ID=b-2    # another run
+make results HOLDOUT=none   # without the holdout
+```
+
+It re-runs every attempt from its files with your `evaluate.py`, in-sample
+and on the holdout, checks each score against what hi recorded, and writes
+`results/<run>/`:
+
+| File | Holds |
+|---|---|
+| `report.html` | the report; open it from disk, no server needed |
+| `attempts.parquet` | one row per attempt: agent, result, idea, and every metric in-sample and on the holdout |
+| `returns.parquet` | each attempt's net monthly returns, and the benchmark's (attempt -1) |
+| `weights.parquet` | the weights each attempt held each month |
+| `rounds.parquet`, `run.parquet` | each round, and the run with its limits |
+| `strategies/` | `strategy.py` as each attempt left it |
+| `run.json` | `hi agent best-of show --json`, as it was |
+
+The report charts the score of every attempt with the best so far, the
+growth of $1 and the drawdown of each round against the baseline and the
+benchmark (`BENCHMARK` in `results.py`), one chart per kept version, and
+returns by year. A page opened from disk can't read the files next to it,
+so `make results` puts the Parquet tables and a small Parquet reader inside
+`report.html`; the same tables are there for DuckDB, pandas, or polars:
+
+```sh
+duckdb -c "select round, agent, result, is_sharpe, ho_sharpe from 'results/b-1/attempts.parquet'"
+```
+
+`results/` stays out of git: it holds holdout scores, and boxes start from
+commits, so agents never see them. Scoring every attempt on the holdout
+spends it; read those columns as a check on the loop, not to pick a version.
 
 ## Adapt it before a run
 

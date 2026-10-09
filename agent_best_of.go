@@ -146,7 +146,7 @@ func bestOfStateFile(parts ...string) string {
 type bestOfFlags struct {
 	agents, check, limit, score      string
 	rounds, within, budget, patience string
-	minGain                          string
+	minGain, then                    string
 	edit                             []string
 	lower, higher, now, roundsGiven  bool
 }
@@ -201,6 +201,11 @@ func runBestOf(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			flags.patience = value()
 		case is("--min-gain"):
 			flags.minGain = value()
+		case is("--then"):
+			if flags.then = value(); strings.TrimSpace(flags.then) == "" {
+				fmt.Fprintln(stderr, `hi: --then needs a command, such as --then "make results"`)
+				return 2
+			}
 		case is("--edit"):
 			for _, path := range strings.Split(value(), ",") {
 				if path = strings.TrimPrefix(strings.TrimSpace(path), "./"); path != "" {
@@ -232,7 +237,7 @@ func runBestOf(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	switch command {
 	case "ls":
-		return exitCode(listBestOf(stdout), stderr)
+		return exitCode(listBestOf(options, stdout), stderr)
 	case "show":
 		return exitCode(showBestOf(options, stdout), stderr)
 	case "keep":
@@ -265,7 +270,7 @@ With --score it runs rounds, and keeps a result only when it beats the best so f
 usage:
   hi agent best-of <n> "<task>"     start n boxes (2 to 8) on the same task and wait for the table
   hi agent best-of <n> <brief.md>   the task is the file's contents; - reads it from stdin
-  hi agent best-of ls               runs, their boxes, and their state
+  hi agent best-of ls [--json]      runs, their boxes, and their state
   hi agent best-of show <run> [--full]
                                     the table again; --full adds each box's diff
   hi agent best-of keep <run> <box> keep one box and its branch, remove the others
@@ -293,10 +298,13 @@ rounds (n can be 1):
   --min-gain <number>    a smaller gain is noise (default: any gain counts)
   --edit a,b             the files and folders an agent may change; anything else
                          disqualifies its result
+  --then "<command>"     run it on this machine, in the project, when the rounds end
+                         for any reason; HI_BEST_OF_RUN holds the run, the output
+                         goes to the run's log
   hi agent best-of watch <run>      follow a run; q leaves the view, the run goes on
   hi agent best-of stop <run> [--now]
                                     stop after this round; --now stops the boxes too
-  hi agent best-of resume <run> [--rounds n] [--for d] [--budget $]
+  hi agent best-of resume <run> [--rounds n] [--for d] [--budget $] [--then cmd]
                                     go on from the best so far
 
 Each box works on its own branch, best-of/<run>/<i>, from your last commit.
@@ -1236,13 +1244,19 @@ func printBestOfJSON(run bestOfRun, stdout io.Writer) error {
 // ---------------------------------------------------------------------------
 // ls, show, keep, and rm
 
-func listBestOf(stdout io.Writer) error {
+func listBestOf(options boxOptions, stdout io.Writer) error {
 	entries, _ := os.ReadDir(bestOfStateFile())
-	var runs []bestOfRun
+	runs := []bestOfRun{}
 	for _, entry := range entries {
 		if run, err := loadBestOf(entry.Name()); err == nil {
 			runs = append(runs, run)
 		}
+	}
+	if options.json {
+		sort.Slice(runs, func(i, j int) bool { return runs[i].Created.After(runs[j].Created) })
+		encoder := json.NewEncoder(stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(runs)
 	}
 	if len(runs) == 0 {
 		fmt.Fprintln(stdout, `No best-of runs. Start one with hi agent best-of 3 "<task>".`)
