@@ -16,8 +16,18 @@ its ticker's fee (FEES, or FEE) of the value traded; shorts, when allowed,
 pay BORROW a year. The first WARMUP months only build history and aren't
 scored.
 
-The last line printed is the score: sharpe, with RF as the risk-free rate,
-net of fees.
+The last line printed is the score, SCORE, net of fees, with RF as the
+risk-free rate. Each is a Sharpe ratio, and every score prints all of them:
+
+    sharpe        the whole in-sample period, from one start
+    worst_period  the lowest of the PERIODS equal blocks of the period
+    median_start  the median over start sets: a start at every month that
+                  leaves MIN_YEARS or more
+    tranches      the strategy held as len(TRANCHES) tranches, each
+                  rebalancing that many trading days before the period's end
+
+sharpe rewards fitting one stretch of history; the other three must hold
+across stretches, starts, or rebalance days. make robust shows more.
 """
 
 import argparse
@@ -27,6 +37,7 @@ import re
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from itertools import pairwise
 
 import numpy as np
 import pandas as pd
@@ -46,6 +57,12 @@ MAX_GROSS = 1.0  # the sum of the weights' sizes, longs and shorts
 MAX_NET = 1.0  # the sum of the weights, shorts counted negative
 BORROW = 0.0  # a year, of the value shorted
 PERIODS_PER_YEAR = {"M": 12, "W": 52, "D": 252}
+
+SCORE = "sharpe"  # or worst_period, median_start, tranches: what make score prints last
+SCORES = ["sharpe", "worst_period", "median_start", "tranches"]
+PERIODS = 3  # equal blocks for worst_period
+MIN_YEARS = 3  # the shortest start set
+TRANCHES = (0, 5, 10, 15)  # trading days before each period's end
 
 Allocate = Callable[[pd.DataFrame], Mapping[str, float] | pd.Series | None]
 
@@ -271,14 +288,61 @@ def metrics(returns: pd.Series, held: pd.DataFrame) -> dict[str, float]:
     }
 
 
+def sharpe(returns: pd.Series) -> float:
+    """The Sharpe ratio, or NaN for a stretch without risk."""
+    per_year = periods_per_year(pd.PeriodIndex(returns.index))
+    volatility = float(returns.std()) * math.sqrt(per_year)
+    if len(returns) < 2 or not volatility > 0:
+        return math.nan
+    cagr = float(np.prod(1 + returns.to_numpy())) ** (per_year / len(returns)) - 1
+    return (cagr - RF) / volatility
+
+
+def period_sharpes(window: pd.Series, periods: int = PERIODS) -> list[float]:
+    """The Sharpe of each of periods equal blocks of the window."""
+    bounds = np.linspace(0, len(window), periods + 1).round().astype(int)
+    return [sharpe(window.iloc[a:b]) for a, b in pairwise(bounds)]
+
+
+def start_positions(index: pd.PeriodIndex, min_years: float = MIN_YEARS) -> list[int]:
+    """The first period of each month that leaves min_years or more to the end."""
+    months = index.asfreq("M", "E")
+    firsts = np.flatnonzero(~months.duplicated(keep="first"))
+    left = len(index) - firsts
+    return [int(i) for i in firsts[left >= min_years * periods_per_year(index)]]
+
+
+def start_sharpes(window: pd.Series, min_years: float = MIN_YEARS) -> pd.Series:
+    """The Sharpe from each start set to the window's end, by start."""
+    index = pd.PeriodIndex(window.index)
+    starts = start_positions(index, min_years)
+    return pd.Series([sharpe(window.iloc[i:]) for i in starts], index=index[starts], dtype=float)
+
+
+def tranche_returns(prices: pd.DataFrame, allocate: Allocate) -> pd.DataFrame:
+    """Net returns of each tranche, one column per offset; a daily strategy has one."""
+    offsets = (0,) if REBALANCE == "D" else TRANCHES
+    paths = {offset: simulate(prices, allocate, offset=offset).net for offset in offsets}
+    return pd.DataFrame(paths)
+
+
 def score(prices: pd.DataFrame, allocate: Allocate, holdout: bool = False) -> dict[str, object]:
-    returns, held = backtest(prices, allocate)
+    tranches = tranche_returns(prices, allocate)
+    path = simulate(prices, allocate)
+    returns, held = path.net, path.held
     index = pd.PeriodIndex(returns.index)
     window = returns.loc[holdout_periods(index) if holdout else scored(index)]
     if len(window) < periods_per_year(index):
         raise EvaluationError(f"only {len(window)} periods to score; a score needs a year or more")
     result: dict[str, object] = dict(metrics(window, held.loc[window.index]))
     result["period"] = f"{label(window.index[0])} to {label(window.index[-1])}"
+    starts = start_sharpes(window).dropna()
+    result["worst_period"] = min(period_sharpes(window))
+    result["median_start"] = float(starts.median()) if len(starts) else result["sharpe"]
+    result["tranches"] = sharpe(tranches.loc[window.index].mean(axis=1))
+    for key in SCORES:
+        if not math.isfinite(float(result[key])):  # type: ignore[arg-type]
+            raise EvaluationError(f"{key} has no value: a stretch of the period took no risk")
     return result
 
 
@@ -299,7 +363,8 @@ def main() -> None:
     print(f"period:            {result['period']} ({result['months']} months{kind})")
     for key in ("cagr_pct", "ann_vol_pct", "max_drawdown_pct", "turnover_per_year"):
         print(f"{key + ':':<19}{result[key]:.2f}")
-    print(f"sharpe:            {result['sharpe']:.6f}")
+    for key in [key for key in SCORES if key != SCORE] + [SCORE]:
+        print(f"{key + ':':<19}{result[key]:.6f}")
 
 
 if __name__ == "__main__":

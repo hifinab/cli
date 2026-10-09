@@ -34,15 +34,18 @@ test: ## Tests only
 # hi:end
 
 # Project targets below.
-.PHONY: score holdout data loop results
+.PHONY: score robust holdout data loop results
 
 HOLDOUT ?= ../$(notdir $(CURDIR))-holdout/prices.csv
 BOXES ?= 3
 ROUNDS ?= 20
 BUDGET ?= 20
 
-score: ## The in-sample score; its last line is the number the loop improves
+score: ## The in-sample scores; the last line (evaluate.SCORE) is the number the loop improves
 	@$(RUN) python evaluate.py
+
+robust: ## How much of the score is luck: start sets, tranches, costs, neighbours, placebo
+	@$(RUN) python robust.py
 
 holdout: ## The score after prepare.SPLIT, from outside the repository; once, at the end
 	@test -z "$(HI_BOX)" || { echo "the holdout stays outside boxes"; exit 1; }

@@ -51,10 +51,10 @@ from prepare import EVAL, HOLDOUT, SPLIT, TICKERS
 HERE = Path(__file__).resolve().parent
 REPORT = HERE / "report"
 BENCHMARK = evaluate.BENCHMARK
-SCORE_KEY = "sharpe"  # the key of evaluate.score() that make score prints last
+SCORE_KEY = evaluate.SCORE  # what make score prints last
 ROUND_COLUMNS = ["round", "result", "started", "ended", "spend_usd", "best_before", "score"]
 ROUND_COLUMNS += ["winner", "agent", "idea", "commit"]
-METRICS = ["cagr_pct", "ann_vol_pct", "max_drawdown_pct", "turnover_per_year", "sharpe"]
+METRICS = ["cagr_pct", "ann_vol_pct", "max_drawdown_pct", "turnover_per_year", *evaluate.SCORES]
 
 Run = dict[str, Any]
 

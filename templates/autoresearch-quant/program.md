@@ -3,9 +3,16 @@
 You are improving a monthly asset allocation strategy. The current rules
 are in `strategy.py`.
 
-**The goal is the highest Sharpe ratio** that `make score` prints on its
-last line: the in-sample period in `eval/prices.csv`, net of fees. It takes
-seconds; run it as often as you like.
+**The goal is the highest score** that `make score` prints on its last
+line: a Sharpe ratio on the in-sample period in `eval/prices.csv`, net of
+fees. The lines above it are the other Sharpe ratios `evaluate.py` knows:
+the worst of three periods, the median over start dates, and the strategy
+rebalanced on four different days. It takes seconds; run it as often as you
+like.
+
+`make robust` shows how much of a score is luck: start dates, rebalance
+days, costs, each constant's neighbours, and random portfolios. Use it
+before you settle on an idea.
 
 ## What you can change
 
@@ -30,7 +37,9 @@ volatility, by momentum), volatility targeting, holding cash.
 economic reason (trend, risk parity, a crash signal) carries over; a
 constant tuned to the second decimal to fit the in-sample years doesn't, and
 will do worse on the later data than the original rules. Prefer few, round
-parameters (3, 6, 12 months; 4 assets) over fitted ones.
+parameters (3, 6, 12 months; 4 assets) over fitted ones. A setting whose
+neighbours in `make robust` score much lower is a fitted one; a gain that
+appears on one rebalance day and not the others is luck.
 
 **Simpler is better.** A small gain that adds a lot of code isn't worth
 it; the same Sharpe with fewer rules is a gain. Turnover costs real money in
