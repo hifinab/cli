@@ -578,6 +578,15 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.36.1 — Report layout, excess returns, and Makefile notes
+
+- [x] The report's fees, dates and period buttons sit at the top of the
+  P&L panel; the per-version small multiples are gone, so a long run keeps
+  a short page; returns by year get tabs for the excess return over the
+  baseline and over the index.
+- [x] `hi init --update` notes template changes outside a managed file's hi
+  block, such as a new Makefile target, in `docs/upgrades`.
+
 ### v0.36.0 — A research suite for `autoresearch-quant`
 
 Asked for on 2026-10-09, after run b-3 raised the in-sample Sharpe from 0.86
