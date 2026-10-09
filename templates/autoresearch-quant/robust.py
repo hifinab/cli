@@ -37,6 +37,7 @@ import numpy as np
 import pandas as pd
 
 import evaluate
+import regimes
 from prepare import EVAL, TICKERS
 
 COSTS = (0.0, 1.0, 2.0, 5.0)  # multiples of the fees
@@ -282,6 +283,9 @@ def run(source: str, prices: pd.DataFrame, slow: bool = True) -> Result:
         "end_windows": end_windows(window, bench),
         "periods": periods(window),
         "costs": costs(path, window_index, bench),
+        "regimes": regimes.by_state(window, bench, regimes.labels(prices, window_index)).to_dict(
+            "records"
+        ),
     }
     spread = result["tranches"]["std"]
     result["min_gain"] = max(0.01, math.ceil(spread * 100 - 1e-9) / 100)
@@ -330,7 +334,17 @@ def show(result: Result) -> None:
             f"{p['invested']:.0%} invested: median {p['median_sharpe']:.3f}, 95th percentile "
             f"{p['p95_sharpe']:.3f}; the strategy beats {p['percentile']:.0f}%"
         )
-    print(f"noise        --min-gain {result['min_gain']:.2f}")
+    for model, names in regimes.MODELS.items():
+        rows = [r for r in result["regimes"] if r["model"] == model]
+        cells = ", ".join(
+            f"{r['state']} {r['ann_return_pct']:+.1f}% vs {r['bench_ann_return_pct']:+.1f}%"
+            for r in rows
+        )
+        print(f"regimes      {model}: {cells} a year ({len(names)} states)")
+    print(
+        f"noise        --min-gain {result['min_gain']:.2f}: the Sharpe moves this much with the "
+        'rebalance day alone; or set SCORE = "tranches" in evaluate.py to average it out'
+    )
 
 
 def main() -> None:

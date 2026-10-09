@@ -17,9 +17,16 @@ results/<run>/
                        what, the score hi recorded, and every metric re-run
                        in-sample and on the holdout
   rounds.parquet       one row per round
-  returns.parquet      each attempt's net monthly returns, and the benchmark's
+  returns.parquet      each attempt's monthly returns, net and gross, with the
+                       fees and borrow between them, and the benchmark's
                        (attempt -1), from the first scored month on
   weights.parquet      the weights each attempt held each month
+  robust.parquet       make robust's checks, in-sample, for the baseline and
+                       every kept version (JSON); sensitivity and the placebo
+                       for the baseline and the best only
+  regimes.parquet      each month's market regime (regimes.py)
+  capacity.parquet     how much money the baseline and the best could run,
+                       from daily volume (when make data saved it)
   strategies/<name>.py strategy.py as each attempt left it
   run.json             hi agent best-of show <run> --json, as it was
 
@@ -46,7 +53,9 @@ from typing import Any
 import pandas as pd
 
 import evaluate
-from prepare import EVAL, HOLDOUT, SPLIT, TICKERS
+import regimes
+import robust
+from prepare import EVAL, HOLDOUT, SPLIT, TICKERS, volume_path
 
 HERE = Path(__file__).resolve().parent
 REPORT = HERE / "report"
@@ -54,6 +63,9 @@ BENCHMARK = evaluate.BENCHMARK
 SCORE_KEY = evaluate.SCORE  # what make score prints last
 ROUND_COLUMNS = ["round", "result", "started", "ended", "spend_usd", "best_before", "score"]
 ROUND_COLUMNS += ["winner", "agent", "idea", "commit"]
+PARTICIPATION = 0.01  # the share of a day's dollar volume a position may take
+CAPACITY_COLUMNS = ["ticker", "months_held", "avg_weight", "max_weight"]
+CAPACITY_COLUMNS += ["median_dollar_volume", "capacity_usd", "worst_usd", "worst_month"]
 METRICS = ["cagr_pct", "ann_vol_pct", "max_drawdown_pct", "turnover_per_year", *evaluate.SCORES]
 
 Run = dict[str, Any]
@@ -173,8 +185,35 @@ def _init(in_sample: pd.DataFrame, full: pd.DataFrame | None) -> None:
     _PRICES["in"], _PRICES["full"] = in_sample, full
 
 
-def run_source(source: str) -> Run:
-    """Score one strategy.py: in-sample, on the holdout, and its monthly path."""
+def monthly(path: evaluate.Path) -> pd.DataFrame:
+    """A path's returns by calendar month, whatever it rebalances on."""
+    frame = pd.DataFrame(
+        {"net": path.net, "gross": path.gross, "borrow": path.borrow, "traded": path.traded}
+    )
+    months = pd.PeriodIndex(frame.index).asfreq("M", "E")
+    grouped = frame.groupby(months)
+    out = pd.DataFrame(
+        {
+            "net": grouped["net"].apply(lambda r: float((1 + r).prod() - 1)),
+            "gross": grouped["gross"].apply(lambda r: float((1 + r).prod() - 1)),
+            "borrow": grouped["borrow"].sum(),
+            "traded": grouped["traded"].sum(),
+        }
+    )
+    # What the fees took, so that net = gross - fees - borrow holds each month.
+    out["fees"] = out["gross"] - out["net"] - out["borrow"]
+    return out
+
+
+def monthly_weights(held: pd.DataFrame) -> pd.DataFrame:
+    """The weights held through each month: the average over its periods."""
+    return held.groupby(pd.PeriodIndex(held.index).asfreq("M", "E")).mean()
+
+
+def run_source(task: tuple[str, str]) -> Run:
+    """Score one strategy.py: in-sample, on the holdout, its monthly path, and,
+    for a version (checks "fast" or "slow"), make robust's checks in-sample."""
+    source, checks = task
     try:
         evaluate.check_source(source)
         module = types.ModuleType("attempt")
@@ -187,13 +226,54 @@ def run_source(source: str) -> Run:
         path_prices = in_sample if full is None else full
         if full is not None:
             out["out"] = evaluate.score(full, allocate, holdout=True)
-        returns, held = evaluate.backtest(path_prices, allocate)
-        window = evaluate.scored(pd.PeriodIndex(returns.index))
-        out["returns"] = returns.loc[window]
-        out["held"] = held.loc[window]
+        path = evaluate.simulate(path_prices, allocate)
+        window = evaluate.scored(pd.PeriodIndex(path.net.index))
+        months = monthly(path).loc[lambda f: f.index >= window[0].asfreq("M", "E")]
+        out["months"] = months
+        out["held"] = monthly_weights(path.held.loc[window]).loc[months.index]
+        if checks != "none":
+            out["robust"] = robust.run(source, in_sample, slow=checks == "slow")
         return out
     except Exception as error:  # any failure belongs to the attempt, not to make results
         return {"error": f"{type(error).__name__}: {error}"}
+
+
+def capacity(held: pd.DataFrame, prices: pd.DataFrame, volume: pd.DataFrame) -> pd.DataFrame:
+    """Per ticker held: the fund size at which its position reaches PARTICIPATION
+    of a day's dollar volume (the median of the 63 days before), over its last
+    12 months held, and at its worst month (often when a fund was new)."""
+    dollars = (prices * volume).rolling(63, min_periods=21).median()
+    month_end = dollars.groupby(pd.DatetimeIndex(dollars.index).to_period("M")).last()
+    adv = month_end.shift(1).reindex(held.index)  # known when the month's weights were set
+    rows = []
+    for ticker in held.columns:
+        weights = held[ticker].abs()
+        mask = weights > 1e-6
+        if not mask.any() or ticker not in adv:
+            continue
+        limit = (PARTICIPATION * adv.loc[mask, ticker] / weights[mask]).dropna()
+        if limit.empty:
+            continue
+        rows.append(
+            {
+                "ticker": ticker,
+                "months_held": int(mask.sum()),
+                "avg_weight": float(weights[mask].mean()),
+                "max_weight": float(weights.max()),
+                "median_dollar_volume": float(adv.loc[mask, ticker].median()),
+                "capacity_usd": float(limit.iloc[-12:].min()),
+                "worst_usd": float(limit.min()),
+                "worst_month": str(limit.idxmin()),
+            }
+        )
+    return pd.DataFrame(rows, columns=CAPACITY_COLUMNS)
+
+
+def load_volume(prices_path: Path) -> pd.DataFrame | None:
+    path = volume_path(prices_path)
+    if not path.exists():
+        return None
+    return pd.read_csv(path, index_col=0, parse_dates=True).reindex(columns=TICKERS)
 
 
 def benchmark_returns(prices: pd.DataFrame, months: pd.PeriodIndex) -> pd.Series:
@@ -222,6 +302,7 @@ def build(
     full: pd.DataFrame | None,
     read_source: Callable[[str | list[str]], str | None] = git_source,
     workers: int | None = None,
+    volume: pd.DataFrame | None = None,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
     """The tables, and each attempt's strategy.py by attempt name."""
     attempts = attempts_of(run)
@@ -234,18 +315,25 @@ def build(
             sha = hashlib.sha256(source.encode()).hexdigest()[:12]
             sources[attempt["name"]], by_hash[sha], attempt["source_sha"] = source, source, sha
 
+    # Versions get make robust's checks; the baseline and the best get them all.
+    versions = [a for a in attempts if a["result"] in ("baseline", "kept") and a["source_sha"]]
+    checks = {a["source_sha"]: "fast" for a in versions}
+    ends = {versions[0]["source_sha"], versions[-1]["source_sha"]} if versions else set()
+    checks |= dict.fromkeys(ends, "slow")
+
     # Attempts that left strategy.py as another left it share one backtest.
     hashes = list(by_hash)
+    tasks = [(by_hash[h], checks.get(h, "none")) for h in hashes]
     if workers == 1:
         _init(in_sample, full)
-        outcomes = dict(zip(hashes, map(run_source, (by_hash[h] for h in hashes)), strict=True))
+        outcomes = dict(zip(hashes, map(run_source, tasks), strict=True))
     else:
         with ProcessPoolExecutor(workers, initializer=_init, initargs=(in_sample, full)) as pool:
-            done = pool.map(run_source, (by_hash[h] for h in hashes))
-            outcomes = dict(zip(hashes, done, strict=True))
+            outcomes = dict(zip(hashes, pool.map(run_source, tasks), strict=True))
 
     version = 0
-    rows, returns, weights = [], [], []
+    rows, returns, weights, checked, capacities = [], [], [], [], []
+    prices = in_sample if full is None else full
     for attempt in attempts:
         outcome = outcomes.get(attempt["source_sha"]) or {"error": "git has no files for it"}
         row = dict(attempt)
@@ -263,19 +351,34 @@ def build(
             recorded is None or not math.isfinite(recomputed) or abs(recorded - recomputed) < 5e-6
         )
         rows.append(row)
-        if "returns" in outcome:
-            series = outcome["returns"]
+        if is_version and "robust" in outcome:
+            checked.append(
+                {
+                    "attempt": attempt["attempt"],
+                    "slow": "placebo" in outcome["robust"],
+                    "json": json.dumps(outcome["robust"], default=float),
+                }
+            )
+            if volume is not None and attempt["source_sha"] in ends:
+                table = capacity(outcome["held"], prices, volume)
+                capacities.append(table.assign(attempt=attempt["attempt"]))
+        if "months" in outcome:
+            frame = outcome["months"]
             returns.append(
                 pd.DataFrame(
                     {
                         "attempt": attempt["attempt"],
-                        "month": series.index.astype(str),
-                        "ret": series,
+                        "month": frame.index.astype(str),
+                        "ret": frame["net"],
+                        "gross": frame["gross"],
+                        "fees": frame["fees"],
+                        "borrow": frame["borrow"],
+                        "traded": frame["traded"],
                     }
                 )
             )
             held = outcome["held"].stack()
-            held = held[held > 1e-6]
+            held = held[held.abs() > 1e-6]
             weights.append(
                 pd.DataFrame(
                     {
@@ -289,9 +392,22 @@ def build(
 
     attempts_table = pd.DataFrame(rows)
     months = pd.PeriodIndex(returns[0]["month"], freq="M") if returns else pd.PeriodIndex([], "M")
-    prices = in_sample if full is None else full
     bench = benchmark_returns(prices, months)
-    returns.append(pd.DataFrame({"attempt": -1, "month": months.astype(str), "ret": bench}))
+    zero = pd.Series(0.0, index=bench.index)
+    returns.append(
+        pd.DataFrame(
+            {
+                "attempt": -1,
+                "month": months.astype(str),
+                "ret": bench,
+                "gross": bench,
+                "fees": zero,
+                "borrow": zero,
+                "traded": zero,
+            }
+        )
+    )
+    states = regimes.labels(prices, months, "M")
     first_holdout = str(pd.Period(SPLIT, freq="M") + 1)
     bench_in = bench[bench.index < first_holdout]
     bench_out = bench[bench.index >= first_holdout]
@@ -347,7 +463,17 @@ def build(
         "split": SPLIT,
         "first_holdout_month": first_holdout,
         "fee": evaluate.FEE,
+        "fees": json.dumps(evaluate.FEES),
         "rf": evaluate.RF,
+        "rebalance": evaluate.REBALANCE,
+        "offset": evaluate.OFFSET,
+        "long_only": evaluate.LONG_ONLY,
+        "max_gross": evaluate.MAX_GROSS,
+        "max_net": evaluate.MAX_NET,
+        "borrow": evaluate.BORROW,
+        "warmup": evaluate.WARMUP,
+        "participation": PARTICIPATION,
+        "volume": volume is not None,
         "benchmark": BENCHMARK,
         "holdout_scored": full is not None,
         "made": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -364,6 +490,13 @@ def build(
         "weights": pd.concat(weights, ignore_index=True)
         if weights
         else pd.DataFrame(columns=["attempt", "month", "ticker", "weight"]),
+        "robust": pd.DataFrame(checked, columns=["attempt", "slow", "json"]),
+        "regimes": states.reset_index(drop=True).assign(month=months.astype(str))[
+            ["month", *regimes.MODELS]
+        ],
+        "capacity": pd.concat(capacities, ignore_index=True)
+        if capacities
+        else pd.DataFrame(columns=["attempt", *CAPACITY_COLUMNS]),
     }
     return tables, sources
 
@@ -410,7 +543,8 @@ def main() -> None:
         raise SystemExit(f"error: {error}") from None
     if full is None:
         print(f"No holdout at {arguments.holdout}: in-sample results only.", file=sys.stderr)
-    tables, sources = build(run, in_sample, full)
+    volume = load_volume(Path(arguments.holdout) if full is not None else EVAL)
+    tables, sources = build(run, in_sample, full, volume=volume)
     folder = HERE / "results" / run["id"]
     write(folder, run, tables, sources)
     attempts = tables["attempts"]

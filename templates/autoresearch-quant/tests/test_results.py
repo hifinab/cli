@@ -86,8 +86,9 @@ def built() -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
     in_sample = full[full.index <= "2022-12-31"]
     # The recorded score of the kept attempt is what evaluate gives it.
     results._init(in_sample, full)
-    top3 = results.run_source(TOP3)["in"]["sharpe"]
-    return results.build(fake_run(top3), in_sample, full, read_source, workers=1)
+    top3 = results.run_source((TOP3, "none"))["in"]["sharpe"]
+    volume = pd.DataFrame(1e6, index=full.index, columns=full.columns)
+    return results.build(fake_run(top3), in_sample, full, read_source, workers=1, volume=volume)
 
 
 def test_every_attempt_is_a_row(built):
@@ -160,3 +161,44 @@ def test_find_run():
     assert results.find_run(runs, here, "b-3")["id"] == "b-3"
     with pytest.raises(SystemExit):
         results.find_run(runs, Path("/nowhere"))
+
+
+def test_returns_split_into_gross_fees_and_borrow(built):
+    returns = built[0]["returns"]
+    gap = returns["gross"] - returns["fees"] - returns["borrow"] - returns["ret"]
+    assert gap.abs().max() < 1e-12
+    assert (returns[returns["attempt"] == 1]["fees"] > 0).any()
+    assert (returns[returns["attempt"] == -1]["fees"] == 0).all()
+
+
+def test_versions_get_the_robust_checks(built):
+    robust = built[0]["robust"]
+    # The baseline and the best (the only kept round) get every check.
+    assert list(robust["attempt"]) == [0, 1]
+    assert robust["slow"].all()
+    checks = json.loads(robust["json"][1])
+    assert {"start_sets", "tranches", "costs", "sensitivity", "placebo", "regimes"} <= set(checks)
+
+
+def test_regimes_and_capacity(built):
+    tables = built[0]
+    states = tables["regimes"]
+    assert list(states["month"]) == list(tables["returns"].query("attempt == -1")["month"])
+    assert set(states["vol2"].dropna()) <= {"calm", "volatile"}
+    capacity = tables["capacity"]
+    assert set(capacity["attempt"]) == {0, 1}
+    # A million shares a day at $100 or so: 1% of it, over a weight of at most 1.
+    assert (capacity["capacity_usd"] > 0.01 * 1e6 * capacity["max_weight"] * 5).all()
+    assert (capacity["capacity_usd"] < capacity["median_dollar_volume"]).all()
+    assert tables["run"]["volume"][0]
+
+
+def test_monthly_compounds_weekly_periods(monkeypatch):
+    from tests.conftest import synthetic_prices
+
+    monkeypatch.setattr(results.evaluate, "REBALANCE", "W")
+    prices = synthetic_prices()
+    path = results.evaluate.simulate(prices, lambda history: {"SPY": 1.0})
+    months = results.monthly(path)
+    weeks = path.net[pd.PeriodIndex(path.net.index).asfreq("M", "E") == months.index[30]]
+    assert months["net"].iloc[30] == pytest.approx(float((1 + weeks).prod() - 1))
