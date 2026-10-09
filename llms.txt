@@ -32,7 +32,7 @@
 ## Guide
 
 - [Your first remote GPU](https://hifin.sh/guide/quickstart/): sign in, run a script, stop it
-- [Let your coding agent use a GPU](https://hifin.sh/guide/examples/agent/): what to ask an agent, and what it does
+- [Let your coding agent use a GPU](https://hifin.sh/guide/tutorials/agent/): what to ask an agent, and what it does
 - [Skills](https://hifin.sh/guide/reference/skill/): `hi skill` finds, installs, and updates agent skills from skills.sh, and writes the hi skill
 - [All commands](https://hifin.sh/guide/reference/commands/): every command and option
 - [Hand tasks to agents](https://hifin.sh/guide/agent/): `hi agent`, Claude Code, Codex, or Hermes on a task in a box, without permission prompts, with one report for every agent, and `--bundle web,office,data` for skills and the tools they need; `hi agent best-of` runs one task in several boxes, checks each, and ranks them, or with `--score` runs rounds that commit only gains, and `--then "<command>"` runs a command when they end

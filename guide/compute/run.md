@@ -156,7 +156,7 @@ Colab runs cannot detach. For long work on Colab, start an
 A run's machine is gone when it ends, and so is everything written to its
 disk. Save results somewhere that outlives it: print them, push them to the
 Hugging Face Hub from the script (pass `--secret HF_TOKEN`), or upload them to
-your own storage. [Train with uv scripts](/guide/examples/train/) shows
+your own storage. [Train with uv scripts](/guide/tutorials/train/) shows
 uploading a model to the Hub.
 
 ## Options

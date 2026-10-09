@@ -5,7 +5,7 @@ description: Start several detached training runs with different settings on Hug
 
 Detached runs make sweeps simple: start one run per setting, then wait for
 all of them. This uses the `train.py` from
-[Train with uv scripts](/guide/examples/train/) and Hugging Face, which
+[Train with uv scripts](/guide/tutorials/train/) and Hugging Face, which
 supports `--detach`.
 
 > Every run bills separately. Five `a10g-small` runs cost five times $1.00 per

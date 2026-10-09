@@ -52,6 +52,9 @@ and runs their checks on every change.
 
 ## From template to running loop
 
+The tutorial [Autoresearch: a trading strategy](/guide/tutorials/autoresearch-quant/)
+walks through these steps with a real run and its output.
+
 ```sh
 hi init autoresearch-quant momentum && cd momentum
 make data                      # downloads the prices; the holdout goes to ../momentum-holdout

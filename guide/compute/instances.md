@@ -58,7 +58,7 @@ Forwarding http://127.0.0.1:8000 to box port 8000. Press Ctrl+C to close.
 - Colab uses port 8080 on its machines for itself, so `hi` refuses to tunnel
   it. Serve on another port, such as 8000.
 
-[JupyterLab on a rented GPU](/guide/examples/jupyter/) is a complete example.
+[JupyterLab on a rented GPU](/guide/tutorials/jupyter/) is a complete example.
 
 ## Connect VS Code, rsync, or plain ssh
 

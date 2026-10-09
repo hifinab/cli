@@ -21,7 +21,7 @@ hi compute serve qwen3.8-flash-next --on colab --max 1h
 |----------------------|--------------------------------------------|--------------------------------------|------------------------------|
 | `qwen3.8-flash-next` | `unsloth/Qwen3.8-Flash-Next-GGUF`, `UD-Q3_K_XL` (90 GB), 131k context | Colab `G4`, Hugging Face `rtx-pro-6000` (96 GB) | Colab G4: ready in ~7 min, ~84 tokens/s |
 
-[Try a 125B model on a 96 GB GPU](/guide/examples/big-model/) walks through
+[Try a 125B model on a 96 GB GPU](/guide/tutorials/big-model/) walks through
 this one.
 
 ## With any GGUF model

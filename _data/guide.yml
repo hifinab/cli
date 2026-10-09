@@ -31,18 +31,22 @@
       url: /guide/compute/runpod/
     - title: Shadeform
       url: /guide/compute/shadeform/
-- section: Examples
+- section: Tutorials
   pages:
+    - title: All tutorials
+      url: /guide/tutorials/
+    - title: "Autoresearch: a trading strategy"
+      url: /guide/tutorials/autoresearch-quant/
     - title: Try a 125B model on a 96 GB GPU
-      url: /guide/examples/big-model/
+      url: /guide/tutorials/big-model/
     - title: Train with uv scripts
-      url: /guide/examples/train/
+      url: /guide/tutorials/train/
     - title: Run a parameter sweep
-      url: /guide/examples/sweep/
+      url: /guide/tutorials/sweep/
     - title: JupyterLab on a rented GPU
-      url: /guide/examples/jupyter/
+      url: /guide/tutorials/jupyter/
     - title: Let your coding agent use a GPU
-      url: /guide/examples/agent/
+      url: /guide/tutorials/agent/
 - section: Terminal
   pages:
     - title: Ask for a command
