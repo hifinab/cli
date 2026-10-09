@@ -182,7 +182,7 @@ func (l *bestOfLoop) stopsText() string {
 		parts = append(parts, "after "+formatDuration(time.Until(l.Deadline))+" (no round starts later)")
 	}
 	if l.Budget > 0 {
-		parts = append(parts, fmt.Sprintf("once agents have spent $%.2f", l.Budget))
+		parts = append(parts, fmt.Sprintf("once agents have used $%.2f at API prices", l.Budget))
 	}
 	if l.Patience > 0 {
 		parts = append(parts, fmt.Sprintf("after %d rounds without a gain", l.Patience))
@@ -402,7 +402,7 @@ func bestOfShouldStop(run bestOfRun) (state, reason string) {
 	case !loop.Deadline.IsZero() && time.Now().After(loop.Deadline):
 		return "done", "its time is up (--for)"
 	case loop.Budget > 0 && loop.Spend >= loop.Budget:
-		return "done", fmt.Sprintf("agents spent $%.2f of the $%.2f budget", loop.Spend, loop.Budget)
+		return "done", fmt.Sprintf("agents used $%.2f of the $%.2f budget, at API prices", loop.Spend, loop.Budget)
 	case loop.Patience > 0 && loop.Round-max(loop.BestRound, loop.Since) >= loop.Patience:
 		return "done", fmt.Sprintf("no gain in %d rounds (--patience)", loop.Patience)
 	}
@@ -886,9 +886,9 @@ func bestOfLiveLines(run bestOfRun, live map[string]agentProgress, width int) st
 	table.Flush()
 	fmt.Fprintf(&b, "  This round so far: %s in · %s out", formatTokenCount(in), formatTokenCount(out))
 	if run.Loop.Spend > 0 {
-		fmt.Fprintf(&b, ", on top of $%.2f spent", run.Loop.Spend)
+		fmt.Fprintf(&b, ", on top of $%.2f at API prices", run.Loop.Spend)
 	}
-	b.WriteString("; dollars are counted when each box ends.\n")
+	b.WriteString("; dollars come when each box ends.\n")
 	return b.String()
 }
 
@@ -911,7 +911,7 @@ func bestOfLoopView(run bestOfRun, width, rows int, live map[string]agentProgres
 		header = append(header, formatDuration(end.Sub(loop.Started)))
 	}
 	if loop.Spend > 0 {
-		header = append(header, fmt.Sprintf("$%.2f spent", loop.Spend))
+		header = append(header, fmt.Sprintf("$%.2f at API prices", loop.Spend))
 	}
 	fmt.Fprintln(&b, strings.Join(header, " · "))
 	direction := "lower is better"

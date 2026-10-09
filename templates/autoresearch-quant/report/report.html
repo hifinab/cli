@@ -437,7 +437,7 @@ function header(T) {
   $("#title").textContent = `${R.project}: run ${R.id}`;
   $("#progressTitle").textContent = `In-sample ${NAME}, attempt by attempt`;
   $("#logTitle").textContent = `All ${A.length} attempts`;
-  let lede = `${boxes} ${boxes === 1 ? "box" : "boxes"} a round, ${ROUNDS} rounds, ${mins} minutes, $${R.spend_usd.toFixed(2)}. In-sample ${NAME} went from ${f3(base.score)} to ${f3(last.score)}.`;
+  let lede = `${boxes} ${boxes === 1 ? "box" : "boxes"} a round, ${ROUNDS} rounds, ${mins} minutes, $${R.spend_usd.toFixed(2)} at API prices. In-sample ${NAME} went from ${f3(base.score)} to ${f3(last.score)}.`;
   if (HOOK) lede += ` On the holdout, which the loop never saw, it went from ${f3(base.scoreHo)} to ${f3(last.scoreHo)}.` + (num(BENCH.hoM[KEY]) ? ` Over those months ${BENCH.name} alone had ${f3(BENCH.hoM[KEY])}.` : "");
   $("#lede").textContent = lede;
   $("#meta").innerHTML = [`base ${R.base.slice(0, 7)}`, `best ${R.best_commit ? R.best_commit.slice(0, 7) : "–"} (round ${R.best_round})`, `started ${R.started.slice(0, 16).replace("T", " ")} UTC`, `agents: ${R.agents}${R.models ? ` (${R.models})` : ""}`, `score: ${R.score_command}, ${R.higher ? "higher" : "lower"} is better`, R.edit ? `--edit ${R.edit}` : "", `${R.state}: ${R.reason}`].filter(Boolean).map((s) => `<span>${esc(s)}</span>`).join("");
@@ -447,7 +447,7 @@ function header(T) {
   if (HOOK) figs.push([`Holdout ${NAME}`, f3(last.scoreHo), `from ${f3(base.scoreHo)} · ${change(base.scoreHo, last.scoreHo)}`]);
   if (HOOK && num(BENCH.hoM[KEY])) figs.push([`${BENCH.name} on the holdout`, f3(BENCH.hoM[KEY]), `CAGR ${f2(BENCH.hoM.cagr_pct)}% vs ${f2(last.hoM.cagr_pct)}%`]);
   figs.push(["Rounds kept", `${kept} / ${ROUNDS}`, Object.entries(keptBy).map(([k, v]) => `${esc(k)} ${v}`).join(" · ") || "no gains"]);
-  figs.push(["Spend", `$${R.spend_usd.toFixed(2)}`, `${mins} min · ${A.length - 1} attempts`]);
+  figs.push(["At API prices", `$${R.spend_usd.toFixed(2)}`, `${mins} min · ${A.length - 1} attempts · on a subscription, usage, not a bill`]);
   $("#figures").innerHTML = figs.map(([k, v, s]) => `<div class="fig"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
 
   // Facts, computed: nothing here is a judgement.

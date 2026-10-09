@@ -293,7 +293,8 @@ rounds (n can be 1):
   --lower | --higher     which way is better
   --rounds <n>|forever   how many rounds (default 1)
   --for <duration>       start no round after this long, such as 8h
-  --budget <dollars>     start no round once agents have spent this much
+  --budget <dollars>     start no round once agents have used this much at API prices
+                         (what Claude Code reports; on a subscription, usage, not a bill)
   --patience <n>         stop after n rounds without a gain
   --min-gain <number>    a smaller gain is noise (default: any gain counts)
   --edit a,b             the files and folders an agent may change; anything else
@@ -564,7 +565,7 @@ func confirmBestOf(run bestOfRun, options boxOptions, stdin io.Reader, w io.Writ
 			fmt.Fprintf(w, "  cost    %d agent runs a round, with no end set\n", n)
 		}
 		if loop.Budget > 0 && containsAny(run.Options.Agents, "codex", "hermes") {
-			fmt.Fprintln(w, "Note: --budget counts what agents report in dollars; Codex reports only tokens.")
+			fmt.Fprintln(w, "Note: --budget counts what Claude Code reports at API prices (on a subscription, usage, not a bill); Codex reports only tokens.")
 		}
 		if loop.Rounds == 0 && loop.Deadline.IsZero() && loop.Budget == 0 && loop.Patience == 0 {
 			fmt.Fprintf(w, "Note: nothing ends this run but hi agent best-of stop %s.\n", run.ID)

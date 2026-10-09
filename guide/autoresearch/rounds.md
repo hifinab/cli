@@ -15,7 +15,7 @@ hi agent best-of 4 --rounds 100 --gpu --edit train.py \
 ```
 
 ```text
-Best-of b-7 · "program.md" · 4 boxes a round · round 9 of 100 · 2h41m · $31.20 spent
+Best-of b-7 · "program.md" · 4 boxes a round · round 9 of 100 · 2h41m · $31.20 at API prices
 Score: make score (lower is better)
 Best: 0.9871 from round 6, baseline 0.9979 · on best-of/b-7/best
 
@@ -115,7 +115,7 @@ list, so the editable file can't read the data it is scored on.
 |---|---|
 | `--rounds 50` | after 50 rounds (default 1; `forever` has no end) |
 | `--for 8h` | no round starts after 8 hours |
-| `--budget 30` | no round starts once agents have spent $30, as they report it |
+| `--budget 30` | no round starts once agents have used $30 at API prices, as Claude Code reports it; on a subscription that is a measure of usage, not a bill, and Codex reports no dollars |
 | `--patience 10` | after 10 rounds without a gain |
 | `--max 30m` | not the run: a time limit for each agent in each round |
 

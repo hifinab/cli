@@ -402,7 +402,7 @@ func TestBestOfWatchShowsLiveTokens(t *testing.T) {
 		t.Fatalf("live progress: %+v", live)
 	}
 	lines := bestOfLiveLines(run, live, 0)
-	for _, want := range []string{"p-b1-r2-1", "working", "1.2k in", "Bash: make score", "p-b1-r2-2", "done", "on top of $1.50 spent"} {
+	for _, want := range []string{"p-b1-r2-1", "working", "1.2k in", "Bash: make score", "p-b1-r2-2", "done", "on top of $1.50 at API prices"} {
 		if !strings.Contains(lines, want) {
 			t.Errorf("missing %q in:\n%s", want, lines)
 		}
