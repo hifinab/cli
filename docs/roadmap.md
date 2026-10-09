@@ -930,6 +930,31 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   Spec: [hi_agent.md, Releases](specs/approved/hi_agent.md#releases) (4).
   Spec: [hi_agent_bundles.md](specs/ideas/hi_agent_bundles.md) (draft).
 
+### Later — A research suite for the autoresearch templates
+
+Follow-up to v0.34.0, asked for on 2026-10-09 after the first real run in a
+user project. The templates are a working minimum; a research project needs
+a fuller, tested suite it can start from. No spec yet: write one in
+`specs/ideas/` first.
+
+- [ ] Evaluation that resists overfitting: a validation window inside the
+  data agents see, walk-forward scoring, and a score that must hold in
+  every period (such as the worst of several periods' Sharpe), so rounds
+  can't win by fitting one stretch of history. A `make noise` that runs the
+  score several times and suggests `--min-gain`.
+- [ ] A backtester for `autoresearch-quant` that can carry real strategies:
+  daily as well as monthly rebalancing, long and short, slippage and fees
+  per asset, a benchmark, cash and leverage limits, and tests against an
+  independent implementation like today's.
+- [ ] Result presentation: a report per run (`make report`) with the equity
+  curve, drawdowns, a table per year, turnover, and the benchmark; for
+  `autoresearch-ml`, the loss curves. A chart of the score round by round,
+  with the kept ideas, from `hi agent best-of show --json`. The holdout
+  next to the in-sample score, measured once.
+- [ ] More: cross-validation and several seeds for `autoresearch-ml`, data
+  sources beyond Yahoo Finance and one text file, and a record of every
+  holdout look so a holdout spent is visible.
+
 ### Later — `hi data` and `hi server expose`
 
 Follow-ups to v0.24–v0.28, not scheduled yet.
