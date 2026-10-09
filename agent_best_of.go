@@ -1326,7 +1326,7 @@ func showBestOf(options boxOptions, stdout io.Writer) error {
 		return printBestOfJSON(run, stdout)
 	}
 	if run.Loop != nil {
-		fmt.Fprint(stdout, bestOfLoopView(run, 0, 0))
+		fmt.Fprint(stdout, bestOfLoopView(run, 0, 0, bestOfLiveProgress(run, nil)))
 		if options.full && run.Loop.BestCommit != "" {
 			var out bytes.Buffer
 			boxCommand(nil, &out, io.Discard, "git", "-C", run.Root, "log", "-p", "--reverse", run.Base+".."+run.Loop.Branch)

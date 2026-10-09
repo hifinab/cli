@@ -384,3 +384,34 @@ func TestBestOfRoundThatChangesNothing(t *testing.T) {
 		t.Fatalf("result %q", result)
 	}
 }
+
+func TestBestOfWatchShowsLiveTokens(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	home := boxStateFile("p-b1-r2-1", "home")
+	writeSkillTestFile(t, filepath.Join(home, ".claude", "projects", "-box", "s.jsonl"),
+		`{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":1200,"output_tokens":300},"content":[{"type":"tool_use","name":"Bash","input":{"command":"make score"}}]}}`+"\n", 0o644)
+	writeSkillTestFile(t, boxStateFile("p-b1-r2-2", "home", agentResultDir, "agent.json"), "{}", 0o644)
+	run := bestOfRun{ID: "b-1", Loop: &bestOfLoop{Round: 2, Spend: 1.5}, Boxes: []bestOfBox{
+		{Name: "p-b1-r2-1", Agent: "claude", State: "running"},
+		{Name: "p-b1-r2-2", Agent: "codex", State: "running"},
+		{Name: "p-b1-r1-1", Agent: "claude", State: "finished"},
+	}}
+	readers := map[string]*agentProgressReader{}
+	live := bestOfLiveProgress(run, readers)
+	if len(live) != 2 || live["p-b1-r2-1"].in != 1200 || live["p-b1-r2-1"].out != 300 {
+		t.Fatalf("live progress: %+v", live)
+	}
+	lines := bestOfLiveLines(run, live, 0)
+	for _, want := range []string{"p-b1-r2-1", "working", "1.2k in", "Bash: make score", "p-b1-r2-2", "done", "on top of $1.50 spent"} {
+		if !strings.Contains(lines, want) {
+			t.Errorf("missing %q in:\n%s", want, lines)
+		}
+	}
+	if strings.Contains(lines, "p-b1-r1-1") {
+		t.Errorf("a finished box is shown live:\n%s", lines)
+	}
+	// The reader is kept, so the next poll reads only what the log gained.
+	if readers["p-b1-r2-1"] == nil {
+		t.Error("the watch didn't keep the box's reader")
+	}
+}

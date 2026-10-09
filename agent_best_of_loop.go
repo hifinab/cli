@@ -823,7 +823,76 @@ func resumeBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout
 
 // bestOfLoopView is the run's rounds as text: rows limits the rounds shown,
 // and width the idea column; 0 shows everything.
-func bestOfLoopView(run bestOfRun, width, rows int) string {
+// bestOfLiveProgress reads the session logs of the round's boxes that are
+// still running: tokens, steps and the latest step, before hi measures them.
+// readers keeps each box's reader between calls, so a watch reads only
+// what a log gained; nil starts afresh.
+func bestOfLiveProgress(run bestOfRun, readers map[string]*agentProgressReader) map[string]agentProgress {
+	live := map[string]agentProgress{}
+	for _, box := range run.Boxes {
+		if box.State != "running" {
+			continue
+		}
+		reader := readers[box.Name]
+		if reader == nil {
+			reader = newAgentProgressReader(box.Agent, boxStateFile(box.Name, "home"))
+			if readers != nil {
+				readers[box.Name] = reader
+			}
+		}
+		live[box.Name] = reader.poll()
+	}
+	return live
+}
+
+// bestOfLiveLines is a line per box of the round in progress, and the
+// round's tokens so far.
+func bestOfLiveLines(run bestOfRun, live map[string]agentProgress, width int) string {
+	if len(live) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	var in, out int
+	table := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
+	for _, box := range run.Boxes {
+		progress, ok := live[box.Name]
+		if !ok {
+			continue
+		}
+		in, out = in+progress.in, out+progress.out
+		tokens := "–"
+		if progress.in+progress.out > 0 {
+			tokens = formatTokenCount(progress.in) + " in · " + formatTokenCount(progress.out) + " out"
+		}
+		state := "working"
+		if box.AgentStatus != "" {
+			state = box.AgentStatus
+		} else if fileExists(boxStateFile(box.Name, "home", agentResultDir, "agent.json")) {
+			state = "done"
+		}
+		step := strings.Join(strings.Fields(progress.step), " ")
+		if state != "working" || step == "" {
+			step = ""
+		}
+		room := 60
+		if width > 0 {
+			room = max(12, width-80)
+		}
+		if len([]rune(step)) > room {
+			step = string([]rune(step)[:room-1]) + "…"
+		}
+		fmt.Fprintf(table, "  %s\t%s\t%s\t%s\t%s\t%s\n", box.Name, box.Agent, state, tokens, plural(progress.steps, "step"), step)
+	}
+	table.Flush()
+	fmt.Fprintf(&b, "  This round so far: %s in · %s out", formatTokenCount(in), formatTokenCount(out))
+	if run.Loop.Spend > 0 {
+		fmt.Fprintf(&b, ", on top of $%.2f spent", run.Loop.Spend)
+	}
+	b.WriteString("; dollars are counted when each box ends.\n")
+	return b.String()
+}
+
+func bestOfLoopView(run bestOfRun, width, rows int, live map[string]agentProgress) string {
 	loop := run.Loop
 	var b strings.Builder
 	alive := bestOfDriverAlive(run)
@@ -892,6 +961,7 @@ func bestOfLoopView(run bestOfRun, width, rows int) string {
 	switch {
 	case alive:
 		fmt.Fprintf(&b, "Now: %s\n", firstNonEmpty(loop.Phase, "between rounds"))
+		b.WriteString(bestOfLiveLines(run, live, width))
 		switch bestOfStopRequest(run.ID) {
 		case "now":
 			fmt.Fprintln(&b, "It is stopping now.")
@@ -937,6 +1007,9 @@ type bestOfWatchModel struct {
 	asking   bool
 	message  string
 	finished bool
+	// The session logs of the round's running boxes, read as they grow.
+	readers map[string]*agentProgressReader
+	live    map[string]agentProgress
 }
 
 type bestOfWatchTick struct{}
@@ -968,6 +1041,7 @@ func (m *bestOfWatchModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case bestOfWatchData:
 		if message.err == nil && message.run.Loop != nil {
 			m.run, m.loaded = message.run, true
+			m.live = bestOfLiveProgress(m.run, m.readers)
 			if !bestOfDriverAlive(m.run) && m.run.Loop.State != "running" {
 				m.finished = true
 				return m, tea.Quit
@@ -1006,7 +1080,7 @@ func (m *bestOfWatchModel) View() string {
 	if m.height > 0 {
 		rows = max(3, m.height-12)
 	}
-	view := bestOfLoopView(m.run, m.width, rows)
+	view := bestOfLoopView(m.run, m.width, rows, m.live)
 	if m.finished {
 		return view
 	}
@@ -1030,10 +1104,10 @@ func watchBestOf(id string, stdin io.Reader, stdout io.Writer) error {
 		return nil
 	}
 	if !isTerminal(stdin) {
-		fmt.Fprint(stdout, bestOfLoopView(run, 0, 0))
+		fmt.Fprint(stdout, bestOfLoopView(run, 0, 0, bestOfLiveProgress(run, nil)))
 		return nil
 	}
-	model := &bestOfWatchModel{id: id}
+	model := &bestOfWatchModel{id: id, readers: map[string]*agentProgressReader{}}
 	if _, err := tea.NewProgram(model, tea.WithInput(stdin), tea.WithOutput(stdout)).Run(); err != nil {
 		return err
 	}
