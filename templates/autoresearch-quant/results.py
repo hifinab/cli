@@ -50,7 +50,7 @@ from prepare import EVAL, HOLDOUT, SPLIT, TICKERS
 
 HERE = Path(__file__).resolve().parent
 REPORT = HERE / "report"
-BENCHMARK = "SPY"  # bought and held, without fees; one of prepare.TICKERS
+BENCHMARK = evaluate.BENCHMARK
 SCORE_KEY = "sharpe"  # the key of evaluate.score() that make score prints last
 ROUND_COLUMNS = ["round", "result", "started", "ended", "spend_usd", "best_before", "score"]
 ROUND_COLUMNS += ["winner", "agent", "idea", "commit"]
@@ -188,9 +188,9 @@ def run_source(source: str) -> Run:
         if full is not None:
             out["out"] = evaluate.score(full, allocate, holdout=True)
         returns, held = evaluate.backtest(path_prices, allocate)
-        first = returns.index[evaluate.WARMUP + 1]
-        out["returns"] = returns.loc[first:]
-        out["held"] = held.loc[first:]
+        window = evaluate.scored(pd.PeriodIndex(returns.index))
+        out["returns"] = returns.loc[window]
+        out["held"] = held.loc[window]
         return out
     except Exception as error:  # any failure belongs to the attempt, not to make results
         return {"error": f"{type(error).__name__}: {error}"}

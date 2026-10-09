@@ -133,3 +133,70 @@ def test_strategies_that_could_read_other_data_are_refused(source: str) -> None:
 def test_the_example_strategy_is_allowed() -> None:
     with open("strategy.py") as file:
         check_source(file.read())
+
+
+def reference_path(
+    prices: pd.DataFrame, weights_of, freq: str, fees: dict[str, float], borrow: float
+) -> pd.Series:
+    """Net returns for weights given by date, written without evaluate's helpers."""
+    frame = prices.copy()
+    frame["period"] = pd.DatetimeIndex(frame.index).to_period(freq)
+    days = pd.DatetimeIndex(frame.groupby("period").tail(1).index)
+    rows = [pd.Series(weights_of(day), index=TICKERS, dtype=float).fillna(0.0) for day in days]
+    weights = pd.DataFrame(rows, index=days)
+    held = weights.shift(1).fillna(0.0)
+    returns = prices.loc[days].pct_change(fill_method=None).fillna(0.0)
+    fee = pd.Series([fees.get(t, evaluate.FEE) for t in TICKERS], index=TICKERS)
+    traded = held.diff().fillna(held).abs()
+    per_year = {"M": 12, "W": 52}[freq]
+    short = (-held).clip(lower=0).sum(axis=1)
+    net = (held * returns).sum(axis=1) - (traded * fee).sum(axis=1) - short * borrow / per_year
+    net.index = days.to_period(freq)
+    return net
+
+
+@pytest.mark.parametrize("freq", ["M", "W"])
+def test_shorts_borrow_and_fees_per_ticker(monkeypatch, prices: pd.DataFrame, freq: str) -> None:
+    fees = {"SPY": 0.0005, "TLT": 0.003}
+    monkeypatch.setattr(evaluate, "LONG_ONLY", False)
+    monkeypatch.setattr(evaluate, "MAX_GROSS", 2.0)
+    monkeypatch.setattr(evaluate, "FEES", fees)
+    monkeypatch.setattr(evaluate, "BORROW", 0.02)
+    monkeypatch.setattr(evaluate, "REBALANCE", freq)
+
+    def long_short(day: pd.Timestamp) -> dict[str, float]:
+        return {"SPY": 1.0, "TLT": -0.5} if day.month % 3 else {"IEF": 0.8, "SPY": -0.4}
+
+    path = evaluate.simulate(prices, lambda history: long_short(history.index[-1]))
+    reference = reference_path(prices, long_short, freq, fees, 0.02)
+    assert len(path.net) == len(reference)
+    assert (path.net - reference).abs().max() < 1e-12
+    assert (path.gross - path.fees - path.borrow - path.net).abs().max() < 1e-15
+    assert path.borrow.iloc[5] > 0
+
+
+def test_weekly_scores_annualize_by_weeks(monkeypatch, prices: pd.DataFrame) -> None:
+    monkeypatch.setattr(evaluate, "REBALANCE", "W")
+    result = score(prices, strategy.allocate)
+    assert str(result["period"]).startswith("2008-07-06")
+    assert 170 <= result["months"] <= 175  # type: ignore[operator]
+
+
+def test_offset_rebalances_earlier(prices: pd.DataFrame) -> None:
+    ends = evaluate.rebalance_days(prices, "M", 0)
+    early = evaluate.rebalance_days(prices, "M", 5)
+    days = pd.DatetimeIndex(prices.index)
+    gaps = days.get_indexer(ends) - days.get_indexer(early)
+    assert (gaps == 5).all()
+    assert (early.to_period("M") == ends.to_period("M")).all()
+
+
+@pytest.mark.parametrize(
+    ("weights", "message"),
+    [({"SPY": 1.5, "TLT": -1.0}, "at most 2"), ({"SPY": 1.5}, "net long; at most 1")],
+)
+def test_exposure_limits(monkeypatch, prices, weights, message) -> None:
+    monkeypatch.setattr(evaluate, "LONG_ONLY", False)
+    monkeypatch.setattr(evaluate, "MAX_GROSS", 2.0)
+    with pytest.raises(EvaluationError, match=message):
+        backtest(prices, lambda history: weights)
