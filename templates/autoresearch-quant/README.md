@@ -41,6 +41,8 @@ make holdout    # once, at the end, on the gains' branch
 yourself. `results/<run>/report.html` opens from disk and shows every
 attempt, the growth and drawdown of each round against the baseline and
 SPY, and returns by year. The numbers are in Parquet files next to it.
+`results/` stays out of git: it holds every attempt's holdout score, and
+boxes start from commits, so agents never see it.
 
 The gains are commits on `best-of/<run>/best`. Check them on the holdout
 before you merge:
