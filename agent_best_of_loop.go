@@ -50,6 +50,7 @@ type bestOfLoop struct {
 	Round        int           `json:"round"`
 	RoundStarted time.Time     `json:"round_started,omitempty"`
 	Spend        float64       `json:"spend_usd"`
+	Billed       float64       `json:"billed_usd,omitempty"` // the part of Spend that was billed (OpenRouter, API keys)
 	Started      time.Time     `json:"started"`
 	PID          int           `json:"pid,omitempty"`
 	State        string        `json:"state"` // running, stopped, done, or failed
@@ -71,6 +72,7 @@ type bestOfRound struct {
 	Idea    string      `json:"idea,omitempty"`
 	Commit  string      `json:"commit,omitempty"`
 	Spend   float64     `json:"spend_usd"`
+	Billed  float64     `json:"billed_usd,omitempty"`
 	Boxes   []bestOfBox `json:"boxes"`
 }
 
@@ -442,7 +444,8 @@ func startBestOfRound(run *bestOfRun, log io.Writer) error {
 			fmt.Fprintf(log, "round %d: %s didn't start: %v\n", loop.Round, box.name, err)
 			continue
 		}
-		run.Boxes = append(run.Boxes, bestOfBox{Name: meta.Name, Agent: agent, Model: meta.Model, Branch: meta.Branch, State: "running",
+		billing, metered := agentBilling(agent)
+		run.Boxes = append(run.Boxes, bestOfBox{Name: meta.Name, Agent: agent, Model: meta.Model, Branch: meta.Branch, State: "running", Billing: billing, Metered: metered,
 			ChangedFiles: []string{}, Flags: []string{}})
 		if err := saveBestOf(run); err != nil {
 			return err
@@ -651,8 +654,11 @@ func settleBestOfRound(run *bestOfRun, log io.Writer) error {
 	}
 	for _, box := range run.Boxes {
 		round.Spend += box.CostUSD
+		if box.Metered {
+			round.Billed += box.CostUSD
+		}
 	}
-	loop.Spend += round.Spend
+	loop.Spend, loop.Billed = loop.Spend+round.Spend, loop.Billed+round.Billed
 	if winner != nil {
 		round.Winner, round.Agent, round.Score, round.Idea = winner.Name, winner.Agent, winner.Score, winner.Idea
 		round.Result = "discarded"
@@ -717,9 +723,12 @@ func bestOfDiscardRound(run *bestOfRun, result string) {
 	for i := range run.Boxes {
 		measureBestOfBox(run, &run.Boxes[i])
 		round.Spend += run.Boxes[i].CostUSD
+		if run.Boxes[i].Metered {
+			round.Billed += run.Boxes[i].CostUSD
+		}
 		discardBestOfBox(*run, &run.Boxes[i])
 	}
-	loop.Spend += round.Spend
+	loop.Spend, loop.Billed = loop.Spend+round.Spend, loop.Billed+round.Billed
 	loop.History = append(loop.History, round)
 	run.Boxes, loop.Phase = []bestOfBox{}, ""
 	saveBestOf(run)
@@ -876,12 +885,12 @@ func bestOfLiveLines(run bestOfRun, live map[string]agentProgress, width int) st
 		}
 		room := 60
 		if width > 0 {
-			room = max(12, width-80)
+			room = max(12, width-110)
 		}
 		if len([]rune(step)) > room {
 			step = string([]rune(step)[:room-1]) + "…"
 		}
-		fmt.Fprintf(table, "  %s\t%s\t%s\t%s\t%s\t%s\n", box.Name, box.Agent, state, tokens, plural(progress.steps, "step"), step)
+		fmt.Fprintf(table, "  %s\t%s\t%s\t%s\t%s\t%s\t%s\n", box.Name, box.Agent, firstNonEmpty(box.Billing, "–"), state, tokens, plural(progress.steps, "step"), step)
 	}
 	table.Flush()
 	fmt.Fprintf(&b, "  This round so far: %s in · %s out", formatTokenCount(in), formatTokenCount(out))
@@ -911,7 +920,11 @@ func bestOfLoopView(run bestOfRun, width, rows int, live map[string]agentProgres
 		header = append(header, formatDuration(end.Sub(loop.Started)))
 	}
 	if loop.Spend > 0 {
-		header = append(header, fmt.Sprintf("$%.2f at API prices", loop.Spend))
+		spend := fmt.Sprintf("$%.2f at API prices", loop.Spend)
+		if loop.Billed > 0 {
+			spend += fmt.Sprintf(" ($%.2f of it billed)", loop.Billed)
+		}
+		header = append(header, spend)
 	}
 	fmt.Fprintln(&b, strings.Join(header, " · "))
 	direction := "lower is better"

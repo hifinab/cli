@@ -437,17 +437,17 @@ function header(T) {
   $("#title").textContent = `${R.project}: run ${R.id}`;
   $("#progressTitle").textContent = `In-sample ${NAME}, attempt by attempt`;
   $("#logTitle").textContent = `All ${A.length} attempts`;
-  let lede = `${boxes} ${boxes === 1 ? "box" : "boxes"} a round, ${ROUNDS} rounds, ${mins} minutes, $${R.spend_usd.toFixed(2)} at API prices. In-sample ${NAME} went from ${f3(base.score)} to ${f3(last.score)}.`;
+  let lede = `${boxes} ${boxes === 1 ? "box" : "boxes"} a round, ${ROUNDS} rounds, ${mins} minutes, $${R.spend_usd.toFixed(2)} at API prices${R.billed_usd > 0 ? ` ($${R.billed_usd.toFixed(2)} of it billed)` : ""}. In-sample ${NAME} went from ${f3(base.score)} to ${f3(last.score)}.`;
   if (HOOK) lede += ` On the holdout, which the loop never saw, it went from ${f3(base.scoreHo)} to ${f3(last.scoreHo)}.` + (num(BENCH.hoM[KEY]) ? ` Over those months ${BENCH.name} alone had ${f3(BENCH.hoM[KEY])}.` : "");
   $("#lede").textContent = lede;
-  $("#meta").innerHTML = [`base ${R.base.slice(0, 7)}`, `best ${R.best_commit ? R.best_commit.slice(0, 7) : "–"} (round ${R.best_round})`, `started ${R.started.slice(0, 16).replace("T", " ")} UTC`, `agents: ${R.agents}${R.models ? ` (${R.models})` : ""}`, `score: ${R.score_command}, ${R.higher ? "higher" : "lower"} is better`, R.edit ? `--edit ${R.edit}` : "", `${R.state}: ${R.reason}`].filter(Boolean).map((s) => `<span>${esc(s)}</span>`).join("");
+  $("#meta").innerHTML = [`base ${R.base.slice(0, 7)}`, `best ${R.best_commit ? R.best_commit.slice(0, 7) : "–"} (round ${R.best_round})`, `started ${R.started.slice(0, 16).replace("T", " ")} UTC`, `agents: ${R.agents}${R.models ? ` (${R.models})` : ""}`, R.billing ? `paid by ${R.billing}` : "", `score: ${R.score_command}, ${R.higher ? "higher" : "lower"} is better`, R.edit ? `--edit ${R.edit}` : "", `${R.state}: ${R.reason}`].filter(Boolean).map((s) => `<span>${esc(s)}</span>`).join("");
   const keptBy = A.filter((a) => a.result === "kept").reduce((o, a) => (o[a.agent] = (o[a.agent] || 0) + 1, o), {});
   const change = (a, b) => num(a) && num(b) && a !== 0 ? `<span class="${(b - a) * (R.higher ? 1 : -1) >= 0 ? "up" : "down"}">${pct((b / a - 1) * 100, 0)}</span>` : "";
   const figs = [[`In-sample ${NAME}`, f3(last.score), `from ${f3(base.score)} · ${change(base.score, last.score)}`]];
   if (HOOK) figs.push([`Holdout ${NAME}`, f3(last.scoreHo), `from ${f3(base.scoreHo)} · ${change(base.scoreHo, last.scoreHo)}`]);
   if (HOOK && num(BENCH.hoM[KEY])) figs.push([`${BENCH.name} on the holdout`, f3(BENCH.hoM[KEY]), `CAGR ${f2(BENCH.hoM.cagr_pct)}% vs ${f2(last.hoM.cagr_pct)}%`]);
   figs.push(["Rounds kept", `${kept} / ${ROUNDS}`, Object.entries(keptBy).map(([k, v]) => `${esc(k)} ${v}`).join(" · ") || "no gains"]);
-  figs.push(["At API prices", `$${R.spend_usd.toFixed(2)}`, `${mins} min · ${A.length - 1} attempts · on a subscription, usage, not a bill`]);
+  figs.push(["At API prices", `$${R.spend_usd.toFixed(2)}`, `${mins} min · ${A.length - 1} attempts · ` + (R.billed_usd > 0 ? `$${R.billed_usd.toFixed(2)} billed, the rest subscription usage` : "on a subscription, usage, not a bill")]);
   $("#figures").innerHTML = figs.map(([k, v, s]) => `<div class="fig"><div class="k">${esc(k)}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
 
   // Facts, computed: nothing here is a judgement.

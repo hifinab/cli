@@ -119,9 +119,17 @@ list, so the editable file can't read the data it is scored on.
 | `--patience 10` | after 10 rounds without a gain |
 | `--max 30m` | not the run: a time limit for each agent in each round |
 
-`--budget` counts dollars agents report: Claude Code's cost at API prices,
-and Hermes' when it has one. Codex reports only tokens, so its runs count as
-nothing. After the first round, the view shows what a round costs.
+`--budget` counts dollars agents report. Claude Code works out its own cost
+at API prices from its built-in price list, whether you pay by subscription
+or by API key. Hermes reports what OpenRouter charged. Codex reports only
+tokens, so its runs count as nothing. After the first round, the view shows
+what a round costs.
+
+hi reads how each agent is paid for from its sign-in on your machine: a
+Claude plan (such as Max 20x), a ChatGPT plan, an OpenAI API key, or
+OpenRouter. The live view shows it for each box, and the header splits the
+dollars: `$4.10 at API prices ($0.62 of it billed)` means $0.62 was charged
+(OpenRouter or an API key) and the rest was subscription usage.
 
 ## Watching and stopping
 

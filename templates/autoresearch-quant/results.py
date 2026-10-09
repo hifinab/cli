@@ -126,6 +126,8 @@ def attempts_of(run: Run) -> list[Run]:
             "rev": run["base"],
             "commit": run["base"],
             "cost_usd": 0.0,
+            "billing": "",
+            "metered": False,
             "input_tokens": 0,
             "output_tokens": 0,
             "agent_seconds": 0,
@@ -154,6 +156,8 @@ def attempts_of(run: Run) -> list[Run]:
                     "rev": [f"refs/{branch}", box.get("snapshot", "")],
                     "commit": round_.get("commit", "") if result == "kept" else "",
                     "cost_usd": box.get("cost_usd", 0.0),
+                    "billing": box.get("billing", ""),
+                    "metered": bool(box.get("metered", False)),
                     "input_tokens": tokens.get("input", 0),
                     "output_tokens": tokens.get("output", 0),
                     "agent_seconds": box.get("agent_seconds", 0),
@@ -455,6 +459,10 @@ def build(
         "state": loop.get("state", ""),
         "reason": loop.get("reason", ""),
         "spend_usd": loop.get("spend_usd", 0.0),
+        "billed_usd": loop.get("billed_usd", 0.0),
+        "billing": "; ".join(
+            sorted({f"{a['agent']}: {a['billing']}" for a in rows if a["billing"]})
+        ),
         "started": loop.get("started", ""),
         "ended": history[-1].get("ended", "") if history else "",
         "agents": ",".join(options.get("agents") or []),

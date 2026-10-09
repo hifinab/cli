@@ -72,7 +72,7 @@ so `git merge best-of/b-4/2` takes all of it. Nothing is pushed.
 
 | Option | |
 |---|---|
-| `--agents claude,codex` | the agents, taken in turn; different agents fail in different ways (default: the first agent ready) |
+| `--agents claude,codex` | the agents, taken in turn; different agents fail in different ways (default: the first agent ready). A model after a colon picks one per agent: `--agents claude:opus,codex,hermes:qwen/qwen3.8-max-0902` (Hermes takes any OpenRouter model) |
 | `--check "<command>"` | the check hi runs in each box (default: `make check`) |
 | `--max 45m` | a time limit for each agent |
 | `--model <model>` | with one agent only; with several, each uses its own default |

@@ -101,7 +101,12 @@ type bestOfBox struct {
 	Outside      []string     `json:"outside,omitempty"` // changed files outside --edit
 	Tokens       *agentTokens `json:"tokens,omitempty"`
 	CostUSD      float64      `json:"cost_usd,omitempty"`
-	Discarded    bool         `json:"discarded,omitempty"`
+	// Billing is how the agent is paid for here, such as a Claude Max
+	// subscription or OpenRouter; Metered means its dollars are billed,
+	// not a value at API prices.
+	Billing   string `json:"billing,omitempty"`
+	Metered   bool   `json:"metered,omitempty"`
+	Discarded bool   `json:"discarded,omitempty"`
 }
 
 type bestOfCheck struct {
@@ -277,7 +282,8 @@ usage:
   hi agent best-of rm <run>         remove every box of a run and its branches
 
 options:
-  --agents claude,codex  the agents, taken in turn (default: the first one ready)
+  --agents claude,codex  the agents, taken in turn (default: the first one ready); a model
+                         after a colon, such as hermes:qwen/qwen3.8-max-0902 (OpenRouter)
   --check "<command>"    how to check a result (default: make check, without --score);
                          hi runs it in each box after its agent ends, on the box's network
   --max <duration>       a time limit for each agent, such as 45m or 2h
@@ -372,14 +378,14 @@ func startBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout,
 	if err != nil {
 		return err
 	}
-	kinds, err := bestOfAgents(flags.agents, kind)
+	kinds, models, err := bestOfAgents(flags.agents, kind)
 	if err != nil {
 		return err
 	}
 	if options.model != "" {
 		for _, other := range kinds {
 			if other != kinds[0] {
-				return usageError{"--model goes with one agent; with several, each uses its own default model"}
+				return usageError{"--model goes with one agent; with several, name each one's model in --agents, such as --agents claude:opus,hermes:qwen/qwen3.8-max-0902"}
 			}
 		}
 		if !agentModelName.MatchString(options.model) {
@@ -405,7 +411,7 @@ func startBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout,
 	for i := 0; i < n; i++ {
 		agent := kinds[i%len(kinds)]
 		run.Options.Agents = append(run.Options.Agents, agent)
-		run.Options.Models = append(run.Options.Models, firstNonEmpty(options.model, defaultAgentModel(agent)))
+		run.Options.Models = append(run.Options.Models, firstNonEmpty(models[i%len(models)], options.model, defaultAgentModel(agent)))
 	}
 	if err := confirmBestOf(run, options, stdin, info); err != nil {
 		return err
@@ -437,7 +443,8 @@ func startBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout,
 			}
 			return fmt.Errorf("started %d of %d boxes, then: %w\n  hi agent best-of show %s   the table for the boxes that started\n  hi agent best-of rm %s     remove them", len(run.Boxes), n, err, id, id)
 		}
-		run.Boxes = append(run.Boxes, bestOfBox{Name: meta.Name, Agent: agent, Model: meta.Model, Branch: meta.Branch, State: "running",
+		billing, metered := agentBilling(agent)
+		run.Boxes = append(run.Boxes, bestOfBox{Name: meta.Name, Agent: agent, Model: meta.Model, Branch: meta.Branch, State: "running", Billing: billing, Metered: metered,
 			ChangedFiles: []string{}, Flags: []string{}})
 		if err := saveBestOf(&run); err != nil {
 			return err
@@ -476,39 +483,51 @@ func startBestOf(options boxOptions, flags bestOfFlags, stdin io.Reader, stdout,
 }
 
 // bestOfAgents is the agents to take in turn: --agents, else the brief's
-// agent, else the first one ready.
-func bestOfAgents(list, kind string) ([]string, error) {
+// agent, else the first one ready. Each comes with the model it named
+// after a colon, such as hermes:qwen/qwen3.8-max-0902, or "".
+func bestOfAgents(list, kind string) ([]string, []string, error) {
 	if list == "" {
 		if kind == "" {
 			chosen, err := chooseAgent()
-			return []string{chosen}, err
+			return []string{chosen}, []string{""}, err
 		}
-		return []string{kind}, agentReady(kind)
+		return []string{kind}, []string{""}, agentReady(kind)
 	}
-	var kinds []string
-	for _, name := range strings.Split(list, ",") {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
-		}
-		if !agentKinds[name] {
-			return nil, fmt.Errorf("--agents takes claude, codex, and hermes, not %q", name)
-		}
-		kinds = append(kinds, name)
-	}
-	if len(kinds) == 0 {
-		return nil, usageError{"--agents needs at least one agent, such as --agents claude,codex"}
+	kinds, models, err := parseBestOfAgents(list)
+	if err != nil {
+		return nil, nil, err
 	}
 	checked := map[string]bool{}
 	for _, name := range kinds {
 		if !checked[name] {
 			checked[name] = true
 			if err := agentReady(name); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	}
-	return kinds, nil
+	return kinds, models, nil
+}
+
+func parseBestOfAgents(list string) ([]string, []string, error) {
+	var kinds, models []string
+	for _, item := range strings.Split(list, ",") {
+		name, model, _ := strings.Cut(strings.TrimSpace(item), ":")
+		if name == "" {
+			continue
+		}
+		if !agentKinds[name] {
+			return nil, nil, fmt.Errorf("--agents takes claude, codex, and hermes, not %q", name)
+		}
+		if model != "" && !agentModelName.MatchString(model) {
+			return nil, nil, fmt.Errorf("%q isn't a model name", model)
+		}
+		kinds, models = append(kinds, name), append(models, model)
+	}
+	if len(kinds) == 0 {
+		return nil, nil, usageError{"--agents needs at least one agent, such as --agents claude,codex"}
+	}
+	return kinds, models, nil
 }
 
 var makeCheckTarget = regexp.MustCompile(`(?m)^check\s*:`)
