@@ -87,16 +87,25 @@ and on the holdout, checks each score against what hi recorded, and writes
 |---|---|
 | `report.html` | the report; open it from disk, no server needed |
 | `attempts.parquet` | one row per attempt: agent, result, idea, and every metric in-sample and on the holdout |
-| `returns.parquet` | each attempt's net monthly returns, and the benchmark's (attempt -1) |
+| `returns.parquet` | each attempt's monthly returns, net and gross, with the fees and borrow between them, and the benchmark's (attempt -1) |
 | `weights.parquet` | the weights each attempt held each month |
+| `robust.parquet` | `make robust`'s checks, in-sample, for the baseline and every kept version |
+| `regimes.parquet` | each month's market regime: volatility (two and three states) and trend |
+| `capacity.parquet` | how much money the baseline and the best could run, from daily volume |
 | `rounds.parquet`, `run.parquet` | each round, and the run with its limits |
 | `strategies/` | `strategy.py` as each attempt left it |
 | `run.json` | `hi agent best-of show --json`, as it was |
 
 The report charts the score of every attempt with the best so far, the
 growth of $1 and the drawdown of each round against the baseline and the
-benchmark (`BENCHMARK` in `results.py`), one chart per kept version, and
-returns by year. A page opened from disk can't read the files next to it,
+benchmark (`BENCHMARK` in `evaluate.py`), the weights held, returns by
+regime, one chart per kept version, and returns by year. A fees slider (0
+to 5 times the backtest's) and a date range recompute every chart and
+number. Below them: `make robust`'s checks for the baseline and the round
+you pick, a decision log of every kept change with the checks before and
+after, what helped and what isn't proven yet, how much money it could run
+(a position at 1% of a day's dollar volume), and what the backtest charges
+and doesn't. A page opened from disk can't read the files next to it,
 so `make results` puts the Parquet tables and a small Parquet reader inside
 `report.html`; the same tables are there for DuckDB, pandas, or polars:
 
@@ -108,6 +117,34 @@ duckdb -c "select round, agent, result, is_sharpe, ho_sharpe from 'results/b-1/a
 commits, so agents never see them. Scoring every attempt on the holdout
 spends it; read those columns as a check on the loop, not to pick a version.
 
+## How much of the score is luck
+
+In `autoresearch-quant`, a score is one backtest: one start month, one
+rebalance day, one level of fees. `make robust` redraws it, in seconds, for
+the current `strategy.py`:
+
+| Check | What it asks |
+|---|---|
+| Start sets | a backtest from every month that leaves 3 years: how often is it ahead of the benchmark? |
+| Tranches | the same rules rebalancing 5, 10 and 15 trading days early: how far does the Sharpe move with the day alone? |
+| End windows | every 1, 3 and 5-year stretch: how often is it ahead? |
+| Periods | three equal blocks of the period: does it hold in each? |
+| Costs | the Sharpe at 0, 1, 2 and 5 times the fees, and the multiple at which the benchmark pulls ahead |
+| Sensitivity | each numeric constant in capitals moved to its neighbours: is the chosen setting the top of its grid? |
+| Placebo | 200 random portfolios of the same size: what share does the strategy beat? |
+| Noise | a `--min-gain` for the loop |
+
+On the run in the [tutorial](/guide/tutorials/autoresearch-quant/), it
+showed what the holdout later confirmed: moving the rebalance day five
+trading days earlier took the best version from 1.53 to 1.17, and its
+`TOP = 4` was the top of its grid.
+
+`SCORE` in `evaluate.py` picks what the loop improves. The default,
+`sharpe`, rewards fitting one stretch of history; `worst_period`,
+`median_start` and `tranches` must hold across stretches, start months or
+rebalance days. `make score` prints all four, so a run's log shows them.
+Agents can run `make robust` in their boxes too; `program.md` asks them to.
+
 ## Adapt it before a run
 
 Change these first, then commit, then start the loop. Never during a run:
@@ -116,13 +153,16 @@ scores before and after wouldn't compare.
 1. **The data.** In `prepare.py`: `TICKERS`, `START`, and `SPLIT`
    (`autoresearch-quant`), or `URL` and `SHA256` or your own `download()`
    (`autoresearch-ml`). Run `make data` again.
-2. **The starting point.** Replace the example in `strategy.py` or
+2. **The backtest and the score** (`autoresearch-quant`). In `evaluate.py`:
+   `REBALANCE`, shorts and their limits, `FEES`, `BORROW`, `BENCHMARK`, and
+   `SCORE`. Run `make robust` on the baseline for a `--min-gain`.
+3. **The starting point.** Replace the example in `strategy.py` or
    `train.py` with yours. Agents improve what you give them.
-3. **The metric.** In `evaluate.py`: the fee and risk-free rate, or the time
+4. **The metric.** In `evaluate.py`: the fee and risk-free rate, or the time
    budget in `prepare.py`. Keep the last printed line a number.
-4. **The task.** `program.md` is what agents read every round: the goal,
+5. **The task.** `program.md` is what agents read every round: the goal,
    what's allowed, and what good judgement means here.
-5. **The run.** The `loop` target in the `Makefile`: `BOXES`, `ROUNDS`, and
+6. **The run.** The `loop` target in the `Makefile`: `BOXES`, `ROUNDS`, and
    `BUDGET` (`make loop BOXES=4 ROUNDS=50`), and the flags themselves.
 
 Then run `make check`: the tests still hold for your changes, or tell you

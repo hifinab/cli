@@ -298,7 +298,7 @@ results/b-3/report.html: 61 attempts
 results/b-3/
   report.html        the report; open it from disk, no server needed
   attempts.parquet   61 rows: every attempt, its idea, and every metric in-sample and on the holdout
-  returns.parquet    each attempt's net monthly returns, and SPY's
+  returns.parquet    each attempt's monthly returns, net and gross, and SPY's
   weights.parquet    what each attempt held each month
   rounds.parquet     20 rows, one per round
   run.parquet        the run: its settings, limits, and how it ended
@@ -306,17 +306,27 @@ results/b-3/
   run.json           hi agent best-of show b-3 --json
 ```
 
+hi v0.36.0 adds `robust.parquet`, `regimes.parquet` and `capacity.parquet`;
+the report linked below has them.
+
 All 61 attempts re-ran to exactly the score hi recorded.
 
 **[Open this run's report](/guide/tutorials/autoresearch-quant/results/b-3/report.html)**,
-the same file `make results` wrote, served as it is. It has:
+re-made with hi v0.36.0's report. It has:
 
 - the Sharpe of every attempt, with the best so far and that version's
   holdout Sharpe beneath it;
+- a fees slider and a date range that recompute everything below them;
 - the growth of $1 and the drawdown of each round against the baseline and
-  SPY, one round at a time or all at once, with the holdout marked;
+  SPY, one round at a time or all at once, with the holdout marked and
+  volatile months shaded;
+- what each round held, month by month, and its returns by market regime;
 - one small chart per kept version, and returns by year for every version;
-- facts computed from the tables, and the log of all 61 attempts.
+- `make robust`'s checks for the baseline and the round you pick (see
+  below), a decision log of every kept change, and what helped and what
+  isn't proven;
+- how much money it could run, the backtest's assumptions, facts computed
+  from the tables, and the log of all 61 attempts.
 
 ![The report's progress chart: the in-sample Sharpe climbs from 0.855 to 1.530 while the same strategy's holdout Sharpe stays between 0.68 and 1.01](/guide/tutorials/autoresearch-quant/progress.png)
 
@@ -379,13 +389,51 @@ That is a result, not a failure of the tool: hi kept the agents to one file
 and a fixed backtest, measured every attempt itself, and kept the years
 that tell the truth out of reach.
 
+**What `make robust` would have said.** hi v0.36.0 added `make robust`,
+which redraws a score many ways using only the in-sample data. Run on the
+baseline and on round 16, before anyone looked at the holdout:
+
+```text
+sharpe 1.530, SPY 0.523
+start sets   139 starts: 63% ahead of SPY; Sharpe median 1.523, worst 1.231
+tranches     0d 1.530, 5d 1.169, 10d 0.812, 15d 0.862; together 1.381; spread 0.719
+end windows  1y: ahead in 47% of 163; worst -19.0 pts a year
+end windows  3y: ahead in 34% of 139; worst -12.9 pts a year
+end windows  5y: ahead in 17% of 115; worst -8.0 pts a year
+periods      2008-07 to 2013-04 2.116, 2013-05 to 2018-02 0.644, 2018-03 to 2022-12 1.768
+costs        0x 1.594, 1x 1.530, 2x 1.466, 5x 1.267; behind SPY from 8.3x the fees
+sensitivity  TOP: 2 1.226, 3 1.466, [4 1.530], 5 1.416, 6 1.347; median 1.416  <- the chosen setting is the top of its grid
+sensitivity  VOL_DAYS: 61 1.530, 62 1.530, [63 1.530], 64 1.527, 65 1.527; median 1.530
+placebo      200 random portfolios of 4, 100% invested: median 0.248, 95th percentile 0.478; the strategy beats 100%
+noise        --min-gain 0.29: the Sharpe moves this much with the rebalance day alone; ...
+```
+
+| Check | Baseline | Round 16 |
+|---|---|---|
+| Sharpe, rebalancing on the last trading day (what the loop scored) | 0.855 | 1.530 |
+| Sharpe, rebalancing 5 trading days earlier | 0.499 | 1.169 |
+| Four rebalance days held together | 0.735 | 1.381 |
+| Worst of three periods | 0.429 | 0.644 |
+| Start months ahead of SPY | 36% | 63% |
+| Suggested `--min-gain` | 0.16 | 0.29 |
+
+Two things stand out. The Sharpe depends on the rebalance day: moving it
+five trading days earlier costs the best version 0.36, about what the last
+eight kept rounds gained together. And `TOP = 4` sits at the top of its grid in
+both versions, which is what a fitted setting looks like. The run used
+`--min-gain 0.01`; the noise on the baseline was 0.16. The strategy is
+still better than random picks, and better in volatile months, but most of
+its 79% in-sample gain is fit, which the holdout then confirmed.
+
 **To make the next run more robust**, change these before it starts, in a
 new commit:
 
-- a score that must hold in more than one period, for example the worse of
-  the 2008–2015 and 2016–2022 Sharpe ratios, in `evaluate.py`;
+- `SCORE = "tranches"` or `"worst_period"` in `evaluate.py`, so a gain has
+  to hold on every rebalance day or in every period, and `--min-gain` from
+  `make robust` on the baseline;
 - a complexity limit in `program.md`, such as at most eight tunable
-  numbers;
+  numbers, and `make robust` before every idea is settled (the template's
+  `program.md` now asks for it);
 - a new holdout: this one has been looked at, so the next clean test is
   the future. Paper-trade the version you choose from today.
 

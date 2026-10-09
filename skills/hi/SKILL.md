@@ -361,7 +361,10 @@ and a commit, `make loop` starts them (ask about the cost first).
 In `autoresearch-quant`, `make loop` ends with `make results`, and
 `make results` after an early stop writes `results/<run>/`: every attempt
 re-run, as Parquet, and `report.html`. Don't commit `results/`: it holds
-holdout scores. `hi init --update --dry-run` shows how a project
+holdout scores. `make robust` shows how much of a score is luck, in-sample,
+and suggests a `--min-gain`; run it on the baseline before a run, and
+suggest `SCORE = "tranches"` or `"worst_period"` in `evaluate.py` when the
+user wants gains that hold. `hi init --update --dry-run` shows how a project
 differs from the current templates, and `hi init --update` applies it; if it
 writes `docs/upgrades/<version>.md`, apply what fits from it, run
 `make check`, and delete the file. `hi init --adopt <template>` brings an

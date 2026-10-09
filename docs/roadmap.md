@@ -578,6 +578,74 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.36.0 — A research suite for `autoresearch-quant`
+
+Asked for on 2026-10-09, after run b-3 raised the in-sample Sharpe from 0.86
+to 1.53 while the holdout fell from 0.94 to 0.87. The ideas come from a
+strategy decision record the user shared the same day: judge on many start
+dates, end dates, costs, nearby settings and placebos, and write down every
+decision and what it did. Built step by step, released together. Tested on 2026-10-09 on run b-3
+of the tutorial: every attempt re-run, and `make robust` on its baseline and
+best.
+Spec: [autoresearch_quant_suite.md](specs/approved/autoresearch_quant_suite.md).
+
+- [x] 1. A backtester that carries real strategies, in `evaluate.py`:
+  - `REBALANCE` monthly (as today), weekly or daily, with metrics
+    annualized by periods a year.
+  - Long and short (`LONG_ONLY`), with gross and net exposure limits
+    (`MAX_GROSS`, `MAX_NET`); the defaults keep long only, 100% at most.
+  - A fee per ticker (`FEES`, defaulting to `FEE`), and a yearly borrow fee
+    on shorts (`BORROW`).
+  - `OFFSET`: rebalance a number of trading days before the period's end.
+  - `simulate()` returns the whole path: net and gross returns, costs,
+    turnover, borrow and weights. `BENCHMARK` moves into `evaluate.py`.
+  - Tests against an independent implementation for the defaults, and a
+    second vectorized reference for shorts, borrow, fees per ticker and
+    weekly rebalancing.
+- [x] 2. `make robust` (`robust.py`): how much of the score is luck, in
+  seconds, for the current `strategy.py`:
+  - Start sets: a backtest from every in-sample month with at least 3
+    years left; the share ahead of the benchmark, median and worst Sharpe.
+  - Tranches: the rebalance day moved 0, 5, 10 and 15 trading days earlier,
+    and the four held together.
+  - End windows: the share of rolling 1, 3 and 5-year windows ahead of the
+    benchmark.
+  - Periods: the Sharpe of three equal blocks of the in-sample period.
+  - Costs: the Sharpe at 0, 1, 2 and 5 times the fees, and the break-even
+    multiple against the benchmark.
+  - Sensitivity: every numeric constant in capitals in `strategy.py` moved
+    to its neighbours, the Sharpe at each, and a flag when the chosen
+    setting is the top of its grid.
+  - Placebo: 200 random but persistent portfolios with the strategy's
+    holdings and invested share; the strategy's percentile.
+  - Noise: a suggested `--min-gain`, from how far the Sharpe moves with the
+    rebalance day alone.
+- [x] 3. A score that must hold: `SCORE` in `evaluate.py` picks what `make
+  score` prints last: `sharpe` (the default), `worst_period`,
+  `median_start` or `tranches`. Every score prints all four above it.
+- [x] 4. Regimes (`regimes.py`): causal labels from the benchmark, known at
+  each period's end: 2-state and 3-state volatility, and trend. Each
+  version's returns by state, next to the benchmark's.
+- [x] 5. Liquidity and capacity: `make data` also saves daily volume;
+  results report each held ticker's average weight, median dollar volume,
+  and the fund size at which its largest position reaches 1% of a day's
+  volume.
+- [x] 6. The report records decisions:
+  - A decision log of kept rounds: the idea, the in-sample and holdout
+    change, and the robustness before and after.
+  - What helped and what didn't: kept ideas ranked by gain; discarded,
+    unchanged and failed attempts with their ideas.
+  - A cost slider (0–5 times the fees) and a date range that recompute
+    every curve and number.
+  - The selected version's weights over time, regime shading, and returns
+    by regime.
+  - Robustness of the baseline and the best version: start sets, end
+    windows, periods, costs, sensitivity and placebo.
+  - Capacity, when volume exists, and the assumptions: what the backtest
+    charges and what it doesn't.
+- [x] 7. `program.md`, the README and the guide describe the checks;
+  release v0.36.0.
+
 ### v0.35.0 — Results of a run
 
 - [x] `hi agent best-of --then "<command>"` runs a command on this machine,
@@ -909,72 +977,6 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   Spec: [hi_data.md](specs/approved/hi_data.md).
 
 ## Planned
-
-### v0.36.0 — A research suite for `autoresearch-quant`
-
-Asked for on 2026-10-09, after run b-3 raised the in-sample Sharpe from 0.86
-to 1.53 while the holdout fell from 0.94 to 0.87. The ideas come from a
-strategy decision record the user shared the same day: judge on many start
-dates, end dates, costs, nearby settings and placebos, and write down every
-decision and what it did. Built step by step, released together.
-Spec: [autoresearch_quant_suite.md](specs/approved/autoresearch_quant_suite.md).
-
-- [ ] 1. A backtester that carries real strategies, in `evaluate.py`:
-  - `REBALANCE` monthly (as today), weekly or daily, with metrics
-    annualized by periods a year.
-  - Long and short (`LONG_ONLY`), with gross and net exposure limits
-    (`MAX_GROSS`, `MAX_NET`); the defaults keep long only, 100% at most.
-  - A fee per ticker (`FEES`, defaulting to `FEE`), and a yearly borrow fee
-    on shorts (`BORROW`).
-  - `OFFSET`: rebalance a number of trading days before the period's end.
-  - `simulate()` returns the whole path: net and gross returns, costs,
-    turnover, borrow and weights. `BENCHMARK` moves into `evaluate.py`.
-  - Tests against an independent implementation for the defaults, and a
-    second vectorized reference for shorts, borrow, fees per ticker and
-    weekly rebalancing.
-- [ ] 2. `make robust` (`robust.py`): how much of the score is luck, in
-  seconds, for the current `strategy.py`:
-  - Start sets: a backtest from every in-sample month with at least 3
-    years left; the share ahead of the benchmark, median and worst Sharpe.
-  - Tranches: the rebalance day moved 0, 5, 10 and 15 trading days earlier,
-    and the four held together.
-  - End windows: the share of rolling 1, 3 and 5-year windows ahead of the
-    benchmark.
-  - Periods: the Sharpe of three equal blocks of the in-sample period.
-  - Costs: the Sharpe at 0, 1, 2 and 5 times the fees, and the break-even
-    multiple against the benchmark.
-  - Sensitivity: every numeric constant in capitals in `strategy.py` moved
-    to its neighbours, the Sharpe at each, and a flag when the chosen
-    setting is the top of its grid.
-  - Placebo: 200 random but persistent portfolios with the strategy's
-    holdings and invested share; the strategy's percentile.
-  - Noise: a suggested `--min-gain`, from how far the Sharpe moves with the
-    rebalance day alone.
-- [ ] 3. A score that must hold: `SCORE` in `evaluate.py` picks what `make
-  score` prints last: `sharpe` (the default), `worst_period`,
-  `median_start` or `tranches`. Every score prints all four above it.
-- [ ] 4. Regimes (`regimes.py`): causal labels from the benchmark, known at
-  each period's end: 2-state and 3-state volatility, and trend. Each
-  version's returns by state, next to the benchmark's.
-- [ ] 5. Liquidity and capacity: `make data` also saves daily volume;
-  results report each held ticker's average weight, median dollar volume,
-  and the fund size at which its largest position reaches 1% of a day's
-  volume.
-- [ ] 6. The report records decisions:
-  - A decision log of kept rounds: the idea, the in-sample and holdout
-    change, and the robustness before and after.
-  - What helped and what didn't: kept ideas ranked by gain; discarded,
-    unchanged and failed attempts with their ideas.
-  - A cost slider (0–5 times the fees) and a date range that recompute
-    every curve and number.
-  - The selected version's weights over time, regime shading, and returns
-    by regime.
-  - Robustness of the baseline and the best version: start sets, end
-    windows, periods, costs, sensitivity and placebo.
-  - Capacity, when volume exists, and the assumptions: what the backtest
-    charges and what it doesn't.
-- [ ] 7. `program.md`, the README and the guide describe the checks;
-  release v0.36.0.
 
 ### Later — More for the autoresearch templates
 

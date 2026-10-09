@@ -213,7 +213,7 @@ def sensitivity(source: str, prices: pd.DataFrame, chosen: float) -> list[Result
                 "value": value,
                 "grid": grid,
                 "median": float(np.median(values)),
-                "top": bool(finite) and chosen >= max(finite),
+                "top": bool(finite) and chosen > max(finite) + 1e-6,  # a tie is a flat grid
             }
         )
     return rows

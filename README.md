@@ -256,7 +256,9 @@ are embedded in the binary. `autoresearch-ml` and `autoresearch-quant` are
 projects shaped for `hi agent best-of` rounds: a fixed, tested evaluation,
 one file agents change, frozen data, and a holdout outside the repository;
 `autoresearch-quant`'s `make results` re-runs every attempt of a run into
-Parquet files and a report that opens from disk. Private templates, such as quant `research`,
+Parquet files and a report that opens from disk, and `make robust` shows how
+much of a score is luck (start months, rebalance days, costs, nearby
+settings, random portfolios). Private templates, such as quant `research`,
 live in a private repository that a `hi server` mirrors
 (`hi server templates add`) and serves, signed, to connected devices. Template
 authors can try a folder of layers with `HI_TEMPLATES_DIR=<path> hi init …`.
