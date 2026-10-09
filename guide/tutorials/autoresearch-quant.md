@@ -321,7 +321,8 @@ re-made with hi v0.36.0's report. It has:
   SPY, one round at a time or all at once, with the holdout marked and
   volatile months shaded;
 - what each round held, month by month, and its returns by market regime;
-- one small chart per kept version, and returns by year for every version;
+- returns by year for every version, or their excess return over the
+  baseline or SPY;
 - `make robust`'s checks for the baseline and the round you pick (see
   below), a decision log of every kept change, and what helped and what
   isn't proven;

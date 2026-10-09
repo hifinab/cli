@@ -99,9 +99,9 @@ and on the holdout, checks each score against what hi recorded, and writes
 The report charts the score of every attempt with the best so far, the
 growth of $1 and the drawdown of each round against the baseline and the
 benchmark (`BENCHMARK` in `evaluate.py`), the weights held, returns by
-regime, one chart per kept version, and returns by year. A fees slider (0
-to 5 times the backtest's) and a date range recompute every chart and
-number. Below them: `make robust`'s checks for the baseline and the round
+regime, and returns by year (or the excess over the baseline or the
+benchmark). At the top of the chart, a fees slider (0 to 5 times the
+backtest's) and a date range recompute every chart and number. Below them: `make robust`'s checks for the baseline and the round
 you pick, a decision log of every kept change with the checks before and
 after, what helped and what isn't proven yet, how much money it could run
 (a position at 1% of a day's dollar volume), and what the backtest charges

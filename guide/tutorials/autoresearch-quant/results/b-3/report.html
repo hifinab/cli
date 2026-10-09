@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <style>
-/* Layout: one research-note column; charts span the column, a stats table sits under the main chart, small multiples in a wrapping grid. */
+/* Layout: one research-note column; charts span the column, a stats table sits under the main chart. */
 :root {
   --bg: #f4f6f8; --panel: #ffffff; --ink: #17212c; --muted: #5b6876; --rule: #dbe1e8;
   --accent: #1f5fbf; --kept: #18845a; --base: #b2741a; --spy: #69737f; --attempt: #a7b2bf;
@@ -119,13 +119,6 @@ tr.grp th { text-align: center; border-bottom: 0; color: var(--ink); }
 #yearTable tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 td.p { background: var(--posbg); color: var(--pos); } td.n { background: var(--negbg); color: var(--neg); }
 
-.multiples { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-.tile { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 10px 6px; cursor: pointer; display: grid; gap: 2px; text-align: left; font: inherit; color: inherit; min-width: 0; }
-.tile:hover { border-color: var(--accent); }
-.tile.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.tile .h { display: flex; justify-content: space-between; gap: 8px; font-family: var(--f-mono); font-size: 11.5px; color: var(--muted); }
-.tile .l { font-size: 12.5px; line-height: 1.3; min-height: 2.6em; }
-.tile svg { width: 100%; height: auto; display: block; }
 
 .findings { display: grid; gap: 18px; counter-reset: f; }
 .finding { display: grid; grid-template-columns: 34px 1fr; gap: 4px 12px; }
@@ -134,7 +127,7 @@ td.p { background: var(--posbg); color: var(--pos); } td.n { background: var(--n
 .finding p { grid-column: 2; }
 .note { border-left: 3px solid var(--base); padding: 4px 0 4px 14px; color: var(--ink); max-width: 80ch; }
 ul.recs { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-width: 76ch; }
-.viewbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--rule); padding-block: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; }
+.viewbar { border-bottom: 1px solid var(--rule); padding-bottom: 12px; gap: 10px 22px; }
 .viewbar .grp { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .viewbar select { font: 13px var(--f-mono); color: var(--ink); background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 4px 6px; }
 .viewbar input[type=range] { width: 150px; accent-color: var(--accent); }
@@ -184,7 +177,14 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
   </div>
 </section>
 
-<div class="viewbar" id="viewbar" aria-label="View">
+<section id="equity">
+  <div class="sec-head">
+    <div class="eyebrow">P&amp;L</div>
+    <h2>Growth of $1 and drawdown, round by round</h2>
+    <p id="equityText">Each round's best strategy, net of fees, against the baseline and the benchmark bought and held. Beneath it, on the same dates, each line's drawdown from its previous high. The shaded area right of the line is the holdout. Show every version at once, or step through them one at a time. The fees and the dates at the top of the chart change every chart and number from here down, except the decision log, which is as the run scored it.</p>
+  </div>
+  <div class="panel" style="display:grid;gap:12px">
+    <div class="controls viewbar" id="viewbar" aria-label="View">
   <span class="grp">Fees <input type="range" id="costs" min="0" max="5" step="0.25" value="1" aria-label="Fees, as a multiple of the backtest's"><span class="num mono" id="costsLbl">1×</span></span>
   <span class="grp">From <select id="from" aria-label="First month"></select> to <select id="to" aria-label="Last month"></select></span>
   <span class="seg" role="group" aria-label="Period">
@@ -194,14 +194,6 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
   </span>
   <span class="grp mono" id="viewNote"></span>
 </div>
-
-<section id="equity">
-  <div class="sec-head">
-    <div class="eyebrow">P&amp;L</div>
-    <h2>Growth of $1 and drawdown, round by round</h2>
-    <p id="equityText">Each round's best strategy, net of fees, against the baseline and the benchmark bought and held. Beneath it, on the same dates, each line's drawdown from its previous high. The shaded area right of the line is the holdout. Show every version at once, or step through them one at a time. The fees and the dates in the bar above change every chart and number from here down, except the decision log, which is as the run scored it.</p>
-  </div>
-  <div class="panel" style="display:grid;gap:12px">
     <div class="controls">
       <div class="seg" role="group" aria-label="Traces">
         <button id="modeAll" aria-pressed="false">All rounds</button>
@@ -247,20 +239,16 @@ footer { color: var(--muted); font-size: 13px; display: grid; gap: 6px; }
   <div class="tablewrap panel" style="padding:8px"><table id="regimeTable"></table></div>
 </section>
 
-<section id="each">
-  <div class="sec-head">
-    <div class="eyebrow">Every version</div>
-    <h2 id="eachTitle">Every version, one chart each</h2>
-    <p>The baseline and every kept round; rounds where nothing was kept are left out. Each tile shows the version, the baseline and the benchmark, with drawdowns beneath and the holdout marked. The numbers are in-sample → holdout score. Select a tile to open it above.</p>
-  </div>
-  <div class="multiples" id="multiples"></div>
-</section>
-
 <section id="years">
   <div class="sec-head">
     <div class="eyebrow">Calendar returns</div>
     <h2>Returns by year</h2>
-    <p id="yearsText">Net returns per calendar year for the benchmark, the baseline and every kept round, with each one's in-sample and holdout score at the end. The first and last years can be partial; blue years are the holdout. The highlighted row is the round chosen above; select any row to chart it.</p>
+    <p id="yearsText">Net returns per calendar year for the benchmark, the baseline and every kept round, with each one's in-sample and holdout score at the end. Switch to excess returns to see, year by year, where a round beat the baseline or the index and where it fell behind. The first and last years can be partial; blue years are the holdout. The highlighted row is the round chosen above; select any row to chart it.</p>
+  </div>
+  <div class="seg" role="group" aria-label="Returns or excess returns" style="justify-self:start">
+    <button id="yrRet" aria-pressed="true">Returns</button>
+    <button id="yrBase" aria-pressed="false">Excess return vs baseline</button>
+    <button id="yrIdx" aria-pressed="false">Excess return vs index</button>
   </div>
   <div class="tablewrap panel" style="padding:8px"><table id="yearTable"></table></div>
 </section>
@@ -461,7 +449,6 @@ function header(T) {
   $("#eyebrow").textContent = `hi agent best-of · run ${R.id} · ${R.project}`;
   $("#title").textContent = `${R.project}: run ${R.id}`;
   $("#progressTitle").textContent = `In-sample ${NAME}, attempt by attempt`;
-  $("#eachTitle").textContent = `The ${V.length} versions, one chart each`;
   $("#logTitle").textContent = `All ${A.length} attempts`;
   let lede = `${boxes} ${boxes === 1 ? "box" : "boxes"} a round, ${ROUNDS} rounds, ${mins} minutes, $${R.spend_usd.toFixed(2)}. In-sample ${NAME} went from ${f3(base.score)} to ${f3(last.score)}.`;
   if (HOOK) lede += ` On the holdout, which the loop never saw, it went from ${f3(base.scoreHo)} to ${f3(last.scoreHo)}.` + (num(BENCH.hoM[KEY]) ? ` Over those months ${BENCH.name} alone had ${f3(BENCH.hoM[KEY])}.` : "");
@@ -641,7 +628,6 @@ function drawEquity() {
   $("#statTable").innerHTML = `<tr class="grp"><th></th>${parts.map(([n, a, b]) => `<th colspan="4">${n} ${M[a]} – ${M[b]}</th>`).join("")}</tr><tr><th></th>${"<th>Sharpe</th><th>CAGR</th><th>Vol</th><th>Max DD</th>".repeat(parts.length)}</tr>` +
     row(v.round ? `Round ${v.round}` : "Baseline", "var(--accent)", v.ret) + (vi ? row("Baseline", "var(--base)", base.ret, true) : "") + row(BENCH.name, "var(--spy)", BENCH.ret);
   $("#slider").value = round;
-  document.querySelectorAll(".tile").forEach((t) => t.classList.toggle("sel", +t.dataset.vi === vi));
   drawYears(); drawHoldings(); drawRegimes(); drawRobust();
 }
 function setMode(m) { mode = m; store("results.mode", m); $("#modeAll").setAttribute("aria-pressed", m === "all"); $("#modeOne").setAttribute("aria-pressed", m === "one"); drawEquity(); }
@@ -653,34 +639,28 @@ function setView(from, to) {
   $("#rangeIs").setAttribute("aria-pressed", HOOK && FROM === is[0] && TO === is[1]);
   $("#rangeHo").setAttribute("aria-pressed", HOOK && FROM === ho[0] && TO === ho[1]);
   $("#viewNote").textContent = `${TO - FROM + 1} months` + (K !== 1 ? ` · fees ${K}× the backtest's` : "");
-  drawEquity(); drawMultiples();
+  drawEquity();
 }
 function setRound(r) { round = Math.max(0, Math.min(ROUNDS, r)); drawEquity(); }
 function stop() { if (playing) { clearInterval(playing); playing = null; $("#play").textContent = "Play"; } }
 
-// ---------- multiples ----------
-function drawMultiples() {
-  const box = $("#multiples"); box.innerHTML = "";
-  V.forEach((v, vi) => {
-    const b = document.createElement("button"); b.className = "tile"; b.dataset.vi = vi; b.type = "button";
-    const better = (v.scoreHo - base.scoreHo) * (R.higher ? 1 : -1) >= 0;
-    b.innerHTML = `<div class="h"><span>round ${v.round}${v.round ? " · " + esc(v.agent) : ""}</span><span>${f3(v.score)}${HOOK ? ` → <span class="${v.round ? (better ? "up" : "down") : ""}">${f3(v.scoreHo)}</span>` : ""}</span></div><div class="l">${esc(v.label)}</div><div class="c" style="position:relative"></div>`;
-    equityChart(b.querySelector(".c"), [benchSeries(), baseSeries(), { ret: v.ret, color: css("--accent"), width: 1.8 }].map((s) => ({ ...s, width: (s.width || 1.5) * 0.8 })), { from: FROM, to: TO, mini: true });
-    b.onclick = () => { stop(); round = v.round; setMode("one"); $("#equity").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); };
-    box.appendChild(b);
-  });
-}
-
 // ---------- years ----------
 function yearly(ret) { const o = {}; for (let i = FROM; i <= TO; i++) { const y = M[i].slice(0, 4); o[y] = (o[y] ?? 1) * (1 + ret[i]); } for (const y in o) o[y] = (o[y] - 1) * 100; return o; }
+let yearView = store("results.years") || "ret";
 function drawYears() {
   const sel = roundVer[round], benchY = yearly(BENCH.ret), years = Object.keys(benchY), hoYear = HOOK ? M[HO].slice(0, 4) : "9999";
-  const cell = (r) => { const a = Math.min(1, Math.abs(r) / 25) * 34 + 6; return `<td style="background:color-mix(in srgb, var(${r >= 0 ? "--pos" : "--neg"}) ${a.toFixed(0)}%, transparent);color:var(${r >= 0 ? "--pos" : "--neg"})">${r.toFixed(1)}</td>`; };
+  // Excess views subtract the reference's return that year, in percentage points; the reference row keeps its own return, uncoloured.
+  const refY = yearView === "base" ? yearly(base.ret) : yearView === "idx" ? benchY : null, scale = refY ? 10 : 25;
+  const isRef = (o) => refY && o === refY;
+  const shown = (o, y) => refY && !isRef(o) ? o[y] - refY[y] : o[y];
+  const paint = (r) => { const a = Math.min(1, Math.abs(r) / scale) * 34 + 6; return `<td style="background:color-mix(in srgb, var(${r >= 0 ? "--pos" : "--neg"}) ${a.toFixed(0)}%, transparent);color:var(${r >= 0 ? "--pos" : "--neg"})">${refY && r > 0 ? "+" : ""}${r.toFixed(1)}</td>`; };
+  const cells = (o) => years.map((y) => isRef(o) ? `<td style="color:var(--muted)">${o[y].toFixed(1)}</td>` : paint(shown(o, y))).join("");
   const tail = (a, b) => `<td class="sh">${f3(a)}</td>` + (HOOK ? `<td class="sh">${f3(b)}</td>` : ""); // as the run scored them
   const head = `<tr><th class="stick">Version</th>${years.map((y) => `<th${y >= hoYear ? ' style="color:var(--accent)"' : ""}>${y}</th>`).join("")}<th class="sh">${esc(NAME)} in</th>${HOOK ? `<th class="sh">${esc(NAME)} out</th>` : ""}</tr>`;
-  const bench = `<tr class="ref"><td class="stick"><span class="key"><i class="sw" style="color:var(--spy)"></i>${esc(BENCH.name)}</span><span class="sub">bought and held</span></td>${years.map((y) => cell(benchY[y])).join("")}${tail(BENCH.in[KEY], BENCH.hoM[KEY])}</tr>`;
-  const rows = V.map((v, vi) => { const o = yearly(v.ret); return `<tr data-round="${v.round}" class="${vi === sel ? "cur" : ""}${vi === 0 ? " ref" : ""}" tabindex="0"><td class="stick"><span class="key"><i class="sw${vi === 0 ? " dash" : ""}" style="color:var(${vi === 0 ? "--base" : "--accent"})"></i>${vi === 0 ? "Baseline" : "Round " + v.round}${vi ? ` <span class="ag">${esc(v.agent)}</span>` : ""}</span><span class="sub">${esc(v.label)}</span></td>${years.map((y) => cell(o[y])).join("")}${tail(v.score, v.scoreHo)}</tr>`; }).join("");
+  const bench = `<tr class="ref"><td class="stick"><span class="key"><i class="sw" style="color:var(--spy)"></i>${esc(BENCH.name)}</span><span class="sub">bought and held${yearView === "idx" ? " · the reference" : ""}</span></td>${cells(benchY)}${tail(BENCH.in[KEY], BENCH.hoM[KEY])}</tr>`;
+  const rows = V.map((v, vi) => { const o = vi === 0 && refY && yearView === "base" ? refY : yearly(v.ret); return `<tr data-round="${v.round}" class="${vi === sel ? "cur" : ""}${vi === 0 ? " ref" : ""}" tabindex="0"><td class="stick"><span class="key"><i class="sw${vi === 0 ? " dash" : ""}" style="color:var(${vi === 0 ? "--base" : "--accent"})"></i>${vi === 0 ? "Baseline" : "Round " + v.round}${vi ? ` <span class="ag">${esc(v.agent)}</span>` : ""}</span><span class="sub">${esc(v.label)}${vi === 0 && yearView === "base" ? " · the reference" : ""}</span></td>${cells(o)}${tail(v.score, v.scoreHo)}</tr>`; }).join("");
   const t = $("#yearTable"); t.innerHTML = head + bench + rows;
+  for (const [id, view] of [["#yrRet", "ret"], ["#yrBase", "base"], ["#yrIdx", "idx"]]) { const b = $(id); b.setAttribute("aria-pressed", yearView === view); b.onclick = () => { yearView = view; store("results.years", view); drawYears(); }; }
   t.querySelectorAll("tr[data-round]").forEach((tr) => { const go = () => { stop(); setRound(+tr.dataset.round); }; tr.onclick = go; tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }; });
 }
 
@@ -896,7 +876,7 @@ function drawAssumptions() {
     "Prices are adjusted closes from Yahoo Finance: dividends and splits are in the returns, reinvested on the day.",
     `The benchmark, ${BENCH.name}, is bought and held without fees.`,
     `The first ${R.warmup ?? 12} months only build history and aren't scored. No taxes.`,
-    "Charts and tables after the fees bar use monthly returns; the scores in the header and the log are evaluate.py's, as the run recorded them.",
+    "Charts and tables that follow the fees and dates use monthly returns; the scores in the header and the log are evaluate.py's, as the run recorded them.",
   ];
   if (HOOK) items.push("make results scored every attempt on the holdout, so it is spent: a version picked because it looks good there has been fitted to it.");
   $("#assumeList").innerHTML = items.map((t) => `<li>${esc(t)}</li>`).join("");
@@ -919,10 +899,10 @@ function start(T) {
   document.addEventListener("keydown", (e) => { if (e.target.tagName === "INPUT" || e.target.tagName === "TR") return; if (e.key === "ArrowLeft") { stop(); setRound(round - 1); } if (e.key === "ArrowRight") { stop(); setRound(round + 1); } });
   if (!REG.some((r) => r.vol2)) { $("#shadeVol").parentElement.hidden = true; $("#regimes").hidden = true; }
   $("#from").value = 0; $("#to").value = TO; $("#viewNote").textContent = `${M.length} months`;
-  drawMultiples(); drawLog(); drawDecisions(); drawLessons(); drawCapacity(); drawAssumptions();
+  drawLog(); drawDecisions(); drawLessons(); drawCapacity(); drawAssumptions();
   observe($("#progressChart"), drawProgress); observe($("#equityChart"), drawEquity);
   observe($("#holdChart"), drawHoldings); observe($("#startChart"), drawRobust);
-  const redraw = () => { drawProgress(); drawEquity(); drawMultiples(); };
+  const redraw = () => { drawProgress(); drawEquity(); };
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
   new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 }
