@@ -941,6 +941,26 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
 
 ## Planned
 
+### v0.37.0 — `hi team`: a virtual team in a Slack channel
+
+- [x] `hi team new`: a step-by-step setup that prints the team's Slack app
+  manifest, checks both tokens and the channel, and makes the team's
+  folder, a git repository (new or cloned), and the lead's `SOUL.md`;
+  `--from <file.json>` without a terminal.
+- [x] `hi team up` and `down`: a systemd user service runs the lead, Hermes'
+  Slack gateway, in a box limited to Slack and OpenRouter, in one channel,
+  without direct messages; `ls`, `status`, `logs`, `manifest`.
+- [x] The broker: the lead's `hi team task`, `review`, `wait`, `merge`, and
+  `stop` start members as `hi agent` on the host, and a merge needs a
+  review that approved the task's latest commit.
+- [x] `hi agent --from <commit>` starts a worktree from a branch.
+- [x] Hermes in a box no longer installs its dependencies again for each
+  home folder (`HERMES_DISABLE_LAZY_INSTALLS`).
+  Tested on 2026-10-10 on this workstation: the lead's box with Hermes
+  v0.21.6, a task by Claude Code, a review by Codex, and the merge.
+- [ ] Verify with a live Slack workspace and channel.
+  Approved spec: [hi_team.md](specs/approved/hi_team.md).
+
 ### Later — More for the autoresearch templates
 
 - [ ] Cross-validation and several seeds for `autoresearch-ml`, and its

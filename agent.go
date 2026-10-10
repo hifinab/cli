@@ -132,6 +132,7 @@ options:
   --task-file <path>     the task from a file whose name doesn't end in .md
   --model <model>        the agent's model, such as opus or gpt-6.1-sol; without it, the model in your
                          own Claude Code or Codex settings, else opus for Claude Code
+  --from <commit>        start the worktree from this commit or branch instead of HEAD
   --bundle a,b           attach bundles: their skills, and an image with what they need (hi bundle ls)
   --name, --network, --allow, --gpu, --data, --here, --image, --memory
                          the box's options, as for hi box
@@ -435,6 +436,9 @@ func agentBoxSetup(kind, prompt string, meta boxMeta, homeDir string, run *[]str
 		return []string{"sh", "-c", "exec codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check" + model + " -o " +
 			results + "/last.txt - < " + results + "/task.md"}, nil
 	case "hermes":
+		// Hermes would otherwise install its dependencies again for each
+		// new home folder, and write bytecode into its read-only source.
+		env["HERMES_DISABLE_LAZY_INSTALLS"], env["PYTHONDONTWRITEBYTECODE"] = "1", "1"
 		return hermesBoxSetup(prompt, meta, homeDir, results, run)
 	}
 	return nil, fmt.Errorf("unknown agent %q", kind)

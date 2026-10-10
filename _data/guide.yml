@@ -51,6 +51,8 @@
       url: /guide/q/
     - title: Hand tasks to agents
       url: /guide/agent/
+    - title: Run a team in Slack
+      url: /guide/team/
     - title: Run code in a box
       url: /guide/box/
     - title: Download the team's data

@@ -49,6 +49,7 @@ hi data            Download your team's Hugging Face datasets, models, and bucke
 hi server          Run the server that brokers compute and serves templates for your team (hi server help)
 hi agent [task]    Hand a task to Claude Code, Codex, or Hermes in a box and get its report (hi agent help)
 hi box shell       Run a shell or a command in a rootless box (hi box help)
+hi team new <name> Set up a virtual team of agents in a Slack channel; hi team up starts it (hi team help)
 hi bundle ls       Bundles of skills and tools for hi agent --bundle
 hi q [request]     Ask an AI model for a shell command, or chat with it (hi q --setup first)
 hi skills          Find, install, and update agent skills from skills.sh; hi skill add hi teaches agents hi

@@ -17,6 +17,7 @@ description: Every hi command and option in one place.
 | `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
 | `hi shell-init bash\|zsh`        | Shell integration for `hi q`                           |
 | `hi agent …`                     | Hand a task to Claude Code, Codex, or Hermes in a box; see below |
+| `hi team …`                      | A virtual team of agents in a Slack channel; see below |
 | `hi box …`                       | Run a shell or a command in a rootless box; see below  |
 | `hi bundle …`                    | Bundles of skills for `hi agent --bundle`; see below   |
 | `hi skill …`                     | Find, install, and update agent skills; see below      |
@@ -238,6 +239,24 @@ rounds: `--for <duration>`, `--budget <dollars>`, `--patience <n>`,
 `--min-gain <number>`, `--edit a,b` for the files an agent may change, and
 `--then "<command>"`, run on this machine when the rounds end.
 See [Autoresearch](/guide/autoresearch/).
+
+## hi team
+
+See [Run a team in Slack](/guide/team/).
+
+| Command | What it does |
+|---|---|
+| `hi team new <name> [--from <file.json>]` | Set up a team: its Slack app, channel, people, members, and code |
+| `hi team up <name>`                       | Start it as a systemd user service, also at boot |
+| `hi team down <name>`                     | Stop it; its folder stays |
+| `hi team ls`                              | Teams on this machine |
+| `hi team status <name>`                   | Up or down, its members, and its latest tasks |
+| `hi team logs <name> [<task>]`            | The lead's log, or a task's |
+| `hi team manifest <name>`                 | The Slack app manifest again |
+
+In its box, the lead runs `hi team task <role> <brief.md> [--on <task>]`,
+`review <task>`, `wait <task>`, `show <task>`, `tasks`, `merge <task>`, and
+`stop <task>`.
 
 ## hi box
 

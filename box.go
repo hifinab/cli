@@ -239,6 +239,8 @@ func parseBoxOptions(command string, args []string) (boxOptions, error) {
 			options.taskFile, err = value()
 		case command == "agent" && (arg == "--model" || strings.HasPrefix(arg, "--model=")):
 			options.model, err = value()
+		case command == "agent" && (arg == "--from" || strings.HasPrefix(arg, "--from=")):
+			options.from, err = value()
 		case arg == "--bundle" || strings.HasPrefix(arg, "--bundle="):
 			text, err = value()
 			for _, name := range strings.Split(text, ",") {

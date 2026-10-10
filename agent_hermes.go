@@ -74,6 +74,18 @@ func readHermesModelConfig(path string) hermesModelConfig {
 	return config
 }
 
+// hermesInstalled checks that Hermes is installed and has an OpenRouter
+// key for the proxy to put in place of a box's placeholder.
+func hermesInstalled() error {
+	if !fileExists(filepath.Join(hermesInstallDir(), "venv", "bin", "python")) || !fileExists(filepath.Join(hermesInstallDir(), "hermes")) {
+		return errors.New("Hermes is not installed on this machine; install it with hi install hermes")
+	}
+	if _, err := readDotEnvValue(hermesEnvPath(), "OPENROUTER_API_KEY"); err != nil {
+		return errors.New("Hermes has no OpenRouter key in ~/.hermes/.env; run hermes setup")
+	}
+	return nil
+}
+
 // hermesReady checks that Hermes is installed and uses OpenRouter with a
 // key, the one provider hi can keep the key outside the box for.
 func hermesReady() error {
@@ -94,15 +106,7 @@ func hermesReady() error {
 // placeholder key in the box's home folder, and returns its command.
 func hermesBoxSetup(prompt string, meta boxMeta, homeDir, results string, run *[]string) ([]string, error) {
 	install := hermesInstallDir()
-	*run = append(*run, "-v", install+":"+install+":ro")
-	// The venv's python is a link to a Python uv installed in the home
-	// folder; that comes along read-only at the same path.
-	if python, err := filepath.EvalSymlinks(filepath.Join(install, "venv", "bin", "python")); err == nil {
-		home, _ := os.UserHomeDir()
-		if root := filepath.Dir(filepath.Dir(filepath.Dir(python))); strings.HasPrefix(root, home+"/") {
-			*run = append(*run, "-v", root+":"+root+":ro")
-		}
-	}
+	hermesMounts(run)
 	hermesDir := filepath.Join(homeDir, ".hermes")
 	if err := os.MkdirAll(hermesDir, 0o700); err != nil {
 		return nil, err

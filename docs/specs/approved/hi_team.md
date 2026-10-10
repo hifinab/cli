@@ -1,6 +1,6 @@
 # `hi team` specification
 
-Status: Draft (2026-10-10).
+Status: Approved (2026-10-10). The first slice is built (v0.37.0).
 
 Dependencies: `hi box` (boxes, the proxy, token injection, the allowlist),
 `hi agent` (Claude Code, Codex, and Hermes in a box, reports, stats, models),
@@ -41,7 +41,7 @@ A team is a set of members. A member is a role: an agent, a model, a
 bundle, and standing instructions.
 
 ```jsonc
-// ~/.hi/teams/payments/team.json
+// ~/.local/share/hi/teams/payments/team.json
 {
   "name": "payments",
   "purpose": "An app for the finance admins to track supplier payments",
@@ -132,16 +132,20 @@ back or change the budget (the team's owners).
 ## The team folder
 
 ```text
-~/.hi/teams/payments/
+~/.local/share/hi/teams/payments/      (HI_TEAMS_DIR moves it)
   team.json          members, channel, owners, budget (no secrets)
   secrets.json       Slack tokens, keys (0600, never exported in the clear)
   slack-manifest.json
   lead/              Hermes' home: memory, state.db, SOUL.md, skills, cron
   specs/             what the lead and the people agreed, feature by feature
   repo/              the project's git repository (main, branches, tags)
+  tasks/             each task's brief (t-3.md) and record (t-3.json)
   app/               the running app's data: databases, uploads
-  logs/
+  run/               the lead box's home and its proxy's allowlist and log
 ```
+
+The broker's socket is in the user's runtime folder
+(`/run/user/<uid>/hi-team-<name>`), since a socket's path must be short.
 
 Bind-mounted into the boxes; no Docker volumes, so a copy of the folder is
 a copy of the team.
@@ -165,6 +169,27 @@ hi team import <file>           a team from an export, on this or another host
 hi team manifest <name>         print the Slack app manifest again
 hi team remove <name>           delete the team (asks; offers a last export)
 ```
+
+The lead runs these in its box, through the broker:
+
+```text
+hi team task <role> <brief.md|-> [--on <task>]   start a task; --on continues a task on its branch
+hi team review <task> [<notes.md>]               the reviewer checks a task's latest commit
+hi team wait <task>                              wait for a task and print its report
+hi team show <task>                              its state and report, without waiting
+hi team tasks                                    list the tasks
+hi team merge <task>                             merge it, once a review approved its latest commit
+hi team stop <task>                              stop a task's box
+```
+
+- A brief gets a heading before it is saved, so front matter in it can't
+  widen the member's box.
+- A review starts on the task's branch (`hi agent --from`). Its verdict is
+  approve only when the reviewer finished and its summary starts with
+  "Approve".
+- A merge is `git merge --no-ff` into the team's branch, then a push when
+  the repository was cloned. The merged tasks' boxes and branches, and
+  their reviews', are removed.
 
 ## The wizard
 
@@ -278,7 +303,9 @@ preview and live app boxes, snapshots and rollback, and export and import.
 
 ## First slice
 
-`hi team new`, `up`, `down`, and `logs`: the lead in one channel, its
-memory in the folder, and the coder and reviewer through the broker,
-merging to `main`. Then the app's preview and live boxes, then snapshots
-and rollback, then export and import.
+`hi team new`, `up`, `down`, `ls`, `status`, `logs`, and `manifest`: the
+lead in one channel, its memory in the folder, and the coder and reviewer
+through the broker, merging to the team's branch. Built in v0.37.0; the
+wizard asks for purpose, Slack, channel, people, members, and code, and
+leaves backups and the budget to later slices. Then the app's preview and
+live boxes, then snapshots and rollback, then export and import.
