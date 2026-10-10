@@ -20,10 +20,10 @@ import (
 // lead's box with Hermes' Slack gateway, its proxy, and the broker. When
 // the lead stops, so does serve, and systemd starts it again.
 
-// teamLeadHosts are all the lead's box may reach: Slack over Socket Mode,
-// OpenRouter (its model calls go through the proxy's token listener), and
-// the model list Hermes reads.
-var teamLeadHosts = []string{"slack.com", "slack-edge.com", "slack-files.com", "openrouter.ai", "models.dev"}
+// teamLeadHosts is the lead's allowlist: any site, so it can read the
+// links people give it. The box is still its boundary: no credentials, and
+// its model calls go through the proxy's token listener.
+var teamLeadHosts = []string{"*"}
 
 func teamServe(name string, stdout, stderr io.Writer) error {
 	config, err := loadTeam(name)

@@ -418,9 +418,9 @@ func (b *teamBroker) launch(task teamTask, member teamMember, brief, from string
 	if member.Bundle != "" {
 		args = append(args, "--bundle", member.Bundle)
 	}
-	if member.Network != "" {
-		args = append(args, "--network", member.Network)
-	}
+	// Members reach any site unless team.json narrows it; the box is the
+	// boundary.
+	args = append(args, "--network", firstNonEmpty(member.Network, "open"))
 	for _, host := range member.Allow {
 		args = append(args, "--allow", host)
 	}

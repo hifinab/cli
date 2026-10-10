@@ -47,6 +47,7 @@ func setupTeamTest(t *testing.T) string {
 	t.Setenv("GIT_AUTHOR_EMAIL", "test@example.com")
 	t.Setenv("GIT_COMMITTER_NAME", "Test")
 	t.Setenv("GIT_COMMITTER_EMAIL", "test@example.com")
+	t.Chdir(dir)
 	saved := teamSlack
 	teamSlack = fakeTeamSlack{}
 	t.Cleanup(func() { teamSlack = saved })
@@ -103,7 +104,7 @@ func TestTeamManifest(t *testing.T) {
 	if err := json.Unmarshal([]byte(teamManifest(testTeamConfig())), &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Display.Name != "payments-team" || !manifest.Settings.Socket {
+	if manifest.Display.Name != "team-payments" || !manifest.Settings.Socket {
 		t.Fatalf("%+v", manifest)
 	}
 	all := strings.Join(append(manifest.OAuth.Scopes.Bot, manifest.Settings.Events.Bot...), " ")
@@ -114,7 +115,7 @@ func TestTeamManifest(t *testing.T) {
 }
 
 func TestTeamWizard(t *testing.T) {
-	setupTeamTest(t)
+	dir := setupTeamTest(t)
 	answers := strings.Join([]string{
 		"Track supplier payments for the finance admins",
 		"xoxb-bot", "xapp-app",
@@ -128,7 +129,7 @@ func TestTeamWizard(t *testing.T) {
 	if err := teamNew([]string{"payments"}, strings.NewReader(answers), &out); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if !strings.Contains(out.String(), `"name": "payments-team"`) || !strings.Contains(out.String(), "hi team up payments") {
+	if !strings.Contains(out.String(), `"name": "team-payments"`) || !strings.Contains(out.String(), "hi team up payments") {
 		t.Fatal(out.String())
 	}
 	config, err := loadTeam("payments")
@@ -155,6 +156,10 @@ func TestTeamWizard(t *testing.T) {
 	if !strings.Contains(string(soul), "<@U07OWNER1>") || !strings.Contains(string(soul), "may not read code") {
 		t.Fatal(string(soul))
 	}
+	// The folder is where hi team new ran, and hi finds it by name.
+	if want := filepath.Join(dir, "team-payments"); teamDir("payments") != want || !fileExists(filepath.Join(want, ".gitignore")) {
+		t.Fatalf("the team is in %s", teamDir("payments"))
+	}
 	// The same name again is refused.
 	if err := teamNew([]string{"payments"}, strings.NewReader(answers), &out); err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatal(err)
@@ -172,7 +177,7 @@ func TestTeamNewChecksSlack(t *testing.T) {
 	t.Setenv("HI_TEAM_SLACK_BOT_TOKEN", "xoxb-bot")
 	t.Setenv("HI_TEAM_SLACK_APP_TOKEN", "xapp-app")
 	teamSlack = fakeTeamSlack{notMember: true}
-	if err := teamNew([]string{"payments", "--from", file}, strings.NewReader(""), &out); err == nil || !strings.Contains(err.Error(), "/invite @payments-team") {
+	if err := teamNew([]string{"payments", "--from", file}, strings.NewReader(""), &out); err == nil || !strings.Contains(err.Error(), "/invite @team-payments") {
 		t.Fatal(err)
 	}
 	if fileExists(teamDir("payments")) {
@@ -359,7 +364,7 @@ func TestTeamBrokerTaskReviewMerge(t *testing.T) {
 	if !strings.HasPrefix(string(brief), "# Task t-1 for the coder") {
 		t.Fatal(string(brief))
 	}
-	if !strings.Contains(b.calls[0], "agent claude --detach --json --name payments-t-1 --task-file ") || !strings.Contains(b.calls[0], "--model opus") {
+	if !strings.Contains(b.calls[0], "agent claude --detach --json --name payments-t-1 --task-file ") || !strings.Contains(b.calls[0], "--model opus") || !strings.Contains(b.calls[0], "--network open") {
 		t.Fatal(b.calls[0])
 	}
 
@@ -462,5 +467,31 @@ func TestTeamBrokerSocket(t *testing.T) {
 	}
 	if err := runTeamLeadCommand("tasks", nil, strings.NewReader(""), &out); err != nil || !strings.Contains(out.String(), "t-1") {
 		t.Fatal(out.String(), err)
+	}
+}
+
+func TestTeamMovedFolder(t *testing.T) {
+	dir := setupTeamTest(t)
+	t.Setenv("HI_TEAM_SLACK_BOT_TOKEN", "xoxb-bot")
+	t.Setenv("HI_TEAM_SLACK_APP_TOKEN", "xapp-app")
+	file := filepath.Join(dir, "answers.json")
+	writeSkillTestFile(t, file, `{"purpose": "x", "channel": "C07PAYMENTS", "owners": ["U07OWNER1"]}`, 0o600)
+	var out bytes.Buffer
+	if err := teamNew([]string{"payments", "--dir", "elsewhere/pay", "--from", file}, strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	if teamDir("payments") != filepath.Join(dir, "elsewhere", "pay") {
+		t.Fatal(teamDir("payments"))
+	}
+	os.Rename(filepath.Join(dir, "elsewhere", "pay"), filepath.Join(dir, "moved"))
+	if _, err := loadTeam("payments"); err == nil || !strings.Contains(err.Error(), "if you moved it, run hi team up <its new folder>") {
+		t.Fatal(err)
+	}
+	name, err := teamAdopt("moved", &out)
+	if err != nil || name != "payments" || teamDir("payments") != filepath.Join(dir, "moved") {
+		t.Fatal(name, err, teamDir("payments"))
+	}
+	if _, err := loadTeam("payments"); err != nil {
+		t.Fatal(err)
 	}
 }

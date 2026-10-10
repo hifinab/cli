@@ -41,7 +41,7 @@ A team is a set of members. A member is a role: an agent, a model, a
 bundle, and standing instructions.
 
 ```jsonc
-// ~/.local/share/hi/teams/payments/team.json
+// ./team-payments/team.json
 {
   "name": "payments",
   "purpose": "An app for the finance admins to track supplier payments",
@@ -132,7 +132,7 @@ back or change the budget (the team's owners).
 ## The team folder
 
 ```text
-~/.local/share/hi/teams/payments/      (HI_TEAMS_DIR moves it)
+./team-payments/   (where hi team new ran, or --dir)
   team.json          members, channel, owners, budget (no secrets)
   secrets.json       Slack tokens, keys (0600, never exported in the clear)
   slack-manifest.json
@@ -143,6 +143,12 @@ back or change the budget (the team's owners).
   app/               the running app's data: databases, uploads
   run/               the lead box's home and its proxy's allowlist and log
 ```
+
+The folder lives where the team was made, beside the user's other
+projects. `~/.local/share/hi/teams/<name>` is a link to it, so commands find
+a team by name from anywhere, and the systemd unit names only the team.
+A moved or copied folder is registered again with `hi team up <folder>`.
+`secrets.json` and `run/` are in the folder's `.gitignore`.
 
 The broker's socket is in the user's runtime folder
 (`/run/user/<uid>/hi-team-<name>`), since a socket's path must be short.
@@ -284,11 +290,18 @@ and only an owner's button carries it out.
 - Anyone who can post in the channel can steer the team, so only the
   listed people are heard, and nothing the people say can widen what a box
   may reach.
-- Each box reaches only its allowlist, through the proxy.
+- Boxes reach any site by default, through the proxy, which logs every
+  connection: people give the lead links, and members install what they
+  need. Exposure is limited by the box: no credentials, only the team's
+  folder, and model keys added by the proxy on the way out. A member's
+  `network` in team.json narrows it to the dev or locked preset.
+- Later, a security advisor: a member, or Hermes' own guard
+  (`approvals.mode: smart`, which asks an LLM about risky commands), that
+  reviews the proxy's log, the members' commands, and merged changes, and
+  tells the owners about anything risky instead of blocking the team.
 - Model keys never enter a box; tokens for Slack and the repository are
   scoped to this team only.
-- Live deploys, rollbacks, budget changes, and new hosts on the allowlist
-  need an owner.
+- Live deploys, rollbacks, and budget changes need an owner.
 - Every task, review, merge, deploy, and rollback is in the team's log.
 
 ## Reused and new

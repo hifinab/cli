@@ -70,7 +70,31 @@ func teamsDir() string {
 	return filepath.Join(base, "hi", "teams")
 }
 
-func teamDir(name string) string { return filepath.Join(teamsDir(), name) }
+// A team's folder is wherever it was made, ./team-<name> by default.
+// teamsDir holds a link to each, by name, so hi team <command> <name>
+// finds it from anywhere.
+func teamDir(name string) string {
+	link := filepath.Join(teamsDir(), name)
+	if target, err := filepath.EvalSymlinks(link); err == nil {
+		return target
+	}
+	return link
+}
+
+// teamRegister links a team's name to its folder.
+func teamRegister(name, folder string) error {
+	if err := os.MkdirAll(teamsDir(), 0o700); err != nil {
+		return err
+	}
+	link := filepath.Join(teamsDir(), name)
+	if info, err := os.Lstat(link); err == nil {
+		if info.Mode()&os.ModeSymlink == 0 {
+			return fmt.Errorf("%s is in the way: it should be a link to team %s's folder", link, name)
+		}
+		os.Remove(link)
+	}
+	return os.Symlink(folder, link)
+}
 
 func teamUnitName(name string) string { return "hi-team-" + name + ".service" }
 
@@ -133,6 +157,9 @@ func loadTeam(name string) (teamConfig, error) {
 	}
 	data, err := os.ReadFile(filepath.Join(teamDir(name), "team.json"))
 	if errors.Is(err, os.ErrNotExist) {
+		if target, linkErr := os.Readlink(filepath.Join(teamsDir(), name)); linkErr == nil {
+			return config, fmt.Errorf("team %s's folder %s is gone; if you moved it, run hi team up <its new folder>", name, target)
+		}
 		return config, fmt.Errorf("no team named %s; hi team ls lists them", name)
 	}
 	if err != nil {
@@ -181,7 +208,17 @@ func runTeam(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "new":
 		err = teamNew(rest, stdin, stdout)
 	case "up":
-		err = withTeamName(rest, func(name string) error { return teamUp(name, stdout) })
+		err = withTeamName(rest, func(name string) error {
+			// A folder instead of a name: a team that was moved, or copied
+			// from another machine.
+			if strings.ContainsRune(name, '/') || name == "." {
+				var adoptErr error
+				if name, adoptErr = teamAdopt(name, stdout); adoptErr != nil {
+					return adoptErr
+				}
+			}
+			return teamUp(name, stdout)
+		})
 	case "down":
 		err = withTeamName(rest, func(name string) error { return teamDown(name, stdout) })
 	case "ls", "list":
@@ -222,17 +259,20 @@ project's memory, and members it hands tasks to (a coder, a reviewer),
 each in a box of its own.
 
 usage:
-  hi team new <name>               a step-by-step setup: Slack app, channel, people, members, code
+  hi team new <name>               a step-by-step setup: Slack app, channel, people, members, code,
+                                   in a new folder ./team-<name>
+      [--dir <folder>]             the team's folder somewhere else
       [--from <file.json>]         the answers from a file; the Slack tokens from
                                    HI_TEAM_SLACK_BOT_TOKEN and HI_TEAM_SLACK_APP_TOKEN
   hi team up <name>                start the team and keep it up, also after a reboot
+  hi team up <folder>              the same for a team whose folder moved or was copied here
   hi team down <name>              stop it; its folder stays
   hi team ls                       teams on this machine
   hi team status <name>            whether it is up, its members, and its tasks
   hi team logs <name> [<task>]     the lead's log, or a task's
   hi team manifest <name>          the Slack app manifest again
 
-A team lives in `+teamsDir()+`/<name>.`)
+A team is its folder. hi finds it by name through `+teamsDir()+`.`)
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +321,7 @@ type teamAnswers struct {
 }
 
 func teamNew(args []string, stdin io.Reader, stdout io.Writer) error {
-	var name, from string
+	var name, from, folder string
 	for i := 0; i < len(args); i++ {
 		switch {
 		case args[i] == "--from" && i+1 < len(args):
@@ -289,23 +329,34 @@ func teamNew(args []string, stdin io.Reader, stdout io.Writer) error {
 			from = args[i]
 		case strings.HasPrefix(args[i], "--from="):
 			from = strings.TrimPrefix(args[i], "--from=")
+		case args[i] == "--dir" && i+1 < len(args):
+			i++
+			folder = args[i]
+		case strings.HasPrefix(args[i], "--dir="):
+			folder = strings.TrimPrefix(args[i], "--dir=")
 		case strings.HasPrefix(args[i], "-"):
 			return usageError{"unknown option " + args[i]}
 		case name == "":
 			name = args[i]
 		default:
-			return usageError{"usage: hi team new <name> [--from <file.json>]"}
+			return usageError{"usage: hi team new <name> [--dir <folder>] [--from <file.json>]"}
 		}
 	}
 	if name == "" {
-		return usageError{"usage: hi team new <name> [--from <file.json>]"}
+		return usageError{"usage: hi team new <name> [--dir <folder>] [--from <file.json>]"}
 	}
 	if !teamNamePattern.MatchString(name) {
 		return fmt.Errorf("a team's name starts with a letter and has lowercase letters, digits, and dashes, up to 20: %q", name)
 	}
-	dir := teamDir(name)
+	if _, err := loadTeam(name); err == nil {
+		return fmt.Errorf("team %s already exists in %s", name, teamDir(name))
+	}
+	dir, err := filepath.Abs(firstNonEmpty(folder, "team-"+name))
+	if err != nil {
+		return err
+	}
 	if fileExists(dir) {
-		return fmt.Errorf("team %s already exists in %s", name, dir)
+		return fmt.Errorf("%s already exists; choose another folder with --dir", dir)
 	}
 	if err := hermesInstalled(); err != nil {
 		return err
@@ -313,11 +364,10 @@ func teamNew(args []string, stdin io.Reader, stdout io.Writer) error {
 
 	var answers teamAnswers
 	var secrets teamSecrets
-	var err error
 	if from != "" {
 		answers, secrets, err = teamAnswersFromFile(name, from)
 	} else {
-		answers, secrets, err = teamWizard(name, stdin, stdout)
+		answers, secrets, err = teamWizard(name, dir, stdin, stdout)
 	}
 	if err != nil {
 		return err
@@ -330,8 +380,16 @@ func teamNew(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err := teamCheckSlack(config, secrets, stdout); err != nil {
 		return err
 	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	if err := teamRegister(name, dir); err != nil {
+		os.RemoveAll(dir)
+		return err
+	}
 	if err := createTeamFolder(&config, secrets, answers.Clone, stdout); err != nil {
 		os.RemoveAll(dir)
+		os.Remove(filepath.Join(teamsDir(), name))
 		return err
 	}
 	fmt.Fprintf(stdout, "\nTeam %s is ready in %s.\n", name, dir)
@@ -362,14 +420,14 @@ func teamAnswersFromFile(name, path string) (teamAnswers, teamSecrets, error) {
 	return answers, secrets, nil
 }
 
-func teamWizard(name string, stdin io.Reader, stdout io.Writer) (teamAnswers, teamSecrets, error) {
+func teamWizard(name, dir string, stdin io.Reader, stdout io.Writer) (teamAnswers, teamSecrets, error) {
 	var answers teamAnswers
 	var secrets teamSecrets
 	config := &answers.teamConfig
 	config.Name = name
 	var err error
 
-	fmt.Fprintf(stdout, "Setting up team %s. Each step can be changed later in %s.\n\n", name, filepath.Join(teamDir(name), "team.json"))
+	fmt.Fprintf(stdout, "Setting up team %s. Each step can be changed later in %s.\n\n", name, filepath.Join(dir, "team.json"))
 
 	fmt.Fprintln(stdout, "1/6 Purpose")
 	fmt.Fprintln(stdout, "In one sentence, what is this team for? The lead starts from it.")
@@ -572,6 +630,10 @@ func createTeamFolder(config *teamConfig, secrets teamSecrets, clone string, std
 	if err := saveTeamSecrets(config.Name, secrets); err != nil {
 		return err
 	}
+	// In case the folder is inside a repository or a synced folder.
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("secrets.json\nrun/\n"), 0o600); err != nil {
+		return err
+	}
 	repo := filepath.Join(dir, "repo")
 	if clone != "" {
 		fmt.Fprintf(stdout, "Cloning %s…\n", clone)
@@ -639,7 +701,7 @@ code, so the code, its tests, and its docs must explain themselves.
 `
 
 // teamBotName is the bot's handle in Slack.
-func teamBotName(name string) string { return name + "-team" }
+func teamBotName(name string) string { return "team-" + name }
 
 // ---------------------------------------------------------------------------
 // up, down, ls, status, logs
@@ -723,6 +785,34 @@ var teamLingers = func() bool {
 	return err == nil && strings.TrimSpace(string(out)) == "yes"
 }
 
+// teamAdopt registers the team in a folder under its name: a team that
+// was moved, or copied from another machine.
+func teamAdopt(folder string, stdout io.Writer) (string, error) {
+	dir, err := filepath.Abs(folder)
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "team.json"))
+	if err != nil {
+		return "", fmt.Errorf("%s isn't a team's folder: %w", dir, err)
+	}
+	var config teamConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return "", fmt.Errorf("team.json: %w", err)
+	}
+	if !teamNamePattern.MatchString(config.Name) {
+		return "", fmt.Errorf("team.json has no valid name: %q", config.Name)
+	}
+	if current := teamDir(config.Name); current != dir && fileExists(filepath.Join(current, "team.json")) {
+		return "", fmt.Errorf("another team named %s is in %s", config.Name, current)
+	}
+	if err := teamRegister(config.Name, dir); err != nil {
+		return "", err
+	}
+	fmt.Fprintf(stdout, "Team %s is in %s.\n", config.Name, dir)
+	return config.Name, nil
+}
+
 func teamDown(name string, stdout io.Writer) error {
 	if _, err := loadTeam(name); err != nil {
 		return err
@@ -757,14 +847,15 @@ func teamList(stdout io.Writer) error {
 	count := 0
 	for _, entry := range entries {
 		config, err := loadTeam(entry.Name())
-		if !entry.IsDir() || err != nil {
+		if err != nil {
+			fmt.Fprintf(table, "%s\t%s\n", entry.Name(), err)
 			continue
 		}
 		if count == 0 {
-			fmt.Fprintln(table, "TEAM\tSTATE\tCHANNEL\tMEMBERS\tPURPOSE")
+			fmt.Fprintln(table, "TEAM\tSTATE\tCHANNEL\tMEMBERS\tFOLDER")
 		}
 		count++
-		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n", config.Name, teamState(config.Name), config.Channel, strings.Join(teamRoles(config), ", "), qClip(config.Purpose))
+		fmt.Fprintf(table, "%s\t%s\t%s\t%s\t%s\n", config.Name, teamState(config.Name), config.Channel, strings.Join(teamRoles(config), ", "), teamDir(config.Name))
 	}
 	table.Flush()
 	if count == 0 {

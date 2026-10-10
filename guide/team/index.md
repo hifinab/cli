@@ -22,6 +22,12 @@ whether it works.
 One team has one channel, one Slack app, and one machine. A new project is a
 new team.
 
+The lead and the members can reach any website, so the lead can read the
+links people give it and the members can install what they need. Their
+boxes are the boundary: they hold no keys or sign-ins (hi's proxy adds the
+model keys on the way out), and they see only the team's folder. To narrow
+a member, give it a `network` in `team.json` (see below).
+
 ## Before you start
 
 On the machine that will run the team:
@@ -45,11 +51,11 @@ The setup asks six things, one at a time:
 
 1. **Purpose.** One sentence; the lead starts from it.
 2. **Slack app.** hi prints a manifest named after the team
-   (`payments-team`). In Slack, create a new app from it, install it to the
+   (`team-payments`). In Slack, create a new app from it, install it to the
    workspace, and paste its bot token (`xoxb-…`, under OAuth & Permissions)
    and an app-level token with `connections:write` (`xapp-…`, under Basic
    Information). Neither shows as you paste it.
-3. **Channel.** Invite the app to the channel (`/invite @payments-team`) and
+3. **Channel.** Invite the app to the channel (`/invite @team-payments`) and
    paste the channel's ID (`C…`).
 4. **People.** The owners' Slack member IDs (`U…`), and who else may ask
    for work; Enter lets everyone in the channel.
@@ -96,8 +102,9 @@ nothing it asks for widens a member's box.
 
 ## The team's folder
 
-Everything a team knows and has made is in
-`~/.local/share/hi/teams/<name>/` (set `HI_TEAMS_DIR` to move it):
+Everything a team knows and has made is in one folder: `team-<name>` in
+the folder where you ran `hi team new`, or wherever `--dir` puts it. hi
+finds it by name from anywhere, through a link in `~/.local/share/hi/teams`.
 
 | Path | What |
 |---|---|
@@ -108,18 +115,24 @@ Everything a team knows and has made is in
 | `repo/` | The project's git repository |
 | `tasks/` | Each task's brief and report |
 
-The containers are rebuilt from the folder on every start. `lead/SOUL.md`
+The containers are rebuilt from the folder on every start, so a copy of the
+folder is a copy of the team. To move it, stop the team, move the folder,
+and start it by its new folder: `hi team up ~/projects/team-payments`. The
+same works for a folder copied from another machine. `secrets.json` is
+listed in the folder's `.gitignore`, in case the folder sits inside a
+repository. `lead/SOUL.md`
 is the lead's identity: edit it to change how the lead works, then
 `hi team up payments` to restart it.
 
 ## Change a member
 
 Edit `members` in `team.json` and restart the team. A member may have a
-`bundle` (see [bundles](/guide/agent/#bundles-skills-and-the-tools-they-need)) and, if the bundle needs
-more of the network, `network` and `allow`:
+`bundle` (see [bundles](/guide/agent/#bundles-skills-and-the-tools-they-need)),
+and a `network` to narrow what it reaches: `dev` (code hosts and package
+registries, plus any `allow`) or `locked`:
 
 ```json
-"coder": { "agent": "claude", "model": "opus", "bundle": "web", "allow": ["cdn.example.com"] }
+"coder": { "agent": "claude", "model": "opus", "bundle": "web", "network": "dev", "allow": ["cdn.example.com"] }
 ```
 
 The lead is always Hermes, and the reviewer must be a different agent or

@@ -948,7 +948,7 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   folder, a git repository (new or cloned), and the lead's `SOUL.md`;
   `--from <file.json>` without a terminal.
 - [x] `hi team up` and `down`: a systemd user service runs the lead, Hermes'
-  Slack gateway, in a box limited to Slack and OpenRouter, in one channel,
+  Slack gateway, in a box that reaches any site through the proxy, in one channel,
   without direct messages; `ls`, `status`, `logs`, `manifest`.
 - [x] The broker: the lead's `hi team task`, `review`, `wait`, `merge`, and
   `stop` start members as `hi agent` on the host, and a merge needs a
@@ -958,7 +958,16 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   home folder (`HERMES_DISABLE_LAZY_INSTALLS`).
   Tested on 2026-10-10 on this workstation: the lead's box with Hermes
   v0.21.6, a task by Claude Code, a review by Codex, and the merge.
+- [x] A team's folder is `./team-<name>` where it was made (or `--dir`),
+  found by name through a link; `hi team up <folder>` takes a moved or
+  copied one. The bot is `team-<name>`.
+- [x] Members reach any site by default (`--network open`); `network` in
+  team.json narrows one.
 - [ ] Verify with a live Slack workspace and channel.
+- [ ] A security advisor that reviews the proxy's log, the members'
+  commands, and merged changes, and tells the owners about anything risky
+  rather than blocking the team; Hermes' `approvals.mode: smart` is one
+  starting point.
   Approved spec: [hi_team.md](specs/approved/hi_team.md).
 
 ### Later — More for the autoresearch templates
