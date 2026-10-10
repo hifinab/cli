@@ -578,6 +578,16 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   uncommitted work are kept unless `--force`, branches with commits are
   kept, and without a terminal it needs `--yes`.
 
+### v0.36.3 — The quant template moves to the private repo
+
+- [x] `autoresearch-quant` is no longer built into hi; it is in
+  `hifinab/templates` and reaches connected devices through `hi server`,
+  with its tutorial, run b-3 and its specification. The public guide and
+  docs no longer describe it, and its tutorial's address redirects.
+- [x] `hi init --update` follows a layer that left the built-ins to the
+  one server source that has it, so projects made from the built-in
+  template keep updating.
+
 ### v0.36.2 — Live tokens, how agents are paid for, a model per agent
 
 - [x] `hi agent best-of watch` and `show` read the running boxes' session
@@ -590,85 +600,19 @@ and image policy on the server. Podman arrived in `hi install` in v0.22.2.
   from subscription usage.
 - [x] `--agents` takes a model per agent, such as
   `hermes:qwen/qwen3.8-max-0902`, and refuses more agents than boxes.
-- [x] `make results` prints its progress; the report compares a score that
-  isn't `sharpe` with the benchmark's Sharpe.
+- [x] The quant template's results print their progress (private repo).
 
 ### v0.36.1 — Report layout, excess returns, and Makefile notes
 
-- [x] The report's fees, dates and period buttons sit at the top of the
-  P&L panel; the per-version small multiples are gone, so a long run keeps
-  a short page; returns by year get tabs for the excess return over the
-  baseline and over the index.
+- [x] The quant template's report layout (private repo).
 - [x] `hi init --update` notes template changes outside a managed file's hi
   block, such as a new Makefile target, in `docs/upgrades`.
 
-### v0.36.0 — A research suite for `autoresearch-quant`
+### v0.36.0 — A research suite for the quant template
 
-Asked for on 2026-10-09, after run b-3 raised the in-sample Sharpe from 0.86
-to 1.53 while the holdout fell from 0.94 to 0.87. The ideas come from a
-strategy decision record the user shared the same day: judge on many start
-dates, end dates, costs, nearby settings and placebos, and write down every
-decision and what it did. Built step by step, released together. Tested on 2026-10-09 on run b-3
-of the tutorial: every attempt re-run, and `make robust` on its baseline and
-best.
-Spec: [autoresearch_quant_suite.md](specs/approved/autoresearch_quant_suite.md).
-
-- [x] 1. A backtester that carries real strategies, in `evaluate.py`:
-  - `REBALANCE` monthly (as today), weekly or daily, with metrics
-    annualized by periods a year.
-  - Long and short (`LONG_ONLY`), with gross and net exposure limits
-    (`MAX_GROSS`, `MAX_NET`); the defaults keep long only, 100% at most.
-  - A fee per ticker (`FEES`, defaulting to `FEE`), and a yearly borrow fee
-    on shorts (`BORROW`).
-  - `OFFSET`: rebalance a number of trading days before the period's end.
-  - `simulate()` returns the whole path: net and gross returns, costs,
-    turnover, borrow and weights. `BENCHMARK` moves into `evaluate.py`.
-  - Tests against an independent implementation for the defaults, and a
-    second vectorized reference for shorts, borrow, fees per ticker and
-    weekly rebalancing.
-- [x] 2. `make robust` (`robust.py`): how much of the score is luck, in
-  seconds, for the current `strategy.py`:
-  - Start sets: a backtest from every in-sample month with at least 3
-    years left; the share ahead of the benchmark, median and worst Sharpe.
-  - Tranches: the rebalance day moved 0, 5, 10 and 15 trading days earlier,
-    and the four held together.
-  - End windows: the share of rolling 1, 3 and 5-year windows ahead of the
-    benchmark.
-  - Periods: the Sharpe of three equal blocks of the in-sample period.
-  - Costs: the Sharpe at 0, 1, 2 and 5 times the fees, and the break-even
-    multiple against the benchmark.
-  - Sensitivity: every numeric constant in capitals in `strategy.py` moved
-    to its neighbours, the Sharpe at each, and a flag when the chosen
-    setting is the top of its grid.
-  - Placebo: 200 random but persistent portfolios with the strategy's
-    holdings and invested share; the strategy's percentile.
-  - Noise: a suggested `--min-gain`, from how far the Sharpe moves with the
-    rebalance day alone.
-- [x] 3. A score that must hold: `SCORE` in `evaluate.py` picks what `make
-  score` prints last: `sharpe` (the default), `worst_period`,
-  `median_start` or `tranches`. Every score prints all four above it.
-- [x] 4. Regimes (`regimes.py`): causal labels from the benchmark, known at
-  each period's end: 2-state and 3-state volatility, and trend. Each
-  version's returns by state, next to the benchmark's.
-- [x] 5. Liquidity and capacity: `make data` also saves daily volume;
-  results report each held ticker's average weight, median dollar volume,
-  and the fund size at which its largest position reaches 1% of a day's
-  volume.
-- [x] 6. The report records decisions:
-  - A decision log of kept rounds: the idea, the in-sample and holdout
-    change, and the robustness before and after.
-  - What helped and what didn't: kept ideas ranked by gain; discarded,
-    unchanged and failed attempts with their ideas.
-  - A cost slider (0–5 times the fees) and a date range that recompute
-    every curve and number.
-  - The selected version's weights over time, regime shading, and returns
-    by regime.
-  - Robustness of the baseline and the best version: start sets, end
-    windows, periods, costs, sensitivity and placebo.
-  - Capacity, when volume exists, and the assumptions: what the backtest
-    charges and what it doesn't.
-- [x] 7. `program.md`, the README and the guide describe the checks;
-  release v0.36.0.
+- [x] Robustness checks, scores that must hold, regimes, capacity, a fuller
+  backtester, and a report that records decisions, for the quant
+  template. Tracked in the private repo with the template since v0.36.3.
 
 ### v0.35.0 — Results of a run
 
@@ -676,21 +620,16 @@ Spec: [autoresearch_quant_suite.md](specs/approved/autoresearch_quant_suite.md).
   in the project, when the rounds end for any reason, with `HI_BEST_OF_RUN`
   set. hi keeps every attempt's files under `refs/best-of/<run>/`, and
   `ls --json` lists the runs.
-- [x] `autoresearch-quant`: `make results` re-runs every attempt of a run,
-  in-sample and on the holdout, into `results/<run>/`: Parquet tables, each
-  attempt's `strategy.py`, and a `report.html` that embeds the tables and a
-  Parquet reader, so it opens from disk without a server. `make loop` runs
-  it through `--then`. Tested with a real two-round run on 2026-10-09.
-  Spec: [hi_agent_best_of.md, Results](specs/ideas/hi_agent_best_of.md#results-2026-10-09).
+- [x] The quant template's results: every attempt re-run into Parquet and
+  an offline report (private repo since v0.36.3).
 
 ### v0.34.0 — Autoresearch templates
 
-- [x] `hi init autoresearch-ml` and `hi init autoresearch-quant`: projects
-  shaped for `hi agent best-of` rounds, with a fixed and tested evaluation,
+- [x] `hi init autoresearch-ml`, and a quant template now in the private
+  repo: projects shaped for `hi agent best-of` rounds, with a fixed and tested evaluation,
   one file agents change, frozen data, a holdout outside the repository,
   and a box image built from `uv.lock` so boxes run offline. Tested from
-  `hi init` to a score in a locked box, and the quant one through a real
-  round. Spec: [hi_init.md](specs/approved/hi_init.md#built-in-template-types),
+  `hi init` to a score in a locked box, and through a real round. Spec: [hi_init.md](specs/approved/hi_init.md#built-in-template-types),
   [hi_agent_best_of.md](specs/ideas/hi_agent_best_of.md#templates-and-the-guide-2026-10-08).
 - [x] Project images rebuild when a file the Dockerfile copies, or a
   `build.args` value, changes.

@@ -1,9 +1,9 @@
 ---
 title: Advanced examples
-description: Longer hi agent best-of runs - overnight model training on a Strix Halo from the autoresearch-ml template, a trading strategy with a holdout from autoresearch-quant, a safe speed-up with a noisy benchmark, and extending a run.
+description: Longer hi agent best-of runs - overnight model training on a Strix Halo from the autoresearch-ml template, a safe speed-up with a noisy benchmark, and extending a run.
 ---
 
-These start from the [autoresearch templates](/guide/autoresearch/templates/)
+These start from the [autoresearch template](/guide/autoresearch/templates/)
 or follow their pattern: a fixed evaluation, one file agents may change,
 and a holdout outside the repository.
 
@@ -61,58 +61,6 @@ git checkout best-of/b-1/best && make holdout && git checkout -
 If the holdout score improved about as much as the validation score, merge.
 If validation improved and the holdout didn't, the gains fit the validation
 text; keep only the early commits, or none.
-
-## A trading strategy with a holdout
-
-The aim: a better monthly allocation strategy, judged net of fees, without
-fitting the backtest.
-
-```sh
-hi init autoresearch-quant rotation && cd rotation
-```
-
-**Adapt it.** In `prepare.py`, set `TICKERS` to your universe and `SPLIT`
-to the last day agents may see; everything after it stays in
-`../rotation-holdout/`. Put your starting rules in `strategy.py`, and in
-`program.md` say which kinds of ideas are welcome (for example "no more than
-five parameters").
-
-```sh
-make data && make score && make check
-git add -A && git commit -m "Universe, rules, and baseline"
-```
-
-**Run it** with mixed agents and a cap on the spend:
-
-```sh
-make loop BOXES=4 ROUNDS=30 BUDGET=40
-hi agent best-of watch b-1
-```
-
-The evaluation passes `allocate()` only the prices up to each month-end,
-refuses code that reads files or imports anything but numpy, pandas, and a
-few standard modules, and charges 0.1% of every trade. So a gain is a better
-rule, not a peek at the future or a cheaper trade.
-
-**Read the results.** `make loop` ends with `make results`, which re-runs
-every attempt and writes `results/b-1/report.html`: the score round by
-round, the growth and drawdown of each kept version against the baseline
-and SPY, and returns by year. If the run stopped early, run `make results`
-yourself.
-
-**Check it once:**
-
-```sh
-git checkout best-of/b-1/best && make holdout && git checkout -
-```
-
-`make results` scores the holdout for every attempt, so once you've read
-its report the holdout has been looked at many times. Decide on the
-strategy from the in-sample work and the ideas, not from those columns.
-
-Compare it with the holdout score of your starting rules, measured once
-before the run. Every look at the holdout spends some of its value; if you
-change the strategy because of what it showed, it's no longer a holdout.
 
 ## A speed-up with a noisy benchmark
 

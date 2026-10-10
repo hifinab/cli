@@ -265,9 +265,9 @@ Now: round 9: scoring ml-b7-r9-2 (2 of 4)
 
 ### Templates and the guide (2026-10-08)
 
-- `hi init autoresearch-ml` and `hi init autoresearch-quant` start projects
-  shaped for rounds: a fixed `prepare.py` and `evaluate.py`, one file agents
-  change (`train.py` or `strategy.py`), frozen data in `eval/` (committed,
+- `hi init autoresearch-ml` starts a project shaped for rounds (a quant
+  template, built in until v0.36.3, is now in the private repo): a fixed
+  `prepare.py` and `evaluate.py`, one file agents change (`train.py`), frozen data in `eval/` (committed,
   since `data/` is ignored and boxes see only commits), a holdout in
   `../<folder>-holdout/`, and a box image that installs `uv.lock` into
   `/opt/venv` so boxes run offline on the locked network. Their evaluation
@@ -299,24 +299,8 @@ a run in files, and a report that reads them, without a web server.
   `hi agent best-of rm` leaves these refs.
 - `hi agent best-of ls --json` lists the runs, so a script can find the
   newest run of a project.
-- `autoresearch-quant` has `make results` (and `make loop` passes `--then
-  "make results"`): `results.py` re-runs every attempt from its files with
-  the project's `evaluate.py`, in-sample and on the holdout, and writes
-  `results/<run>/`: `run`, `attempts`, `rounds`, `returns`, and `weights` as
-  Parquet, each attempt's `strategy.py`, hi's JSON, and `report.html`.
-  `results/` is ignored by git, since boxes must never see holdout scores.
-- The report needs no server: a page opened from disk can't `fetch()` the
-  files next to it, so `make results` embeds the Parquet files (base64) and
-  a bundled copy of hyparquet (a small Parquet reader in plain JavaScript,
-  MIT) in `report.html`. DuckDB-Wasm would work too, but it is several
-  megabytes of WebAssembly from a CDN for tables of a few hundred kilobytes.
-  Served over HTTP, the same page reads the Parquet files beside it.
-- The report: the score of every attempt with the best so far and its
-  holdout score, the growth of $1 with a synced drawdown chart for each
-  round against the baseline and a benchmark (one round at a time or all at
-  once), one small chart per kept version, returns by year for every
-  version, computed facts, and the attempt log. Each re-run score is
-  compared with what hi recorded.
+- The quant template's results (every attempt re-run into Parquet and an
+  offline report) are described in the private repo, with the template.
 
 ## Releases
 

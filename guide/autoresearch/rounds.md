@@ -178,12 +178,12 @@ else (a model's quality, a strategy's future returns).
 `--then "<command>"` runs a command on your machine, in the project, when
 the rounds end for any reason: the last round, a limit, `stop`, `stop
 --now`, or a failure. `HI_BEST_OF_RUN` holds the run's name, and the output
-goes to the run's log. The templates use it to write their
-[results](/guide/autoresearch/templates/#results):
+goes to the run's log. Use it for a report, a notification, or anything
+that should follow the run:
 
 ```sh
-hi agent best-of 3 --rounds 40 --score "make score" --higher --edit strategy.py \
-  --then "make results" program.md
+hi agent best-of 3 --rounds 40 --score "make score" --lower --edit train.py \
+  --then "make report" program.md
 ```
 
 hi keeps every attempt's files, kept or not, under

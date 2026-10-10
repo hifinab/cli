@@ -45,6 +45,7 @@ type templateChange struct {
 	unchecked []string          // sources a check without them could not cover
 	renamed   map[string]string // a recorded source → its name now
 	notes     []byte            // docs/upgrades content, if any
+	moved     map[string]string // built-in layers now in a server source: name → source
 	notesPath string
 	record    []byte // the new .hifin/template.json
 	commands  [][]string
@@ -138,6 +139,32 @@ func followRenamedSources(catalog *templateCatalog, metadata *templateMetadataFi
 	return renamed
 }
 
+// followMovedLayers finds built-in layers the repository was made from that
+// hi no longer has, such as autoresearch-quant after it moved to the private
+// repo, and records the one server source that has a layer by that name.
+func followMovedLayers(catalog *templateCatalog, metadata *templateMetadataFile) map[string]string {
+	moved := map[string]string{}
+	for i, recorded := range metadata.Layers {
+		if recorded.Source != "builtin" {
+			continue
+		}
+		if layer, ok := catalog.layers[recorded.Name]; ok && layer.source == "builtin" {
+			continue
+		}
+		var sources []string
+		for _, layer := range catalog.layers {
+			if layer.Name == recorded.Name && layer.source != "builtin" && layer.source != "local" {
+				sources = append(sources, layer.source)
+			}
+		}
+		if len(sources) == 1 {
+			metadata.Layers[i] = templateMetadataSource{Name: recorded.Name, Source: sources[0]}
+			moved[recorded.Name] = sources[0]
+		}
+	}
+	return moved
+}
+
 // availableLayers reports whether the catalog has every non-built-in layer
 // the repository was made from, and which sources are missing.
 func availableLayers(catalog *templateCatalog, metadata templateMetadataFile) []string {
@@ -178,6 +205,7 @@ func planUpdate(catalog *templateCatalog, target string, check, strict, force bo
 		}
 	}
 	change := &templateChange{target: target, metadata: metadata, renamed: followRenamedSources(catalog, &metadata)}
+	change.moved = followMovedLayers(catalog, &metadata)
 	templateName := metadata.Template
 	missing := availableLayers(catalog, metadata)
 	if len(missing) > 0 {
@@ -574,6 +602,9 @@ func printTemplateChange(change *templateChange, verb string, stdout io.Writer) 
 	fmt.Fprintf(stdout, "Target    %s\n", change.target)
 	for from, to := range change.renamed {
 		fmt.Fprintf(stdout, "Source    %s is now called %s\n", from, to)
+	}
+	for name, source := range change.moved {
+		fmt.Fprintf(stdout, "Layer     %s moved from the built-in templates to %s\n", name, source)
 	}
 	labels := map[string]string{actionWrite: "write", actionBlock: "block", actionDelete: "delete",
 		actionNote: "note", actionConflict: "CONFLICT", actionSkip: "missing"}

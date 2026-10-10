@@ -355,16 +355,11 @@ hi init python pricing-tools --yes           # after the user agreed to the plan
 ```
 
 Other templates: `web`, `service`, `pipeline`, `ml`, and the team's private
-ones on a connected device. `autoresearch-ml` and `autoresearch-quant` are
-for `hi agent best-of` rounds: after `hi init`, `make data`, `make score`,
-and a commit, `make loop` starts them (ask about the cost first).
-In `autoresearch-quant`, `make loop` ends with `make results`, and
-`make results` after an early stop writes `results/<run>/`: every attempt
-re-run, as Parquet, and `report.html`. Don't commit `results/`: it holds
-holdout scores. `make robust` shows how much of a score is luck, in-sample,
-and suggests a `--min-gain`; run it on the baseline before a run, and
-suggest `SCORE = "tranches"` or `"worst_period"` in `evaluate.py` when the
-user wants gains that hold. `hi init --update --dry-run` shows how a project
+ones on a connected device. `autoresearch-ml`, and private research
+templates built on `autoresearch-base`, are for `hi agent best-of` rounds:
+after `hi init`, `make data`, `make score`, and a commit, `make loop` starts
+them (ask about the cost first). A private template's own README says what
+else it has. `hi init --update --dry-run` shows how a project
 differs from the current templates, and `hi init --update` applies it; if it
 writes `docs/upgrades/<version>.md`, apply what fits from it, run
 `make check`, and delete the file. `hi init --adopt <template>` brings an

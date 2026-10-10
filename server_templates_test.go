@@ -330,7 +330,7 @@ func TestUpdateFollowsARenamedSource(t *testing.T) {
 }
 
 // listsTemplate reports whether hi init --list shows a template by this
-// name, so a built-in such as autoresearch-quant doesn't count as quant.
+// name, so a template whose name merely contains it doesn't count.
 func listsTemplate(list, name string) bool {
 	for _, line := range strings.Split(list, "\n") {
 		if fields := strings.Fields(line); len(fields) > 0 && fields[0] == name {
@@ -338,4 +338,33 @@ func listsTemplate(list, name string) bool {
 		}
 	}
 	return false
+}
+
+func TestUpdateFollowsALayerThatLeftTheBuiltIns(t *testing.T) {
+	ts := newTestServer(t)
+	ts.addTemplates(t, newTemplateRepo(t), "")
+	ts.connectAs(t, "alice", "staff")
+	parent := t.TempDir()
+	if code, stdout, stderr := runInitConnected(t, parent, "", "quant", "alpha", "--yes", "--no-setup"); code != 0 {
+		t.Fatalf("init: %s%s", stdout, stderr)
+	}
+	// As if quant had been built in when the project was made, as
+	// autoresearch-quant was before it moved to the private repo.
+	project := filepath.Join(parent, "alpha")
+	path := filepath.Join(project, templateMetadataPath)
+	var metadata templateMetadataFile
+	json.Unmarshal([]byte(readTestFile(t, path)), &metadata)
+	last := len(metadata.Layers) - 1
+	metadata.Layers[last] = templateMetadataSource{Name: "quant", Source: "builtin", Version: "hi v0.36.2"}
+	data, _ := json.MarshalIndent(metadata, "", "  ")
+	writeTestFile(t, path, string(data), 0o644)
+
+	code, stdout, stderr := runInitConnected(t, project, "", "--update", "--yes")
+	if code != 0 || !strings.Contains(stdout, "quant moved from the built-in templates to firm") {
+		t.Fatalf("update: %d\n%s%s", code, stdout, stderr)
+	}
+	json.Unmarshal([]byte(readTestFile(t, path)), &metadata)
+	if got := metadata.Layers[len(metadata.Layers)-1]; got.Source != "firm" || got.Commit == "" {
+		t.Fatalf("the move was not recorded: %+v", got)
+	}
 }

@@ -66,10 +66,8 @@ the judging moved from the agent to hi.
 - [Rounds that keep only gains](/guide/autoresearch/rounds/): scores,
   limits, `watch`, `stop`, and overfitting.
 - [Start from a template](/guide/autoresearch/templates/): `hi init
-  autoresearch-ml` and `hi init autoresearch-quant`, projects already shaped for
-  rounds, with a tested evaluation and a holdout.
-- [Autoresearch: a trading strategy](/guide/tutorials/autoresearch-quant/):
-  a tutorial that follows one real run from an empty folder to its report.
+  autoresearch-ml`, a project already shaped for rounds, with a tested
+  evaluation and a holdout.
 - [Simple examples](/guide/autoresearch/examples/) and
   [advanced examples](/guide/autoresearch/advanced/).
 

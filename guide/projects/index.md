@@ -39,7 +39,6 @@ plan, or `--yes` to skip the question (for agents and scripts).
 | `pipeline` | Data sources and ingestion     | `python` + one idempotent `run --date`, raw files landed before parsing, offline parser tests |
 | `ml`     | Model training                   | `python` + PyTorch for CPU, CUDA, or ROCm, a typed config, a two-step training test |
 | `autoresearch-ml` | Agents improving model training overnight | PyTorch as in `ml`; `train.py` trains for a fixed five minutes, a fixed evaluation scores it, a holdout outside the repo |
-| `autoresearch-quant` | Agents improving a trading strategy | pandas; `strategy.py` scored by a fixed, lookahead-free backtest net of fees, a holdout outside the repo |
 
 The two `autoresearch` templates are shaped for `hi agent best-of` rounds;
 see [Start from a template](/guide/autoresearch/templates/).

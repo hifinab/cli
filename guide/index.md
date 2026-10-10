@@ -15,7 +15,7 @@ Hugging Face.
   <a href="{{ '/guide/install/' | relative_url }}"><strong>Install hi</strong><span>One command on Linux, then sign in to a provider.</span></a>
   <a href="{{ '/guide/quickstart/' | relative_url }}"><strong>Your first remote GPU</strong><span>Five minutes from install to a shell on a rented GPU.</span></a>
   <a href="{{ '/guide/compute/' | relative_url }}"><strong>How hi compute works</strong><span>Providers, runs and instances, hardware names, and limits.</span></a>
-  <a href="{{ '/guide/tutorials/' | relative_url }}"><strong>Tutorials</strong><span>Autoresearch on a trading strategy, a 125B model, training, sweeps, JupyterLab, and agents.</span></a>
+  <a href="{{ '/guide/tutorials/' | relative_url }}"><strong>Tutorials</strong><span>A 125B model, training, sweeps, JupyterLab, and agents.</span></a>
 </div>
 
 ## What you can do
@@ -33,8 +33,7 @@ Hugging Face.
 | Hand a task to Claude Code, Codex, or Hermes in a sandbox   | [Hand tasks to agents]({{ '/guide/agent/' | relative_url }})   |
 | Try a task several times and keep the best result  | [Several attempts at once]({{ '/guide/autoresearch/best-of/' | relative_url }}) |
 | Let agents improve a number overnight, keeping only gains | [Rounds that keep only gains]({{ '/guide/autoresearch/rounds/' | relative_url }}) |
-| Start an autoresearch project for a model or a strategy | [Start from a template]({{ '/guide/autoresearch/templates/' | relative_url }}) |
-| Follow a whole autoresearch run, step by step      | [Autoresearch: a trading strategy]({{ '/guide/tutorials/autoresearch-quant/' | relative_url }}) |
+| Start an autoresearch project for a model | [Start from a template]({{ '/guide/autoresearch/templates/' | relative_url }}) |
 | Let Claude Code or Codex use a GPU safely          | [Let your coding agent use a GPU]({{ '/guide/tutorials/agent/' | relative_url }}) |
 | Turn "move the md files to notes" into a command   | [Ask for a command]({{ '/guide/q/' | relative_url }})              |
 | Start a new repository that agents work well in   | [Start a project]({{ '/guide/projects/' | relative_url }})          |

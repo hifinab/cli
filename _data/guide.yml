@@ -35,8 +35,6 @@
   pages:
     - title: All tutorials
       url: /guide/tutorials/
-    - title: "Autoresearch: a trading strategy"
-      url: /guide/tutorials/autoresearch-quant/
     - title: Try a 125B model on a 96 GB GPU
       url: /guide/tutorials/big-model/
     - title: Train with uv scripts

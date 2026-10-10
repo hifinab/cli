@@ -40,7 +40,7 @@ hi net status      Show NetBird connection status
 hi net down        Disconnect NetBird
 hi net reconnect   Reconnect an enrolled NetBird peer
 hi net expose 3000 Put a local service on a temporary public address (hi net expose help)
-hi init            Start a project from a template (python, web, service, pipeline, ml, autoresearch-ml, autoresearch-quant, and your server's own)
+hi init            Start a project from a template (python, web, service, pipeline, ml, autoresearch-ml, and your server's own)
 hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
 hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
 hi connect <server>         Join a team's hi server, which approves and pays for compute
@@ -252,13 +252,10 @@ to the project's own files to `docs/upgrades/` for an agent to apply.
 without touching its code.
 
 The built-in templates are public and generic; they live in `templates/` and
-are embedded in the binary. `autoresearch-ml` and `autoresearch-quant` are
-projects shaped for `hi agent best-of` rounds: a fixed, tested evaluation,
-one file agents change, frozen data, and a holdout outside the repository;
-`autoresearch-quant`'s `make results` re-runs every attempt of a run into
-Parquet files and a report that opens from disk, and `make robust` shows how
-much of a score is luck (start months, rebalance days, costs, nearby
-settings, random portfolios). Private templates, such as quant `research`,
+are embedded in the binary. `autoresearch-ml` is a project shaped for
+`hi agent best-of` rounds: a fixed, tested evaluation, one file agents
+change, frozen data, and a holdout outside the repository. Private
+templates, such as the quant ones,
 live in a private repository that a `hi server` mirrors
 (`hi server templates add`) and serves, signed, to connected devices. Template
 authors can try a folder of layers with `HI_TEMPLATES_DIR=<path> hi init …`.
@@ -311,7 +308,7 @@ hi agent codex --json "review this branch"     # the report as JSON, for scripts
 hi agent claude brief.md                       # the task from a markdown file
 hi agent best-of 3 --agents claude,codex "<task>"   # the same task in 3 boxes, checked and ranked
 hi agent best-of 4 --rounds 100 --score "make bench" --lower "<task>"   # rounds that keep only gains
-hi agent best-of 3 --rounds 40 --score "make score" --higher --then "make results" program.md   # a command when the rounds end
+hi agent best-of 3 --rounds 40 --score "make score" --lower --then "make report" program.md   # a command when the rounds end
 hi agent --bundle web,office "compare GPU clouds in a Word document"   # skills and tools for work that isn't code
 hi agent claude                                # interactive, in a box
 hi box shell                                   # or hi box run -- make test
