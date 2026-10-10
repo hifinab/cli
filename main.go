@@ -127,9 +127,9 @@ Usage:
   hi login <hf|colab|runpod|shadeform>
                                 Sign in to a compute provider
   hi connect <server>           Join a hi server that approves and pays for compute
-  hi data                       Download the team's Hugging Face datasets, models, and buckets
+  hi data                       Download your team's Hugging Face datasets, models, and buckets
   hi disconnect                 Leave it; hi compute uses your own keys again
-  hi server                     Run the server that brokers compute and serves templates for a team
+  hi server                     Run the server that brokers compute and serves templates for your team
   hi init [<template> <dir>]    Start a project from a template (python, web, service, pipeline, ml)
   hi q <what you want to do>    Ask an AI model for a shell command, then run, copy, or explain it
   hi q                          Chat with it; hi q --setup chooses the model and sets up the shell

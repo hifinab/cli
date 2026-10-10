@@ -1854,8 +1854,8 @@ func runServer(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 func printServerUsage(w io.Writer) {
 	fmt.Fprintln(w, `hi server brokers compute for connected devices: it holds the provider keys,
-and nothing starts without an approval. It also serves the team's private
-project templates to hi init, and the team's Hugging Face datasets and
+and nothing starts without an approval. It also serves your team's private
+project templates to hi init, and your team's Hugging Face datasets and
 models to hi data.
 
 Usage:
@@ -1881,7 +1881,7 @@ Usage:
   hi server policy show|edit|example|check
                                           Groups: limits, auto-approve, budgets
   hi server spend [--since 30d]           Spend per user and group, compute and models
-  hi server ai [set|off|remove]           Pass hi q's model requests to OpenRouter with the team's key
+  hi server ai [set|off|remove]           Pass hi q's model requests to OpenRouter with your team's key
   hi server live [--wall]                 Live dashboard; --wall is read-only for a shared screen
   hi server wall setup|add|remove|list    Show the wall dashboard on screens over SSH (needs sudo)
   hi server viewer add <name> --key K     A device that may only watch the dashboard

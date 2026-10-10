@@ -70,7 +70,7 @@ and Shadeform stops billing as soon as it is deleting.
 
 ## Through a hi server
 
-A [hi server](/guide/compute/managed/) can hold one Shadeform key for a
+A [hi server](/guide/compute/managed/) can hold one Shadeform key for your
 team:
 
 ```sh

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hi — Hifin workstations</title>
-<meta name="description" content="hi turns a fresh Ubuntu machine into a Hifin AI workstation: Claude Code, Codex, omp, herdr, Hermes, ROCm, Docker and NetBird in one command. It also starts agent-ready projects, rents GPUs, downloads the team's data, and shares local services on a temporary public address.">
+<meta name="description" content="hi turns a fresh Ubuntu machine into a Hifin AI workstation: Claude Code, Codex, omp, herdr, Hermes, ROCm, Docker and NetBird in one command. It also starts agent-ready projects, rents GPUs, downloads your team's data, and shares local services on a temporary public address.">
 <meta name="theme-color" content="#0a0c11">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%239aa0ff'/><stop offset='1' stop-color='%236fd9b8'/></linearGradient></defs><rect width='64' height='64' rx='16' fill='%230a0c11'/><text x='32' y='44' font-family='monospace' font-size='34' font-weight='700' text-anchor='middle' fill='url(%23g)'>hi</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -367,9 +367,9 @@
       <div class="cmd"><code>hi compute stop</code><p>Pick a running machine from a list, or all of them, and stop it after confirming.</p></div>
       <div class="cmd"><code>hi compute run <span>&lt;script.py&gt;</span></code><p>Run a script or container to completion on rented hardware and stream its logs.</p></div>
       <div class="cmd"><code>hi compute serve <span>&lt;model&gt;</span></code><p>Serve a GGUF model with llama.cpp on a rented GPU and tunnel its OpenAI-compatible API to localhost.</p></div>
-      <div class="cmd"><code>hi connect <span>&lt;server&gt;</span></code><p>Join your team's hi server, which approves and pays for GPUs and serves the team's project templates.</p></div>
-      <div class="cmd"><code>hi data</code><p>Search the team's private Hugging Face datasets, models and buckets and download one with <code>hf</code>, or read them straight from code with <code>hi data run</code>. The server keeps the token; your machine never holds one.</p></div>
-      <div class="cmd"><code>hi compute run <span>--data &lt;org&gt;/&lt;name&gt;</span></code><p>Give a cloud job the team's data: the server opens a narrow public address with NetBird for the run, so the job downloads it and can call <code>load_dataset</code> itself, with no Hugging Face token on the machine.</p></div>
+      <div class="cmd"><code>hi connect <span>&lt;server&gt;</span></code><p>Join your team's hi server, which approves and pays for GPUs and serves your team's project templates.</p></div>
+      <div class="cmd"><code>hi data</code><p>Search your team's private Hugging Face datasets, models and buckets and download one with <code>hf</code>, or read them straight from code with <code>hi data run</code>. The server keeps the token; your machine never holds one.</p></div>
+      <div class="cmd"><code>hi compute run <span>--data &lt;org&gt;/&lt;name&gt;</span></code><p>Give a cloud job your team's data: the server opens a narrow public address with NetBird for the run, so the job downloads it and can call <code>load_dataset</code> itself, with no Hugging Face token on the machine.</p></div>
       <div class="cmd"><code>hi skills</code><p>Find, install, and update agent skills from skills.sh, pinned and audited, and teach agents to use hi safely.</p></div>
       <div class="cmd"><code>hi adduser <span>&lt;name&gt;</span></code><p>Create a user who already has render and video access.</p></div>
       <div class="cmd"><code>hi update</code><p>Update hi itself to the latest release, checksum-verified. <code>--check</code> only looks.</p></div>

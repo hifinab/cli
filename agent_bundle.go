@@ -724,7 +724,7 @@ usage:
   hi bundle show <name>       its skills, what each needs, and its network
   hi bundle prune [--all]     remove bundle images unused for 30 days (--all: every unused one)
 
-Bundles come from hi itself, the team's template sources on a hi server,
+Bundles come from hi itself, your team's template sources on a hi server,
 and your own folder (HI_BUNDLES_DIR, or ~/.local/share/hi/bundles). The
 same name in a later one wins. Use them with hi agent --bundle web,office.`)
 }

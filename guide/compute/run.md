@@ -71,9 +71,9 @@ hi compute run --gpu a10g-small \
 > putting the value on a command line.
 {: .warning}
 
-## The team's data
+## Your team's data
 
-With a hi server that serves the team's Hugging Face data
+With a hi server that serves your team's Hugging Face data
 ([`hi data`](/guide/data/)), `--data` downloads it on the instance before
 the script starts:
 
@@ -167,7 +167,7 @@ uploading a model to the Hub.
 | `--max <duration>`  | Stop after this long: hours (`2`), `30m`, `2d`, or `none`; default `1h` |
 | `--name <name>`     | Name for `logs`, `wait`, and `stop`                         |
 | `--env KEY=VALUE`   | Environment variable; repeatable                            |
-| `--data <org>/<name>[/<pattern>]` | The team's data into `data/<name>` first; repeatable |
+| `--data <org>/<name>[/<pattern>]` | Your team's data into `data/<name>` first; repeatable |
 | `--secret KEY`      | Encrypted secret from your shell (Hugging Face); repeatable |
 | `--detach`          | Return after starting (Hugging Face)                        |
 | `--namespace <ns>`  | Bill this Hugging Face account for this run                  |

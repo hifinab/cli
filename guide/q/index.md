@@ -89,7 +89,7 @@ The first time, `hi q` uses what it finds, in this order:
 1. The model saved by `hi q --setup`.
 2. `HI_Q_BASE_URL` and `HI_Q_MODEL`, with `HI_Q_API_KEY` if the endpoint
    needs a key.
-3. The [hi server](/guide/compute/managed/#use-the-teams-model-with-hi-q)
+3. The [hi server](/guide/compute/managed/#use-your-teams-model-with-hi-q)
    this device is connected to, when it serves a model: no key needed. If
    it can't be reached, `hi q` falls back to the next of these and says so.
 4. `OPENAI_API_KEY` (and `OPENAI_BASE_URL` if set), then

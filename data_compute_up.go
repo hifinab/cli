@@ -31,7 +31,7 @@ func checkDataUp(provider computeProvider, request upRequest, values []string) (
 		return nil, usageError{"--data on hi compute up works on RunPod and Shadeform; on Hugging Face, use hi compute run --data"}
 	}
 	if isCommunityHardware(request.hardware.name) {
-		return nil, usageError{"--data puts a token for the team's data on the machine, and Community Cloud machines are third-party hosts; choose Secure Cloud hardware"}
+		return nil, usageError{"--data puts a token for your team's data on the machine, and Community Cloud machines are third-party hosts; choose Secure Cloud hardware"}
 	}
 	if request.noWait {
 		return nil, usageError{"--data needs the machine to be up to hand it the token; leave out --no-wait"}
@@ -73,7 +73,7 @@ func installDataUp(provider computeProvider, request upRequest, access apiRunAcc
 		return err
 	}
 	repos := dataRefIDs(request.data)
-	env := fmt.Sprintf("# Written by hi compute up --data: the team's data through the hi server,\n"+
+	env := fmt.Sprintf("# Written by hi compute up --data: your team's data through the hi server,\n"+
 		"# for %s, until %s.\nexport HF_ENDPOINT=%s\nexport HF_TOKEN=%s\nexport HI_DATA_REPOS=%s\n",
 		repos, access.Expires.UTC().Format(time.RFC3339),
 		shellQuote(access.Endpoint), shellQuote(access.Token), shellQuote(strings.ReplaceAll(repos, ", ", " ")))

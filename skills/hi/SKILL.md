@@ -1,6 +1,6 @@
 ---
 name: hi
-description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform): run a script or container on a GPU, start an SSH-able GPU box, forward ports, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers the team's private Hugging Face datasets, models, and buckets through a hi server (hi data, and --data on runs and boxes), sharing a local service on a temporary public address (hi net expose), handing a task to another coding agent (hi agent), new projects from templates (hi init), workstation setup (hi install, hi verify strix), and NetBird (hi net). Use when the user wants to train, evaluate, or test on a GPU they do not have locally, try or serve an LLM remotely, see or stop remote compute, get the team's data or models, show a local web app or receive a webhook, get a second opinion from another agent, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
+description: Use the hi CLI to run work on rented remote machines (Google Colab, Hugging Face Jobs, RunPod, Shadeform): run a script or container on a GPU, start an SSH-able GPU box, forward ports, serve a GGUF model with an OpenAI-compatible API, check what is running, and stop it. Also covers your team's private Hugging Face datasets, models, and buckets through a hi server (hi data, and --data on runs and boxes), sharing a local service on a temporary public address (hi net expose), handing a task to another coding agent (hi agent), new projects from templates (hi init), workstation setup (hi install, hi verify strix), and NetBird (hi net). Use when the user wants to train, evaluate, or test on a GPU they do not have locally, try or serve an LLM remotely, see or stop remote compute, get your team's data or models, show a local web app or receive a webhook, get a second opinion from another agent, or set up a Hifin machine. Not for local model serving or cloud infrastructure management.
 ---
 
 # hi
@@ -8,7 +8,7 @@ description: Use the hi CLI to run work on rented remote machines (Google Colab,
 `hi` is the Hifin command-line tool. Its `hi compute` commands rent remote
 machines from Colab, Hugging Face, RunPod, or Shadeform with the same commands
 on all of them, and give them back. `hi init` starts new projects from
-templates. On a machine connected to the team's hi server, `hi data` gets the
+templates. On a machine connected to your team's hi server, `hi data` gets the
 team's private Hugging Face data without a token of your own. `hi net expose`
 puts a service on this machine on a temporary public address. `hi agent`
 hands a task to Claude Code, Codex, or Hermes in a box and returns its report. Run
@@ -141,7 +141,7 @@ hi compute logs <name> --follow                                  # build, downlo
 Use any OpenAI-compatible client with the printed base URL and model name.
 Stop the machine when finished.
 
-## Managed compute (a team's hi server)
+## Managed compute (your team's hi server)
 
 If the user's machine has joined a hi server (`hi connect status` says so),
 the providers it manages need an approval, a reason, and a time limit. Colab
@@ -170,9 +170,9 @@ hi compute requests r-9b41e0 --wait --timeout 10m
 Stopping never needs approval, and you can stop only the user's own
 machines.
 
-## Team data (hi data)
+## Your team's data (hi data)
 
-On a machine connected to a hi server, the team's private Hugging Face
+On a machine connected to a hi server, your team's private Hugging Face
 datasets, models, and buckets come through `hi data`. Never look for, ask
 for, or use a Hugging Face token for them: the server keeps it, and `hf`
 runs without one.
@@ -190,7 +190,7 @@ hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
    task needs.
 2. Put `dataset:`, `model:`, or `bucket:` in front when a name is more than
    one kind; the error says which.
-3. A "may not read" error is the team's policy: tell the user, and don't
+3. A "may not read" error is your team's policy: tell the user, and don't
    try another way to reach the data.
 4. If `hf` is missing, `pip install -U huggingface_hub` installs it.
 5. In a project, `hi data get` records what it fetched, at which commit, in
@@ -199,7 +199,7 @@ hi data get hifinab/fdb --include 'runs/*' --to data/fdb-runs
 6. For code that reads the data itself (`load_dataset`, `from_pretrained`,
    `hf://` paths in pandas), run it with `hi data run -- <command>`
    instead of downloading first. Don't set `HF_TOKEN` yourself.
-7. For a `hi compute run` script that needs the team's data, add
+7. For a `hi compute run` script that needs your team's data, add
    `--data <org>/<name>[/<folder or pattern>]`; it lands in `data/<name>`
    on the instance. Never send a Hugging Face token with `--secret` for
    it. On Hugging Face Jobs the script can also read those repositories
@@ -354,7 +354,7 @@ hi init python pricing-tools --dry-run       # every file and command, nothing w
 hi init python pricing-tools --yes           # after the user agreed to the plan
 ```
 
-Other templates: `web`, `service`, `pipeline`, `ml`, and the team's private
+Other templates: `web`, `service`, `pipeline`, `ml`, and your team's private
 ones on a connected device. `autoresearch-ml`, and private research
 templates built on `autoresearch-base`, are for `hi agent best-of` rounds:
 after `hi init`, `make data`, `make score`, and a commit, `make loop` starts

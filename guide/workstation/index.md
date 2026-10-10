@@ -70,7 +70,7 @@ the program but keeps your settings and sign-ins, such as `~/.claude`,
 `~/.codex`, and Docker's images in `/var/lib/docker`. The confirmation lists
 what stays. System packages are removed with apt; if other packages depend on
 one, apt lists them and asks before removing anything else. Removing NetBird
-disconnects the machine from the team network, including SSH sessions over it.
+disconnects the machine from your team's network, including SSH sessions over it.
 Removing Strix Halo support keeps you in the `render` and `video` groups.
 
 ## What gets installed

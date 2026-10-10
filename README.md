@@ -43,10 +43,10 @@ hi net expose 3000 Put a local service on a temporary public address (hi net exp
 hi init            Start a project from a template (python, web, service, pipeline, ml, autoresearch-ml, and your server's own)
 hi compute         Start, reach, and stop remote GPU machines (Colab, Hugging Face, RunPod, Shadeform)
 hi login <hf|colab|runpod|shadeform>  Sign in to a compute provider
-hi connect <server>         Join a team's hi server, which approves and pays for compute
+hi connect <server>         Join your team's hi server, which approves and pays for compute
 hi disconnect               Leave it; hi compute uses your own keys again
-hi data            Download the team's Hugging Face datasets, models, and buckets through it (hi data help)
-hi server          Run the server that brokers compute and serves templates for a team (hi server help)
+hi data            Download your team's Hugging Face datasets, models, and buckets through it (hi data help)
+hi server          Run the server that brokers compute and serves templates for your team (hi server help)
 hi agent [task]    Hand a task to Claude Code, Codex, or Hermes in a box and get its report (hi agent help)
 hi box shell       Run a shell or a command in a rootless box (hi box help)
 hi bundle ls       Bundles of skills and tools for hi agent --bundle
@@ -324,10 +324,10 @@ Strix Halo in, and `devcontainer.json`'s image, environment, and
 where `"bundles": ["data"]` gives every box and agent in the project those
 bundles.
 
-## Team data
+## Your team's data
 
 `hi data` downloads the private Hugging Face datasets, models, and buckets
-of the team's organizations through the hi server, with the official `hf`
+of your team's organizations through the hi server, with the official `hf`
 tool and no Hugging Face token on the machine:
 
 ```sh
@@ -340,7 +340,7 @@ The server keeps one read token per organization (`hi server data add
 <org>`) and passes on only the read calls of one repository or bucket; file
 contents come straight from Hugging Face's CDN. In a project, `hi data get`
 records the commit it fetched in `.hifin/data.json`; `hi data run --
-python train.py` lets `load_dataset` and `from_pretrained` read the team's
+python train.py` lets `load_dataset` and `from_pretrained` read your team's
 repositories directly, and `hi box --data` gives a box the same.
 `hi compute run --data hifinab/bars-1d train.py` gives a cloud job the data:
 on Hugging Face Jobs the server opens a narrow public address with
@@ -348,7 +348,7 @@ on Hugging Face Jobs the server opens a narrow public address with
 elsewhere it sends signed download links. `hi compute up --data
 hifinab/bars-1d` gives a RunPod or Shadeform machine `HF_ENDPOINT` and a
 token for those repositories in its shells. See
-[Download the team's data](https://hifin.sh/guide/data/).
+[Download your team's data](https://hifin.sh/guide/data/).
 
 ## Agent skills
 

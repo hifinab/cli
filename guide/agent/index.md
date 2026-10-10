@@ -169,7 +169,7 @@ Network: open (agent-browser (open): visits whatever sites the task needs)
 - **The network.** `web` needs an open network. hi shows why and asks
   before it widens the box; without a terminal, add `--network open`. An
   open network and `--data` don't go together, since an agent reading
-  untrusted pages could be told to pass the team's data on.
+  untrusted pages could be told to pass your team's data on.
 - **More bundles** come from your team's template sources on a
   [hi server](/guide/compute/managed/), and your own, in
   `~/.local/share/hi/bundles/bundles/<name>.json` (or `HI_BUNDLES_DIR`).

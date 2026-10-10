@@ -308,7 +308,7 @@ Options for up and run:
   --env KEY=VALUE    Environment variable for run; repeatable
   --secret KEY       Pass $KEY as an encrypted secret (Hugging Face)
   --data ORG/NAME[/PATTERN]
-                     run: download the team's data into data/NAME before the script
+                     run: download your team's data into data/NAME before the script
                      starts, through the hi server (hi data). up (RunPod, Shadeform):
                      the machine's shells get HF_ENDPOINT and HF_TOKEN to read
                      ORG/NAME through the hi server until --max
@@ -543,7 +543,7 @@ func computeUpCommand(args []string, stdin io.Reader, stdout, stderr io.Writer) 
 	reason := flags.String("reason", "", "why you need it (managed providers)")
 	noWait := flags.Bool("no-wait", false, "return while approval is pending (managed providers)")
 	var data repeatedFlag
-	flags.Var(&data, "data", "the team's data the machine may read: <org>/<name>")
+	flags.Var(&data, "data", "your team's data the machine may read: <org>/<name>")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return err
 	}
@@ -647,7 +647,7 @@ func startInstance(
 			return nil
 		}
 		if err := installDataUp(provider, request, access, stdout); err != nil {
-			return fmt.Errorf("%s is up, but hi could not give it the team's data: %w\nIt still bills; stop it with hi compute stop %s", request.name, err, request.name)
+			return fmt.Errorf("%s is up, but hi could not give it your team's data: %w\nIt still bills; stop it with hi compute stop %s", request.name, err, request.name)
 		}
 		return nil
 	}
@@ -1412,7 +1412,7 @@ func computeRunCommand(args []string, stdin io.Reader, stdout, stderr io.Writer)
 	var data repeatedFlag
 	flags.Var(&env, "env", "KEY=VALUE")
 	flags.Var(&secrets, "secret", "secret name")
-	flags.Var(&data, "data", "the team's data to download first: <org>/<name>[/<folder or pattern>]")
+	flags.Var(&data, "data", "your team's data to download first: <org>/<name>[/<folder or pattern>]")
 	if err := parseComputeFlags(flags, args); err != nil {
 		return 0, err
 	}

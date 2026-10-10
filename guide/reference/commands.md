@@ -11,7 +11,7 @@ description: Every hi command and option in one place.
 | `hi login <hf\|colab\|runpod\|shadeform>` | Sign in to a compute provider               |
 | `hi connect <server>`            | Join a hi server; `status`, `key`                      |
 | `hi disconnect`                  | Leave it; use your own keys again                      |
-| `hi data …`                      | Download the team's Hugging Face datasets, models, and buckets; see below |
+| `hi data …`                      | Download your team's Hugging Face datasets, models, and buckets; see below |
 | `hi server …`                    | Run the server that brokers compute; see below         |
 | `hi init [<template> <dir>]`     | Start a project from a template; `--update`, `--adopt` |
 | `hi q [<what you want>]`         | Ask for a shell command, or chat; see below            |
@@ -70,7 +70,7 @@ description: Every hi command and option in one place.
 | `--image <image>`   | ✓  |     |       | Container image (Hugging Face, RunPod)               |
 | `--env KEY=VALUE`   |    | ✓   |       | Environment variable; repeatable                     |
 | `--secret KEY`      |    | ✓   |       | Encrypted secret from your shell (Hugging Face)      |
-| `--data <org>/<name>[/<pattern>]` | ✓ | ✓ | | run: the team's data into `data/<name>` first. up (RunPod, Shadeform; whole repositories): `HF_ENDPOINT` and `HF_TOKEN` in the machine's shells (`hi data`) |
+| `--data <org>/<name>[/<pattern>]` | ✓ | ✓ | | run: your team's data into `data/<name>` first. up (RunPod, Shadeform; whole repositories): `HF_ENDPOINT` and `HF_TOKEN` in the machine's shells (`hi data`) |
 | `--detach`          |    | ✓   |       | Return after starting (Hugging Face)                 |
 | `--quant <quant>`   |    |     | ✓     | GGUF quantization, such as `Q4_K_M`                  |
 | `--ctx <tokens>`    |    |     | ✓     | Context length                                       |
@@ -84,7 +84,7 @@ after names for `logs`, `serve`, `stop`, and `billing`.
 
 ## hi connect and hi server
 
-See [Managed compute for a team](/guide/compute/managed/).
+See [Managed compute for your team](/guide/compute/managed/).
 
 | Command                                             | Does                                                 |
 |-----------------------------------------------------|------------------------------------------------------|
@@ -109,7 +109,7 @@ See [Managed compute for a team](/guide/compute/managed/).
 | `hi server approvers add <id> --name <user>`        | Let a Slack member approve and stop; `remove`, `list` |
 | `hi server policy show\|edit\|example\|check`       | Group limits, auto-approve, and budgets              |
 | `hi server spend [--since <d>]`                     | Spend per user and group, compute and models         |
-| `hi server ai [set [--url <u>] [--model <m>] [--no-key]\|off\|remove]` | Pass `hi q`'s requests to OpenRouter with the team's key |
+| `hi server ai [set [--url <u>] [--model <m>] [--no-key]\|off\|remove]` | Pass `hi q`'s requests to OpenRouter with your team's key |
 | `hi server live [--wall] [--names full] [--reasons]` | Live dashboard; `--wall` is read-only               |
 | `sudo hi server wall setup\|add\|remove\|list`       | Show the wall on screens over SSH                    |
 | `hi server viewer add <name> --key <k>`             | A device that may only watch                         |
@@ -137,7 +137,7 @@ server; `hf` runs with `HF_ENDPOINT` pointing to it.
 | `  --revision <rev>`, `--include <glob>`, `--exclude <glob>` | A branch, tag, or commit; filters, repeatable |
 | `  --no-record`                                     | Don't record it in the project's `.hifin/data.json`  |
 | `hi data get`                                       | In a project: everything `.hifin/data.json` records, at the recorded commits |
-| `hi data run -- <command>`                          | Run a command that reads the team's data directly    |
+| `hi data run -- <command>`                          | Run a command that reads your team's data directly    |
 | `hi data env`                                       | `HF_ENDPOINT` and `HF_TOKEN` for `eval` in a shell    |
 
 Put `dataset:`, `model:`, or `bucket:` in front when several share a name.
@@ -177,7 +177,7 @@ hi init --adopt python           # bring this existing repository under a templa
 | `--strict`              | With `--check`: fail when private layers can't be checked |
 
 Templates: `python`, `web`, `service`, `pipeline`, `ml`, and on a connected
-device the team's private ones.
+device your team's private ones.
 
 ## hi q
 
@@ -253,7 +253,7 @@ See [Autoresearch](/guide/autoresearch/).
 | `hi box rm --all [--force] [--yes]`  | Remove every box after one question                      |
 
 Options when starting: `--name`, `--network locked|dev|open`,
-`--allow <domain>`, `--gpu`, `--data` (the team's data through the hi server),
+`--allow <domain>`, `--gpu`, `--data` (your team's data through the hi server),
 `--worktree`, `--here`, `--image`, `--memory`, and `--bundle a,b`. A
 project's `devcontainer.json` can set `network`, `domains`, `gpu`, `data`,
 and `bundles` under `customizations.hi`. See
@@ -267,7 +267,7 @@ and `bundles` under `customizations.hi`. See
 | `hi bundle show <name>`              | Its skills, at which commit, what each needs, and its network |
 | `hi bundle prune [--all]`            | Remove bundle images unused for 30 days (`--all`: every unused one) |
 
-Bundles come from hi itself, the team's template sources on a hi server,
+Bundles come from hi itself, your team's template sources on a hi server,
 and `~/.local/share/hi/bundles` (or `HI_BUNDLES_DIR`); a later one wins on
 a name. See [Bundles](/guide/agent/#bundles-skills-and-the-tools-they-need).
 

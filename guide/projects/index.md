@@ -60,7 +60,7 @@ newest versions.
 
 These built-in templates are public and generic. On a device connected to
 your team's `hi server` (`hi connect`), `hi init` also offers the templates
-from the team's private repo, such as `research`. The menu marks them
+from your team's private repo, such as `research`. The menu marks them
 `(private repo)`, and `hi init --list` shows the source and commit they come
 from. `hi` checks that they are signed by the server and keeps a copy, so
 they still work when the server can't be reached.
@@ -90,7 +90,7 @@ already matches does nothing.
 ## Keep a project up to date
 
 Templates improve over time: a new `hi` brings new built-in templates, and
-the team's private repo changes on its own schedule. Bring a project up to
+your team's private repo changes on its own schedule. Bring a project up to
 date from its folder:
 
 ```sh

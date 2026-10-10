@@ -92,7 +92,7 @@ unreachable; devices keep the last good commit, and the next sync retries.
 `Authentication failed` usually means the source's token expired: run
 `hi server templates remove <name>`, then `add` with a new token.
 
-## Team data
+## Your team's data
 
 | Message                                                     | What to do                                                   |
 |-------------------------------------------------------------|--------------------------------------------------------------|
@@ -101,7 +101,7 @@ unreachable; devices keep the last good commit, and the next sync retries.
 | `hf isn't installed`                                        | `pip install -U huggingface_hub`, or `uv tool install huggingface_hub`. |
 | `… is more than one kind; say dataset:… or model:…`         | Put `dataset:`, `model:`, or `bucket:` in front of the name. |
 | `… is not among what you may download`                      | Check the name with `hi data ls`; your group may not see it. |
-| `your group … may not read …`                               | The team's policy. Ask an admin; don't look for another way in. |
+| `your group … may not read …`                               | Your team's policy. Ask an admin; don't look for another way in. |
 | `this hi data token is for bucket:…, not …`                 | That `hi` is older than v0.24.2 and doesn't know buckets: `hi update`. |
 | `the hi data token has expired`                             | Run the command through `hi data` again; tokens last a day.  |
 | `the hi server is older than v0.25.1`                       | An admin runs `hi update` on the server box.                 |

@@ -1,9 +1,9 @@
 ---
-title: Managed compute for a team
+title: Managed compute for your team
 description: Run hi server so employees, students, and their agents use GPUs through one set of provider keys, with every start approved and every machine stopped at its limit.
 ---
 
-A team can run `hi server` on a small always-on machine inside its NetBird
+Your team can run `hi server` on a small always-on machine inside its NetBird
 network. The server holds the provider keys, makes every provider call itself,
 and starts nothing until someone approves it. People join with `hi connect`
 and then use the same `hi compute` commands as before.
@@ -189,20 +189,20 @@ A full-screen view of your managed machines: running time, cost so far, a
 bar towards each time limit, your requests, and your budget. Select a
 machine with the arrow keys and press `s` to stop it, or `q` to quit.
 
-### Use the team's model with hi q
+### Use your team's model with hi q
 
 When the server serves a model, [`hi q`](/guide/q/) uses it without a key or
 any setup, and `hi q --setup` lists it first. Your choice of model is
-yours; the server passes requests to the upstream with the team's key.
+yours; the server passes requests to the upstream with your team's key.
 `hi q --status` shows "… via <server>".
 
 If the server can't be reached, `hi q` falls back to your own key or Claude
 Code, if you have one, and says so in a dim line. Without one, it stops
 until the server is back.
 
-### Download the team's data
+### Download your team's data
 
-When the server serves the team's Hugging Face organizations,
+When the server serves your team's Hugging Face organizations,
 [`hi data`](/guide/data/) lists and downloads their private datasets,
 models, and buckets with no Hugging Face token on your machine, and
 `hi compute run --data` gives a cloud job the same data.
@@ -506,7 +506,7 @@ hi server templates remove private
 - To keep a group from seeing a source, list the ones it may use in
   `policy.json`: `"template_sources": ["private"]`, or `[]` for none.
 
-### Serve the team's Hugging Face data
+### Serve your team's Hugging Face data
 
 The server can hold one read token per Hugging Face organization and hand
 out the organizations' datasets, models, and buckets through a proxy, so
@@ -550,12 +550,12 @@ minutes.
 - `"expose_listen"` in `config.json` moves the listener, or `"off"` turns
   exposure off.
 
-See [Download the team's data](/guide/data/) for what users do.
+See [Download your team's data](/guide/data/) for what users do.
 
 ### Serve a model to hi q
 
 The server can pass `hi q`'s requests to OpenRouter, or any
-OpenAI-compatible endpoint, with one team key, so nobody needs a key of
+OpenAI-compatible endpoint, with one key for your team, so nobody needs a key of
 their own:
 
 ```sh

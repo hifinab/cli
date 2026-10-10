@@ -408,7 +408,7 @@ func serverAICommand(args []string, stdin io.Reader, stdout, stderr io.Writer) e
 	as := flags.String("as", currentUserName(), "who is acting")
 	urlFlag := flags.String("url", "", "an OpenAI-compatible base URL (default OpenRouter)")
 	modelFlag := flags.String("model", "", "the default model (default "+serverAIDefaultModel+")")
-	noKey := flags.Bool("no-key", false, "the endpoint takes no key, such as a model on the team's own machine")
+	noKey := flags.Bool("no-key", false, "the endpoint takes no key, such as a model on your team's own machine")
 	positional, err := flags.parse(args)
 	if err != nil {
 		return err

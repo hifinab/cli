@@ -1,6 +1,6 @@
 ---
-title: Download the team's data
-description: Download the team's private Hugging Face datasets, models, and buckets with hi data, through the hi server, without a Hugging Face token on your machine.
+title: Download your team's data
+description: Download your team's private Hugging Face datasets, models, and buckets with hi data, through the hi server, without a Hugging Face token on your machine.
 ---
 
 `hi data` downloads the private Hugging Face datasets, models, and buckets
@@ -14,7 +14,7 @@ hi data ls                       # everything you may download
 hi data get hifinab/bars-1d      # straight to ./data/bars-1d
 ```
 
-You need a machine connected to the team's server (`hi connect`) and `hf`:
+You need a machine connected to your team's server (`hi connect`) and `hf`:
 
 ```sh
 pip install -U huggingface_hub   # or: uv tool install huggingface_hub
@@ -69,7 +69,7 @@ changed since. `--no-record` downloads without recording.
 
 ## Use the data in code
 
-`hi data run` runs a command that reads the team's data directly, without
+`hi data run` runs a command that reads your team's data directly, without
 a download step first:
 
 ```sh
@@ -100,7 +100,7 @@ eval "$(hi data env)"   # sets HF_ENDPOINT and HF_TOKEN; the token lasts a day
 
 Boxes from [`hi box`](/guide/box/) and [`hi agent`](/guide/agent/) hold no
 credentials. With `--data`, the box's own `hf` and Python code can still
-read the team's data:
+read your team's data:
 
 ```sh
 hi box run --data -- python train.py
@@ -112,7 +112,7 @@ one on the way to the server, and allows Hugging Face's download hosts.
 
 ## On a rented GPU
 
-`hi compute run --data` downloads the team's data on the instance before
+`hi compute run --data` downloads your team's data on the instance before
 the script starts, through signed links that need no token:
 
 ```sh
@@ -121,7 +121,7 @@ hi compute run --gpu a10g-small --data hifinab/bars-1d train.py
 
 On Hugging Face Jobs, the server opens a narrow public address with
 NetBird for the run, so the script can also call `load_dataset` for the
-repositories you named. See [Run a script](/guide/compute/run/#the-teams-data).
+repositories you named. See [Run a script](/guide/compute/run/#your-teams-data).
 
 ## On a machine you SSH into
 
@@ -154,7 +154,7 @@ permissions.
   `hf download --include`.
 - Not on RunPod's Community Cloud: those are third-party hosts, so hi
   refuses.
-- Through a team server that manages the provider, the start still needs
+- Through your team server that manages the provider, the start still needs
   its approval, and `--no-wait` can't be used: hi hands the machine its
   token once it is up.
 - With `--max none`, the token lasts 24 hours.
@@ -165,7 +165,7 @@ permissions.
 your machine                       hi server                         Hugging Face
 hi data get ──── asks for a ─────▶ checks your group
                  hi data token     
-hf download ──── with the token ─▶ swaps in the team's token ──────▶ the Hub's API
+hf download ──── with the token ─▶ swaps in your team's token ──────▶ the Hub's API
             ◀──────────────────── answers and redirects
             ◀──────────────────────── file contents, straight from the CDN
 ```

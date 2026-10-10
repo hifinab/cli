@@ -4,7 +4,7 @@
 > (Google Colab, Hugging Face Jobs, RunPod, Shadeform) with `hi compute`, starts
 > projects from templates with `hi init`, sets up Ubuntu workstations with
 > `hi install`, turns plain-words requests into shell commands with `hi q`,
-> downloads the team's private Hugging Face data through a hi server with
+> downloads your team's private Hugging Face data through a hi server with
 > `hi data`, and puts a local service on a temporary public address with
 > `hi net expose`. These notes are for coding agents such as Codex and Claude Code.
 
@@ -23,7 +23,7 @@
    always set `--max`; stop what you start and check `hi compute ls`; pass
    credentials with `--secret`, never `--env`; never approve your own requests
    on a hi server; and ask before `hi install`, `hi adduser`, `hi net`, or
-   `hi update`, which change the machine. Get the team's data with `hi data`,
+   `hi update`, which change the machine. Get your team's data with `hi data`,
    never with a Hugging Face token of your own. Ask before `hi net expose`,
    keep its password, never use `--public` without the user's yes, and stop
    it when done.
@@ -38,7 +38,7 @@
 - [Hand tasks to agents](https://hifin.sh/guide/agent/): `hi agent`, Claude Code, Codex, or Hermes on a task in a box, without permission prompts, with one report for every agent, and `--bundle web,office,data` for skills and the tools they need; `hi agent best-of` runs one task in several boxes, checks each, and ranks them, or with `--score` runs rounds that commit only gains, and `--then "<command>"` runs a command when they end
 - [Run code in a box](https://hifin.sh/guide/box/): `hi box`, a shell or a command in a rootless container with no credentials and a limited network, set up per project in `devcontainer.json` (`customizations.hi`, including `bundles`)
 - [Share a local service](https://hifin.sh/guide/workstation/expose/): `hi net expose <port>`, a temporary public address for a service on this machine; ask the user first
-- [Download the team's data](https://hifin.sh/guide/data/): `hi data`, the team's private Hugging Face datasets, models, and buckets through the hi server, on laptops, in boxes, in cloud jobs (`hi compute run --data`), and on machines you SSH into (`hi compute up --data`)
+- [Download your team's data](https://hifin.sh/guide/data/): `hi data`, your team's private Hugging Face datasets, models, and buckets through the hi server, on laptops, in boxes, in cloud jobs (`hi compute run --data`), and on machines you SSH into (`hi compute up --data`)
 - [Ask for a command](https://hifin.sh/guide/q/): `hi q`, for people at a terminal; agents don't need it
 - [Start a project](https://hifin.sh/guide/projects/): `hi init` templates, `--update`, and `--adopt`
 - [Troubleshooting](https://hifin.sh/guide/reference/troubleshooting/): messages and what to do
@@ -46,5 +46,5 @@
 ## Optional
 
 - [Install hi](https://hifin.sh/guide/install/): installer options and updating
-- [Managed compute for a team](https://hifin.sh/guide/compute/managed/): requests and approvals through a hi server
+- [Managed compute for your team](https://hifin.sh/guide/compute/managed/): requests and approvals through a hi server
 - [Source](https://github.com/hifinab/cli)

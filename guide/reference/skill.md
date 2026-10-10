@@ -106,7 +106,7 @@ installed.
 | `.claude/skills/<name>`               | A link to `../../.agents/skills/<name>`    | Claude Code                          |
 | `skills-lock.json`                    | Each skill's source, commit, and file hash | `hi skill` and `npx skills`          |
 
-These are the folders and the lock file `npx skills` uses, so a team can
+These are the folders and the lock file `npx skills` uses, so your team can
 use either tool. `hi` adds each skill's commit to `skills-lock.json`, which
 `npx skills` doesn't record. Commit all three; Git stores the links as
 links. With `--global`, the skills go under your home folder, and `hi`
@@ -179,7 +179,7 @@ packages go in), `apt`, `pip` (`name==version`), `npm` (`name@version`),
 its own; an unknown key or an unpinned package refuses the bundle. The
 `hi` skill goes in every bundle.
 
-A team keeps its own bundles in `bundles/` of a template source on its
+Your team keeps its own bundles in `bundles/` of a template source on its
 [hi server](/guide/compute/managed/), next to `skills/`; there, a skill
 whose `source` is `"."` is the source's own `skills/<name>`. Your own go in
 `~/.local/share/hi/bundles/bundles/` (or `HI_BUNDLES_DIR`), with the same
@@ -231,7 +231,7 @@ What agents learn:
 - **Sharing a local service:** ask before `hi net expose`, keep its
   password, use `--public` only with the user's yes, keep `--max` short,
   and stop it when done.
-- **Team data:** get the team's datasets and models with `hi data`, never
+- **Your team's data:** get your team's datasets and models with `hi data`, never
   with a Hugging Face token of their own; check sizes first; use
   `hi data run` for code that reads them, and `--data` on cloud runs.
 

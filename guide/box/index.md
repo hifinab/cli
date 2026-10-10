@@ -102,11 +102,11 @@ of those bundles, as `--bundle` does (see
 They build their image on hi's own base image, so they don't go with
 `image` or `build.dockerfile` yet.
 
-## The team's data
+## Your team's data
 
 `--data`, or `"data": true`, lets `hf` and Python code in the box download
-the team's Hugging Face datasets, models, and buckets through the hi server
-(see [Download the team's data](/guide/data/)). The box gets
+your team's Hugging Face datasets, models, and buckets through the hi server
+(see [Download your team's data](/guide/data/)). The box gets
 `HF_ENDPOINT` and a placeholder `HF_TOKEN`; hi's proxy adds a hi data token,
 which stays on the host, and allows Hugging Face's download hosts. The
 machine must be connected to a hi server.

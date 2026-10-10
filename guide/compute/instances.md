@@ -21,7 +21,7 @@ hi compute up --gpu T4 --name box --max 2h
 | `--image <image>`  | Container image (Hugging Face); default `python:3.12` on CPU and `pytorch/pytorch:2.6.0-cuda12.4-cudnn9-devel` on GPU |
 | `--high-mem`       | High-RAM machine for `cpu`, `T4`, or `A100` (Colab Pro)        |
 | `--namespace <ns>` | Bill this Hugging Face account                                |
-| `--data <org>/<name>` | The team's data on the machine through the hi server (RunPod, Shadeform); see [On a machine you SSH into](/guide/data/#on-a-machine-you-ssh-into) |
+| `--data <org>/<name>` | Your team's data on the machine through the hi server (RunPod, Shadeform); see [On a machine you SSH into](/guide/data/#on-a-machine-you-ssh-into) |
 
 ## Open a shell
 
