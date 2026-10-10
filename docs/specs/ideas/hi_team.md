@@ -111,8 +111,10 @@ works. Getting there:
    passes. No person reviews code. `main` is always deployable.
 5. **Preview.** Devops deploys `main` to the team's preview app, and the
    lead asks the people to try the acceptance list there, with a link.
-6. **Live.** When the people say it works (or, for small fixes, when the
-   lead decides it may), devops deploys to the live app. Every live deploy
+6. **Live.** When the people say it works, devops deploys to the live
+   app. Small fixes (a typo, a broken button, a wrong label) go live without
+   waiting: the lead decides what is small, deploys, and tells the channel
+   what changed. Every live deploy
    is a release with a number, and a snapshot is taken first (below).
 7. **Done, or a bug.** The lead marks the feature done in its notes. A bug
    found later by a person, the lead, or the reviewer becomes a new task
@@ -186,7 +188,8 @@ hi team remove <name>           delete the team (asks; offers a last export)
    outside the boxes, through the proxy.
 7. **Code.** A new repository, or an existing one and a token limited to
    it.
-8. **Backups.** Where offsite snapshots go, and how long to keep them.
+8. **Backups.** The S3-compatible bucket offsite snapshots go to (its
+   endpoint, bucket, and keys, without echo), and how long to keep them.
 9. **Budget.** Dollars a month; the lead stops starting tasks when it is
    spent and says so in the channel.
 
@@ -204,11 +207,14 @@ At the end hi prints what it set up and the one line to start it.
   with a worktree of `repo/`.
 - **A broker on the host** is the lead's only way to start member boxes:
   a socket in the lead's box that accepts "run this brief as this role",
-  "status", "report", and "stop". hi checks the role, the budget, and how
-  many tasks may run at once, then starts the box. The lead never holds
+  "status", "report", and "stop". hi checks the role and the budget, then
+  starts the box. hi sets no limit on how many boxes run at once; capacity
+  is up to whoever runs the host. The lead never holds
   Claude, Codex, or GitHub credentials.
-- **The app** runs in boxes of its own: preview and live, reachable over
-  NetBird, or on a public address when the team allows it.
+- **The app** runs in boxes of its own on the team's host: preview and
+  live, reachable over NetBird, or on a public address when the team allows
+  it. It stays on the host until someone running the host decides to move
+  it.
 - **Staying up.** `hi team up` installs a systemd user unit for the team,
   so it starts at boot and restarts after a crash, as `hi server` does.
 
@@ -232,8 +238,8 @@ A team has three kinds of state, each kept differently:
 A snapshot is consistent: SQLite files are copied with SQLite's backup API
 and app databases with their own dump, not as raw files while running.
 Snapshots are encrypted and deduplicated (restic, or an equivalent hi
-ships), kept on the host and copied offsite to the place chosen in the
-wizard.
+ships), kept on the host and copied offsite to the S3-compatible bucket chosen
+in the wizard.
 
 Not per commit: commits to `main` are already kept by git, and the app's
 data changes on its own schedule, so the snapshots that matter are before
@@ -276,14 +282,3 @@ preview and live app boxes, snapshots and rollback, and export and import.
 memory in the folder, and the coder and reviewer through the broker,
 merging to `main`. Then the app's preview and live boxes, then snapshots
 and rollback, then export and import.
-
-## Open questions
-
-- Where do the preview and live apps run: always on the team's host, or
-  may devops deploy elsewhere?
-- Should small fixes go live without the people's OK, and who decides what
-  is small?
-- Offsite snapshots: another host over NetBird, an S3-compatible bucket, or
-  your team's hi server?
-- Capacity is left to IT; should hi still cap how many member boxes all
-  teams on a host may run at once?
